@@ -1,5 +1,7 @@
 # .NET FHIR Resource Mapper
 
+NOTE: This library is still under development. 
+
 ## Overview
 
 This is an implementation of resource mapping parts of the FHIR [Structured Data Capture](https://hl7.org/fhir/uv/sdc/index.html) specification, ([Data Extraction](https://hl7.org/fhir/uv/sdc/extraction.html) and [Automatic Population](https://hl7.org/fhir/uv/sdc/populate.html)), using types supplied from the [Firely SDK](https://github.com/FirelyTeam/firely-net-sdk).
@@ -16,9 +18,7 @@ The library should be able to populate `QuestionnareResponse` based on a given `
 
 ### Extraction
 
-The population functionality should follow the FHIR SDC [specification](https://hl7.org/fhir/uv/sdc/extract.html), but at this point only [definition-based](https://hl7.org/fhir/uv/sdc/extraction.html#definition-based-extraction) extraction is implemented.
-
-The Extract resources from a `QuestionnaireResource` based on a given `Questionnaire`.
+The extraction functionality should follow the FHIR SDC [specification](https://hl7.org/fhir/uv/sdc/extract.html), but at this point only [definition-based](https://hl7.org/fhir/uv/sdc/extraction.html#definition-based-extraction) extraction is implemented.
 
 The library should be able to extract FHIR resources from a `QuestionnareResponse` based on a given `Questionnaire`.
 
