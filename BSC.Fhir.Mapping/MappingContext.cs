@@ -4,15 +4,36 @@ using Hl7.Fhir.Model;
 
 namespace BSC.Fhir.Mapping;
 
-public class MappingContext : IDictionary<string, Base[]>
+public class ContextValue
 {
-    private readonly Dictionary<string, Base[]> _namedExpressions = new();
-    private readonly Stack<Base> _context = new();
+    public Base[] Value { get; set; }
+    public Type ValueType { get; set; }
+    public string? Name { get; set; }
 
-    public Base? CurrentContext => _context.TryPeek(out var context) ? context : null;
+    public ContextValue(Base[] value, Type valueType, string? name = null)
+    {
+        Value = value;
+        ValueType = valueType;
+        Name = name;
+    }
+
+    public ContextValue(Base value, Type valueType, string? name = null)
+    {
+        Value = new[] { value };
+        ValueType = valueType;
+        Name = name;
+    }
+}
+
+public class MappingContext : IDictionary<string, ContextValue>
+{
+    private readonly Dictionary<string, ContextValue> _namedExpressions = new();
+    private readonly Stack<ContextValue> _context = new();
+
+    public Base? CurrentContext => _context.TryPeek(out var context) ? context.Value.First() : null;
     public Questionnaire? Questionnaire { get; set; }
 
-    public Base[] this[string key]
+    public ContextValue this[string key]
     {
         get => _namedExpressions[key];
         set => _namedExpressions[key] = value;
@@ -20,7 +41,7 @@ public class MappingContext : IDictionary<string, Base[]>
 
     public void SetCurrentContext(Base context)
     {
-        _context.Push(context);
+        _context.Push(new(context, context.GetType()));
     }
 
     public void RemoveContext()
@@ -30,21 +51,20 @@ public class MappingContext : IDictionary<string, Base[]>
 
     public ICollection<string> Keys => _namedExpressions.Keys;
 
-    public ICollection<Base[]> Values => _namedExpressions.Values;
+    public ICollection<ContextValue> Values => _namedExpressions.Values;
 
-    public int Count => ((ICollection<KeyValuePair<string, Base[]>>)_namedExpressions).Count;
+    public int Count => ((ICollection<KeyValuePair<string, ContextValue>>)_namedExpressions).Count;
 
-    public bool IsReadOnly =>
-        ((ICollection<KeyValuePair<string, Base[]>>)_namedExpressions).IsReadOnly;
+    public bool IsReadOnly => ((ICollection<KeyValuePair<string, ContextValue>>)_namedExpressions).IsReadOnly;
 
-    public void Add(string key, Base[] value)
+    public void Add(string key, ContextValue value)
     {
         _namedExpressions.Add(key, value);
     }
 
-    public void Add(KeyValuePair<string, Base[]> item)
+    public void Add(KeyValuePair<string, ContextValue> item)
     {
-        ((ICollection<KeyValuePair<string, Base[]>>)_namedExpressions).Add(item);
+        ((ICollection<KeyValuePair<string, ContextValue>>)_namedExpressions).Add(item);
     }
 
     public void Clear()
@@ -52,9 +72,9 @@ public class MappingContext : IDictionary<string, Base[]>
         _namedExpressions.Clear();
     }
 
-    public bool Contains(KeyValuePair<string, Base[]> item)
+    public bool Contains(KeyValuePair<string, ContextValue> item)
     {
-        return ((ICollection<KeyValuePair<string, Base[]>>)_namedExpressions).Contains(item);
+        return ((ICollection<KeyValuePair<string, ContextValue>>)_namedExpressions).Contains(item);
     }
 
     public bool ContainsKey(string key)
@@ -62,14 +82,14 @@ public class MappingContext : IDictionary<string, Base[]>
         return _namedExpressions.ContainsKey(key);
     }
 
-    public void CopyTo(KeyValuePair<string, Base[]>[] array, int arrayIndex)
+    public void CopyTo(KeyValuePair<string, ContextValue>[] array, int arrayIndex)
     {
-        ((ICollection<KeyValuePair<string, Base[]>>)_namedExpressions).CopyTo(array, arrayIndex);
+        ((ICollection<KeyValuePair<string, ContextValue>>)_namedExpressions).CopyTo(array, arrayIndex);
     }
 
-    public IEnumerator<KeyValuePair<string, Base[]>> GetEnumerator()
+    public IEnumerator<KeyValuePair<string, ContextValue>> GetEnumerator()
     {
-        return ((IEnumerable<KeyValuePair<string, Base[]>>)_namedExpressions).GetEnumerator();
+        return ((IEnumerable<KeyValuePair<string, ContextValue>>)_namedExpressions).GetEnumerator();
     }
 
     public bool Remove(string key)
@@ -77,12 +97,12 @@ public class MappingContext : IDictionary<string, Base[]>
         return _namedExpressions.Remove(key);
     }
 
-    public bool Remove(KeyValuePair<string, Base[]> item)
+    public bool Remove(KeyValuePair<string, ContextValue> item)
     {
-        return ((ICollection<KeyValuePair<string, Base[]>>)_namedExpressions).Remove(item);
+        return ((ICollection<KeyValuePair<string, ContextValue>>)_namedExpressions).Remove(item);
     }
 
-    public bool TryGetValue(string key, [MaybeNullWhen(false)] out Base[] value)
+    public bool TryGetValue(string key, [MaybeNullWhen(false)] out ContextValue value)
     {
         return _namedExpressions.TryGetValue(key, out value);
     }

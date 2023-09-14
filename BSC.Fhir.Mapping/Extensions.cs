@@ -1,7 +1,6 @@
 using System.Collections;
 using System.Reflection;
 using Hl7.Fhir.Model;
-using Hl7.Fhir.Serialization;
 using Hl7.Fhir.Utility;
 
 namespace BSC.Fhir.Mapping;
@@ -15,42 +14,42 @@ public static class MappingExtenstions
     private const string ITEM_POPULATION_CONTEXT_EXTENSION_URL =
         "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-itemPopulationContext";
 
-    public static string? ItemExtractionContextExtractionValue(
-        this IEnumerable<Extension> extensions
-    )
+    public static DataType? ItemExtractionContextExtractionValue(this IEnumerable<Extension> extensions)
     {
-        var extension = extensions.FirstOrDefault(
-            e => e.Url == ITEM_EXTRACTION_CONTEXT_EXTENSION_URL
-        );
+        var extension = extensions.SingleOrDefault(e => e.Url == ITEM_EXTRACTION_CONTEXT_EXTENSION_URL);
 
-        return extension?.Value switch
-        {
-            Expression expression => expression.Expression_,
-            Code code => code.Value,
-            _ => null
-        };
+        return extension?.Value;
     }
 
-    public static Resource? CreateResource(this Questionnaire questionnaire)
+    public static Resource? CreateResource(this Questionnaire questionnaire, MappingContext ctx)
     {
         var extensionValue = questionnaire.Extension.ItemExtractionContextExtractionValue();
-        if (string.IsNullOrEmpty(extensionValue))
+
+        if (extensionValue is not Expression expression)
         {
             return null;
         }
 
-        return CreateResourceFromExtension(extensionValue);
+        var resource = CreateResourceFromExtension(expression.Expression_);
+
+        if (resource is not null && !string.IsNullOrEmpty(expression.Name))
+        {
+            ctx.Add(expression.Name, new ContextValue(resource, resource.GetType(), expression.Name));
+        }
+
+        return resource;
     }
 
-    public static Resource? CreateResource(this Questionnaire.ItemComponent item)
+    public static Resource? CreateResource(this Questionnaire.ItemComponent item, MappingContext ctx)
     {
         var extensionValue = item.Extension.ItemExtractionContextExtractionValue();
-        if (string.IsNullOrEmpty(extensionValue))
+
+        if (extensionValue is not Expression expression)
         {
             return null;
         }
 
-        return CreateResourceFromExtension(extensionValue);
+        return CreateResourceFromExtension(expression.Expression_);
     }
 
     private static Resource? CreateResourceFromExtension(string extensionValue)
@@ -150,18 +149,14 @@ public static class MappingExtenstions
         }
     }
 
-    public static IReadOnlyCollection<Expression> GetPopulationContextExpressions(
-        this Questionnaire questionnaire
-    )
+    public static IReadOnlyCollection<Expression> GetPopulationContextExpressions(this Questionnaire questionnaire)
     {
         var expression =
             questionnaire.Extension
                 .FirstOrDefault(extension => extension.Url == ITEM_POPULATION_CONTEXT_EXTENSION_URL)
                 ?.Value as Expression;
 
-        var nestedExpessions = questionnaire.Item
-            .SelectMany(item => item.GetPopulationContextExpressions())
-            .ToArray();
+        var nestedExpessions = questionnaire.Item.SelectMany(item => item.GetPopulationContextExpressions()).ToArray();
 
         if (expression is null)
         {
