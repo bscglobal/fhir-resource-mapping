@@ -39,10 +39,7 @@ public static class QuestionnaireItemComponentExtensions
     {
         if (
             questionnaireItem.Initial.Count == 0
-            || (
-                questionnaireItem.GetInitialFirstRep().Value is Quantity quantity
-                && quantity.Value is null
-            )
+            || (questionnaireItem.GetInitialFirstRep().Value is Quantity quantity && quantity.Value is null)
         )
         {
             return null;
@@ -70,9 +67,7 @@ public static class QuestionnaireItemComponentExtensions
             .ToList();
     }
 
-    public static Questionnaire.InitialComponent GetInitialFirstRep(
-        this Questionnaire.ItemComponent questionnaireItem
-    )
+    public static Questionnaire.InitialComponent GetInitialFirstRep(this Questionnaire.ItemComponent questionnaireItem)
     {
         Questionnaire.InitialComponent t;
         if (questionnaireItem.Initial.Count == 0)
@@ -88,9 +83,7 @@ public static class QuestionnaireItemComponentExtensions
         return t;
     }
 
-    public static bool ShouldHaveNestedItemsUnderAnswers(
-        this Questionnaire.ItemComponent questionnaireItem
-    )
+    public static bool ShouldHaveNestedItemsUnderAnswers(this Questionnaire.ItemComponent questionnaireItem)
     {
         return questionnaireItem.Item.Count > 0
             && (
@@ -136,52 +129,6 @@ public static class QuestionnaireItemComponentExtensions
             return null;
         }
 
-        Base[]? result = null;
-        if (expression.Expression_.StartsWith("%"))
-        {
-            if (expression.Expression_.StartsWith("%resource"))
-            {
-                if (context.Questionnaire is null)
-                {
-                    throw new ArgumentException("Questionnaire in MappingContext is null");
-                }
-
-                result = FhirPathExtensions
-                    .Select(context.Questionnaire, expression.Expression_)
-                    .ToArray();
-            }
-            else
-            {
-                var expressionParts = expression.Expression_.Split('.');
-                var variableName = expressionParts.First()[1..];
-
-                if (!context.TryGetValue(variableName, out var variable))
-                {
-                    throw new InvalidOperationException(
-                        $"Variable in Questionnaire with name '{variableName}' does not exist."
-                    );
-                }
-
-                if (variable.Length == 0 || variable.Length > 1)
-                {
-                    throw new InvalidOperationException(
-                        $"Cannot use variable with any number of items other than 1. variableName: {variableName}"
-                    );
-                }
-
-                expressionParts[0] = "%resource";
-                var expr = string.Join('.', expressionParts);
-
-                result = FhirPathExtensions.Select(variable.First(), expr).ToArray();
-            }
-        }
-        else if (context.CurrentContext is not null)
-        {
-            result = FhirPathExtensions
-                .Select(context.CurrentContext, expression.Expression_)
-                .ToArray();
-        }
-
-        return result;
+        return FhirPathMapping.EvaluateExpr(expression.Expression_, context);
     }
 }

@@ -7,6 +7,7 @@
 
 using System.Reflection;
 using Hl7.Fhir.Model;
+using Hl7.Fhir.Serialization;
 using FhirPath = Hl7.Fhir.FhirPath;
 
 namespace BSC.Fhir.Mapping;
@@ -29,19 +30,14 @@ public static class ResourceMapper
     )
     {
         extractionContext.Questionnaire = questionnaire;
-        var rootResource = questionnaire.CreateResource();
+        var rootResource = questionnaire.CreateResource(extractionContext);
         var extractedResources = new List<Resource>();
         if (rootResource is not null)
         {
             extractionContext.SetCurrentContext(rootResource);
         }
 
-        ExtractByDefinition(
-            questionnaire.Item,
-            questionnaireResponse.Item,
-            extractionContext,
-            extractedResources
-        );
+        ExtractByDefinition(questionnaire.Item, questionnaireResponse.Item, extractionContext, extractedResources);
 
         if (rootResource is not null)
         {
@@ -53,9 +49,7 @@ public static class ResourceMapper
         return new Bundle
         {
             Type = Bundle.BundleType.Transaction,
-            Entry = extractedResources
-                .Select(resource => new Bundle.EntryComponent { Resource = resource })
-                .ToList()
+            Entry = extractedResources.Select(resource => new Bundle.EntryComponent { Resource = resource }).ToList()
         };
     }
 
@@ -67,21 +61,15 @@ public static class ResourceMapper
     )
     {
         var questionnaireItemsEnumarator = questionnaireItems.AsEnumerable().GetEnumerator();
-        var questionnaireResponseItemsEnumarator = questionnaireResponseItems
-            .AsEnumerable()
-            .GetEnumerator();
+        var questionnaireResponseItemsEnumarator = questionnaireResponseItems.AsEnumerable().GetEnumerator();
 
-        while (
-            questionnaireItemsEnumarator.MoveNext()
-            && questionnaireResponseItemsEnumarator.MoveNext()
-        )
+        while (questionnaireItemsEnumarator.MoveNext() && questionnaireResponseItemsEnumarator.MoveNext())
         {
             var currentResponseItem = questionnaireResponseItemsEnumarator.Current;
             var currentQuestionnaireItem = questionnaireItemsEnumarator.Current;
 
             while (
-                currentQuestionnaireItem.LinkId != currentResponseItem.LinkId
-                && questionnaireItemsEnumarator.MoveNext()
+                currentQuestionnaireItem.LinkId != currentResponseItem.LinkId && questionnaireItemsEnumarator.MoveNext()
             )
             {
                 currentQuestionnaireItem = questionnaireItemsEnumarator.Current;
@@ -89,12 +77,7 @@ public static class ResourceMapper
 
             if (currentQuestionnaireItem.LinkId == currentResponseItem.LinkId)
             {
-                ExtractByDefinition(
-                    currentQuestionnaireItem,
-                    currentResponseItem,
-                    extractionContext,
-                    extractionResult
-                );
+                ExtractByDefinition(currentQuestionnaireItem, currentResponseItem, extractionContext, extractionResult);
             }
         }
     }
@@ -151,11 +134,7 @@ public static class ResourceMapper
                 );
             }
 
-            ExtractPrimitiveTypeValueByDefinition(
-                questionnaireItem,
-                questionnaireResponseItem,
-                extractionContext
-            );
+            ExtractPrimitiveTypeValueByDefinition(questionnaireItem, questionnaireResponseItem, extractionContext);
         }
     }
 
@@ -166,13 +145,11 @@ public static class ResourceMapper
         List<Resource> extractionResult
     )
     {
-        var resource = questionnaireItem.CreateResource();
+        var resource = questionnaireItem.CreateResource(extractionContext);
 
         if (resource is null)
         {
-            throw new InvalidOperationException(
-                "Unable to create a resource from questionnaire item"
-            );
+            throw new InvalidOperationException("Unable to create a resource from questionnaire item");
         }
 
         extractionContext.SetCurrentContext(resource);
@@ -197,10 +174,7 @@ public static class ResourceMapper
     {
         if (extractionContext.CurrentContext is null)
         {
-            throw new ArgumentException(
-                "ExtractionContext.CurrentContext is null",
-                nameof(extractionContext)
-            );
+            throw new ArgumentException("ExtractionContext.CurrentContext is null", nameof(extractionContext));
         }
 
         var fieldName = FieldNameByDefinition(questionnaireItem.Definition);
@@ -208,7 +182,9 @@ public static class ResourceMapper
 
         if (fieldInfo is null)
         {
-            throw new InvalidOperationException($"No property {fieldName} on Resource");
+            throw new InvalidOperationException(
+                $"No property {fieldName} on {extractionContext.CurrentContext.GetType().ToString()}"
+            );
         }
 
         var type = fieldInfo.NonParameterizedType();
@@ -248,10 +224,7 @@ public static class ResourceMapper
     {
         if (context.CurrentContext is null)
         {
-            throw new ArgumentException(
-                "ExtractionContext.CurrentContext is null",
-                nameof(context)
-            );
+            throw new ArgumentException("ExtractionContext.CurrentContext is null", nameof(context));
         }
 
         if (questionnaireResponseItem.Answer.Count == 0)
@@ -261,7 +234,7 @@ public static class ResourceMapper
 
         var fieldName = FieldNameByDefinition(questionnaireItem.Definition, true);
 
-        var contextType = context.GetType();
+        var contextType = context.CurrentContext.GetType();
         var field = contextType.GetProperty(fieldName);
 
         if (field is null)
@@ -276,11 +249,7 @@ public static class ResourceMapper
         {
             if (field.NonParameterizedType().IsEnum)
             {
-                UpdateFieldWithEnum(
-                    context.CurrentContext,
-                    field,
-                    questionnaireResponseItem.Answer.First().Value
-                );
+                UpdateFieldWithEnum(context.CurrentContext, field, questionnaireResponseItem.Answer.First().Value);
             }
             else
             {
@@ -300,16 +269,10 @@ public static class ResourceMapper
             ?.SetValue(context, questionnaireResponseItem.Answer.SingleOrDefault()?.Value);
     }
 
-    private static void UpdateField(
-        Base resource,
-        PropertyInfo field,
-        IEnumerable<DataType> answers
-    )
+    private static void UpdateField(Base resource, PropertyInfo field, IEnumerable<DataType> answers)
     {
         var fieldType = field.PropertyType;
-        var answersOfFieldType = answers
-            .Select(ans => WrapAnswerInFieldType(ans, fieldType))
-            .ToArray();
+        var answersOfFieldType = answers.Select(ans => WrapAnswerInFieldType(ans, fieldType)).ToArray();
 
         if (field.IsParameterized() && fieldType.IsNonStringEnumerable())
         {
@@ -321,11 +284,7 @@ public static class ResourceMapper
         }
     }
 
-    private static void SetFieldElementValue(
-        Base baseResource,
-        PropertyInfo field,
-        DataType answerValue
-    )
+    private static void SetFieldElementValue(Base baseResource, PropertyInfo field, DataType answerValue)
     {
         field.SetValue(baseResource, answerValue);
     }
@@ -368,11 +327,7 @@ public static class ResourceMapper
         field.SetValue(baseResource, Enum.Parse(fieldType, stringValue));
     }
 
-    private static DataType WrapAnswerInFieldType(
-        DataType answer,
-        Type fieldType,
-        string? system = null
-    )
+    private static DataType WrapAnswerInFieldType(DataType answer, Type fieldType, string? system = null)
     {
         var type = fieldType.NonParameterizedType();
         if (type == typeof(CodeableConcept) && answer is Coding coding)
@@ -423,25 +378,17 @@ public static class ResourceMapper
         return last;
     }
 
-    public static QuestionnaireResponse Populate(
-        Questionnaire questionnaire,
-        params Resource[] resources
-    )
+    public static QuestionnaireResponse Populate(Questionnaire questionnaire, params Resource[] resources)
     {
         PopulateInitialValues(questionnaire.Item.ToArray(), resources);
 
         return new QuestionnaireResponse
         {
-            Item = questionnaire.Item
-                .Select(item => item.CreateQuestionnaireResponseItem())
-                .ToList()
+            Item = questionnaire.Item.Select(item => item.CreateQuestionnaireResponseItem()).ToList()
         };
     }
 
-    private static void PopulateInitialValues(
-        Questionnaire.ItemComponent[] questionnaireItems,
-        Resource[] resources
-    )
+    private static void PopulateInitialValues(Questionnaire.ItemComponent[] questionnaireItems, Resource[] resources)
     {
         foreach (var item in questionnaireItems)
         {
@@ -449,10 +396,7 @@ public static class ResourceMapper
         }
     }
 
-    private static void PopulateInitalValue(
-        Questionnaire.ItemComponent questionnaireItem,
-        Resource[] resources
-    )
+    private static void PopulateInitalValue(Questionnaire.ItemComponent questionnaireItem, Resource[] resources)
     {
         var initialExpression = questionnaireItem.InitialExpression();
         if (!(questionnaireItem.Initial.Count == 0 || initialExpression is null))
@@ -464,10 +408,7 @@ public static class ResourceMapper
 
         if (initialExpression is not null)
         {
-            var populationContext = SelectPopulationContext(
-                resources,
-                initialExpression.Expression_
-            );
+            var populationContext = SelectPopulationContext(resources, initialExpression.Expression_);
             if (populationContext is null)
             {
                 return;
@@ -488,13 +429,7 @@ public static class ResourceMapper
                     },
                 true
                     => evalResult
-                        .Select(
-                            result =>
-                                new Questionnaire.InitialComponent()
-                                {
-                                    Value = result.AsExpectedType()
-                                }
-                        )
+                        .Select(result => new Questionnaire.InitialComponent() { Value = result.AsExpectedType() })
                         .ToList()
             };
         }
@@ -502,10 +437,7 @@ public static class ResourceMapper
         PopulateInitialValues(questionnaireItem.Item.ToArray(), resources);
     }
 
-    public static Resource? SelectPopulationContext(
-        IReadOnlyCollection<Resource> resources,
-        string initialExpression
-    )
+    public static Resource? SelectPopulationContext(IReadOnlyCollection<Resource> resources, string initialExpression)
     {
         var resourceType = initialExpression.Split('.').FirstOrDefault()?.TrimStart('%');
 
@@ -514,8 +446,7 @@ public static class ResourceMapper
             return null;
         }
 
-        return resources.SingleOrDefault(
-                resource => resource.TypeName.ToLower() == resourceType.ToLower()
-            ) ?? resources.FirstOrDefault();
+        return resources.SingleOrDefault(resource => resource.TypeName.ToLower() == resourceType.ToLower())
+            ?? resources.FirstOrDefault();
     }
 }
