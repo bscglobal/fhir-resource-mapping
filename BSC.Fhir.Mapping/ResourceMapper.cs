@@ -316,13 +316,31 @@ public static class ResourceMapper
             return;
         }
 
-        if (fieldName.Contains(':'))
+        var canonicalUrl = questionnaireItem.Definition.Substring(0, questionnaireItem.Definition.LastIndexOf('#'));
+        var profile = await profileLoader.LoadProfileAsync(new Canonical(canonicalUrl));
+
+        if (profile is not null)
         {
-            // TODO: Slicing
-        }
-        else
-        {
-            // TODO: check if profile contains field we are looking at and add as an extenstion on the resource
+            if (fieldName.Contains(':'))
+            {
+                // TODO: Slicing
+            }
+            else
+            {
+                var extensionForType = questionnaireItem.Definition.Substring(
+                    questionnaireItem.Definition.LastIndexOf('#') + 1,
+                    questionnaireItem.Definition.LastIndexOf('.')
+                );
+
+                if (IsExtensionSupportedByProfile(profile, extensionForType, fieldName))
+                {
+                    AddDefinitionBasedCustomExtension(
+                        questionnaireItem,
+                        questionnaireResponseItem,
+                        context.CurrentContext
+                    );
+                }
+            }
         }
     }
 
@@ -420,12 +438,13 @@ public static class ResourceMapper
 
     private static string FieldNameByDefinition(string definition, bool isElement = false)
     {
-        var last = definition.Split('.').LastOrDefault();
+        var last = definition.Substring(definition.LastIndexOf('.') + 1);
 
         if (string.IsNullOrEmpty(last))
         {
             throw new InvalidOperationException($"Invalid field definition: {definition}");
         }
+
         last = last[0..1].ToUpper() + last[1..];
         if (isElement)
         {
@@ -433,6 +452,42 @@ public static class ResourceMapper
         }
 
         return last;
+    }
+
+    private static bool IsExtensionSupportedByProfile(
+        StructureDefinition profile,
+        string extensionForType,
+        string fieldName
+    )
+    {
+        var elementDefinitions = profile.Snapshot.Element.Where(
+            element => element.Path == $"{extensionForType}.extension"
+        );
+        foreach (var definition in elementDefinitions)
+        {
+            if (definition.ElementId.Substring(definition.ElementId.LastIndexOf(':') + 1) == fieldName)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static void AddDefinitionBasedCustomExtension(
+        Questionnaire.ItemComponent questionnaireItem,
+        QuestionnaireResponse.ItemComponent questionnaireResponseItem,
+        Base baseObj
+    )
+    {
+        if (baseObj is DataType dataType)
+        {
+            dataType.AddExtension(questionnaireItem.Definition, questionnaireResponseItem.Answer.First().Value);
+        }
+        else if (baseObj is DomainResource domainResource)
+        {
+            domainResource.AddExtension(questionnaireItem.Definition, questionnaireResponseItem.Answer.First().Value);
+        }
     }
 
     public static QuestionnaireResponse Populate(Questionnaire questionnaire, params Resource[] resources)
