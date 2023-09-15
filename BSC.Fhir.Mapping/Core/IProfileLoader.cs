@@ -4,5 +4,5 @@ namespace BSC.Fhir.Mapping.Core;
 
 public interface IProfileLoader
 {
-    StructureDefinition LoadProfile(Canonical url);
+    Task<StructureDefinition?> LoadProfileAsync(Canonical url, CancellationToken cancellationToken = default);
 }
