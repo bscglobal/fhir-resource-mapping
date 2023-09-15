@@ -1,5 +1,6 @@
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
+using Task = System.Threading.Tasks.Task;
 
 namespace BSC.Fhir.Mapping.Tests;
 
@@ -17,7 +18,7 @@ public class ResourceMapperTests
     private const string VARIABLE_EXTENSION_URL = "http://hl7.org/fhir/StructureDefinition/variable";
 
     [Fact]
-    public void Extract_GivesCorrectBundle()
+    public async Task Extract_GivesCorrectBundle()
     {
         // Console.WriteLine();
         // Console.WriteLine("=================");
@@ -28,7 +29,7 @@ public class ResourceMapperTests
         var demoQuestionnaire = CreateQuestionnaire();
         var demoQuestionnaireResponse = CreateQuestionnaireResponse();
 
-        var bundle = ResourceMapper.Extract(demoQuestionnaire, demoQuestionnaireResponse, new());
+        var bundle = await ResourceMapper.Extract(demoQuestionnaire, demoQuestionnaireResponse, new());
 
         Console.WriteLine(bundle.ToJson(new FhirJsonSerializationSettings { Pretty = true }));
 
