@@ -25,7 +25,7 @@ public class ExtensionsTests
             }
         );
 
-        var resource = questionaire.CreateResource();
+        var resource = questionaire.CreateResource(new());
 
         Assert.IsType(resourceType, resource);
     }
@@ -109,11 +109,7 @@ public class ExtensionsTests
     [Fact]
     public void InitialExpression_ReturnsCorrectExpression()
     {
-        var expression = new Expression
-        {
-            Language = "text/fhirpath",
-            Expression_ = "%relative.id"
-        };
+        var expression = new Expression { Language = "text/fhirpath", Expression_ = "%relative.id" };
         var extension = new Extension { Url = ITEM_INITIAL_EXPRESSION_URL, Value = expression };
         var questionaireItem = new Questionnaire.ItemComponent { Extension = { extension } };
 

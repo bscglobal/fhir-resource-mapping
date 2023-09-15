@@ -9,14 +9,12 @@ public class ResourceMapperTests
         "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-itemExtractionContext";
     private const string ITEM_INITIAL_EXPRESSION =
         "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-initialExpression";
-    private const string QUESTIONNAIRE_HIDDEN_URL =
-        "http://hl7.org/fhir/StructureDefinition/questionnaire-hidden";
+    private const string QUESTIONNAIRE_HIDDEN_URL = "http://hl7.org/fhir/StructureDefinition/questionnaire-hidden";
     private const string ITEM_POPULATION_CONTEXT =
         "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-itemPopulationContext";
     private const string QUESTIONNAIRE_ITEM_CALCULATED_EXPRESSION =
         "http://hl7.org/fhir/uv/sdc/StructureDefinition-sdc-questionnaire-calculatedExpression.html";
-    private const string VARIABLE_EXTENSION_URL =
-        "http://hl7.org/fhir/StructureDefinition/variable";
+    private const string VARIABLE_EXTENSION_URL = "http://hl7.org/fhir/StructureDefinition/variable";
 
     [Fact]
     public void Extract_GivesCorrectBundle()
@@ -32,7 +30,7 @@ public class ResourceMapperTests
 
         var bundle = ResourceMapper.Extract(demoQuestionnaire, demoQuestionnaireResponse, new());
 
-        // Console.WriteLine(bundle.ToJson(new FhirJsonSerializationSettings { Pretty = true }));
+        Console.WriteLine(bundle.ToJson(new FhirJsonSerializationSettings { Pretty = true }));
 
         Assert.True(true);
     }
@@ -134,10 +132,7 @@ public class ResourceMapperTests
                 ?.Item.SingleOrDefault(item => item.LinkId == "relative.relationship")
                 ?.Answer.FirstOrDefault()
                 ?.Value as Coding;
-        Assert.Equivalent(
-            relative.Relationship.First().Coding.First(),
-            actualRelativeRelationshipAnswer
-        );
+        Assert.Equivalent(relative.Relationship.First().Coding.First(), actualRelativeRelationshipAnswer);
 
         var actualRelativeFamilyNameAnswer = response.Item
             .SingleOrDefault(item => item.LinkId == "relative")
@@ -162,10 +157,10 @@ public class ResourceMapperTests
         var composition = CreateGeneralNoteComposition();
         var documentReference = CreateGeneralNoteDocumentReference();
 
-        var response = ResourceMapper.Populate(questionnaire, documentReference, composition);
+        // var response = ResourceMapper.Populate(questionnaire, documentReference, composition);
 
         // Console.WriteLine(questionnaire.ToJson(new() { Pretty = true }));
-        Console.WriteLine(response.ToJson(new() { Pretty = true }));
+        // Console.WriteLine(response.ToJson(new() { Pretty = true }));
     }
 
     [Fact]
@@ -174,9 +169,9 @@ public class ResourceMapperTests
         var questionnaire = CreateGeneralNoteQuestionnaire();
         var response = CreateGeneralNoteQuestionnaireResponse();
 
-        var extractionResult = ResourceMapper.Extract(questionnaire, response, new());
+        // var extractionResult = ResourceMapper.Extract(questionnaire, response, new());
 
-        Console.WriteLine(extractionResult.ToJson(new() { Pretty = true }));
+        // Console.WriteLine(extractionResult.ToJson(new() { Pretty = true }));
     }
 
     private static Questionnaire CreateGeneralNoteQuestionnaire()
@@ -197,8 +192,7 @@ public class ResourceMapperTests
                     {
                         Name = "compositionId",
                         Language = "text/fhirpath",
-                        Expression_ =
-                            "%resource.item.where(linkId = 'compostion.id').first().answer"
+                        Expression_ = "%resource.item.where(linkId = 'compostion.id').first().answer"
                     }
                 },
                 new Extension
@@ -235,11 +229,7 @@ public class ResourceMapperTests
                         new()
                         {
                             Url = ITEM_INITIAL_EXPRESSION,
-                            Value = new Expression
-                            {
-                                Language = "text/fhirpath",
-                                Expression_ = "%composition.id"
-                            }
+                            Value = new Expression { Language = "text/fhirpath", Expression_ = "%composition.id" }
                         },
                         new() { Url = QUESTIONNAIRE_HIDDEN_URL, Value = new FhirBoolean(true) }
                     }
@@ -248,19 +238,20 @@ public class ResourceMapperTests
                 {
                     LinkId = "noteSection",
                     Type = Questionnaire.QuestionnaireItemType.Group,
-                    Extension =
-                    {
-                        new()
-                        {
-                            Url = ITEM_EXTRACTION_CONTEXT_EXTENSION_URL,
-                            Value = new Expression
-                            {
-                                Name = "imagesSection",
-                                Language = "text/fhirpath",
-                                Expression_ = "%composition.section.where(title = 'Note')"
-                            }
-                        }
-                    },
+                    Definition = "Composition.section",
+                    // Extension =
+                    // {
+                    //     new()
+                    //     {
+                    //         Url = ITEM_EXTRACTION_CONTEXT_EXTENSION_URL,
+                    //         Value = new Expression
+                    //         {
+                    //             Name = "noteSection",
+                    //             Language = "text/fhirpath",
+                    //             Expression_ = "%composition.section.where(title = 'Note')"
+                    //         }
+                    //     }
+                    // },
                     Item =
                     {
                         new()
@@ -270,11 +261,7 @@ public class ResourceMapperTests
                             Type = Questionnaire.QuestionnaireItemType.Reference,
                             Extension =
                             {
-                                new()
-                                {
-                                    Url = QUESTIONNAIRE_HIDDEN_URL,
-                                    Value = new FhirBoolean(true)
-                                },
+                                new() { Url = QUESTIONNAIRE_HIDDEN_URL, Value = new FhirBoolean(true) },
                                 new()
                                 {
                                     Url = QUESTIONNAIRE_ITEM_CALCULATED_EXPRESSION,
@@ -318,11 +305,7 @@ public class ResourceMapperTests
                             ReadOnly = true,
                             Extension =
                             {
-                                new()
-                                {
-                                    Url = QUESTIONNAIRE_HIDDEN_URL,
-                                    Value = new FhirBoolean(true)
-                                }
+                                new() { Url = QUESTIONNAIRE_HIDDEN_URL, Value = new FhirBoolean(true) }
                             }
                         },
                         new()
@@ -336,17 +319,9 @@ public class ResourceMapperTests
                                 new()
                                 {
                                     Url = QUESTIONNAIRE_ITEM_CALCULATED_EXPRESSION,
-                                    Value = new Expression
-                                    {
-                                        Language = "text/fhirpath",
-                                        Expression_ = "%patient.id"
-                                    }
+                                    Value = new Expression { Language = "text/fhirpath", Expression_ = "%patient.id" }
                                 },
-                                new()
-                                {
-                                    Url = QUESTIONNAIRE_HIDDEN_URL,
-                                    Value = new FhirBoolean(true)
-                                }
+                                new() { Url = QUESTIONNAIRE_HIDDEN_URL, Value = new FhirBoolean(true) }
                             }
                         },
                         new()
@@ -385,11 +360,7 @@ public class ResourceMapperTests
                                     }
                                 },
                                 new() { Url = "allow-duplicates", Value = new FhirBoolean(false) },
-                                new()
-                                {
-                                    Url = QUESTIONNAIRE_HIDDEN_URL,
-                                    Value = new FhirBoolean(true)
-                                }
+                                new() { Url = QUESTIONNAIRE_HIDDEN_URL, Value = new FhirBoolean(true) }
                             }
                         },
                     }
@@ -409,8 +380,7 @@ public class ResourceMapperTests
                             {
                                 Name = "images",
                                 Language = "application/x-fhir-query",
-                                Expression_ =
-                                    "DocumentReference?_has:Composition:entry:_id={{%compositionId}}"
+                                Expression_ = "DocumentReference?_has:Composition:entry:_id={{%compositionId}}"
                             }
                         }
                     },
@@ -424,11 +394,7 @@ public class ResourceMapperTests
                             Type = Questionnaire.QuestionnaireItemType.String,
                             Extension =
                             {
-                                new()
-                                {
-                                    Url = QUESTIONNAIRE_HIDDEN_URL,
-                                    Value = new FhirBoolean(true)
-                                },
+                                new() { Url = QUESTIONNAIRE_HIDDEN_URL, Value = new FhirBoolean(true) },
                             }
                         },
                         new()
@@ -447,11 +413,7 @@ public class ResourceMapperTests
                                         Expression_ = "%practitioner.id"
                                     }
                                 },
-                                new()
-                                {
-                                    Url = QUESTIONNAIRE_HIDDEN_URL,
-                                    Value = new FhirBoolean(true)
-                                }
+                                new() { Url = QUESTIONNAIRE_HIDDEN_URL, Value = new FhirBoolean(true) }
                             },
                         },
                         new()
@@ -465,17 +427,9 @@ public class ResourceMapperTests
                                 new()
                                 {
                                     Url = QUESTIONNAIRE_ITEM_CALCULATED_EXPRESSION,
-                                    Value = new Expression
-                                    {
-                                        Language = "text/fhirpath",
-                                        Expression_ = "%patient.id"
-                                    }
+                                    Value = new Expression { Language = "text/fhirpath", Expression_ = "%patient.id" }
                                 },
-                                new()
-                                {
-                                    Url = QUESTIONNAIRE_HIDDEN_URL,
-                                    Value = new FhirBoolean(true)
-                                }
+                                new() { Url = QUESTIONNAIRE_HIDDEN_URL, Value = new FhirBoolean(true) }
                             },
                         }
                     }
@@ -490,137 +444,66 @@ public class ResourceMapperTests
     {
         var json = """
             {
-              "resourceType": "QuestionnaireResponse",
-              "item": [
-                {
-                  "linkId": "composition.id",
-                  "answer": [
+                "resourceType": "QuestionnaireResponse",
+                "item": [
                     {
-                      "valueString": "2e100b95-aa0b-42f0-b129-b648383638ac"
-                    }
-                  ]
-                },
-                {
-                  "linkId": "composition.author",
-                  "answer": [
-                    {
-                      "valueReference": {
-                        "reference": "Practitioner/4b27680a-fcfb-4bb3-9e48-3ddd6676fae0"
-                      }
-                    }
-                  ]
-                },
-                {
-                  "linkId": "composition.subject",
-                  "answer": [
-                    {
-                      "valueReference": {
-                        "reference": "Patient/ff7da964-9829-4758-8cf1-91c15ad38c8b"
-                      }
-                    }
-                  ]
-                },
-                {
-                  "linkId": "composition.type",
-                  "answer": [
-                    {
-                      "valueCoding": {
-                        "system": "http://loinc.org",
-                        "code": "34109-9"
-                      }
-                    }
-                  ]
-                },
-                {
-                  "linkId": "composition.date",
-                  "answer": [
-                    {
-                      "valueDateTime": "2023-07-25T07:52:58+00:00"
-                    }
-                  ]
-                },
-                {
-                  "linkId": "composition.section",
-                  "item": [
-                    {
-                      "linkId": "composition.section.title.images",
+                      "linkId": "composition.id",
                       "answer": [
                         {
-                          "valueString": "Images"
+                          "valueString": "2e100b95-aa0b-42f0-b129-b648383638ac"
                         }
                       ]
                     },
                     {
-                      "linkId": "composition.section.entry.images",
-                      "answer": [
-                        {
-                          "valueReference": {
-                            "reference": "DocumentReference/d1c8b7d9-9fbb-40aa-8492-68055ca96383"
-                          }
-                        }
-                      ]
-                    },
-                    {
-                      "linkId": "composition.section.title.notes",
-                      "answer": [
-                        {
-                          "valueString": "Notes"
-                        }
-                      ]
-                    },
-                    {
-                      "linkId": "composition.section.entry.notes",
-                      "answer": [
-                        {
-                          "valueReference": {
-                            "reference": "DocumentReference/28dae626-f92c-4401-9ce1-b5acbc0dc11a"
-                          }
-                        }
-                      ]
-                    }
-                  ]
-                },
-                {
-                  "linkId": "documentReference",
-                  "item": [
-                    {
-                      "linkId": "documentReference.id",
-                      "answer": [
-                        {
-                          "valueString": "28dae626-f92c-4401-9ce1-b5acbc0dc11a"
-                        }
-                      ]
-                    },
-                    {
-                      "linkId": "documentReference.content",
+                      "linkId": "noteSection",
                       "item": [
                         {
-                          "linkId": "documentReference.content.attachment",
-                          "answer": [
-                            {
-                              "valueAttachment": {
-                                "contentType": "text/plain; charset=utf-8",
-                                "data": "VkdocGN5QnBjeUJoSUdkbGJtVnlZV3dnYm05MFpRPT0="
-                              }
-                            }
-                          ]
+                          "linkId": "noteSection.entry",
+                          "answer": {
+                            "valueString": "hello"
+                          }
                         }
                       ]
                     },
                     {
-                      "linkId": "documentReference.author",
-                      "answer": [
+                      "linkId": "noteDocumentReference",
+                      "item": [
                         {
-                          "valueReference": {
-                            "reference": "Practitioner/4b27680a-fcfb-4bb3-9e48-3ddd6676fae0"
-                          }
+                          "linkId": "note.id"
+                        },
+                        {
+                          "linkId": "note.subject"
+                        },
+                        {
+                          "linkId": "note.content",
+                          "item": [
+                            {
+                              "linkId": "documentReference.content.attachment"
+                            }
+                          ]
+                        },
+                        {
+                          "linkId": "note.author"
+                        }
+                      ]
+                    },
+                    {
+                      "linkId": "images",
+                      "item": [
+                        {
+                          "linkId": "image.id"
+                        },
+                        {
+                          "linkId": "image.author"
+                        },
+                        {
+                          "linkId": "image.subject"
                         }
                       ]
                     }
-                  ]
-                }
-              ]
+                ]
             }
+
 """;
 
         var parser = new FhirJsonParser();
@@ -1076,13 +959,7 @@ public class ResourceMapperTests
                 {
                     LinkId = "patient.id",
                     Definition = "Patient.id",
-                    Answer =
-                    {
-                        new QuestionnaireResponse.AnswerComponent
-                        {
-                            Value = new FhirString(patientId)
-                        }
-                    }
+                    Answer = { new QuestionnaireResponse.AnswerComponent { Value = new FhirString(patientId) } }
                 },
                 new()
                 {
@@ -1133,10 +1010,7 @@ public class ResourceMapperTests
                         {
                             LinkId = "relative.patient",
                             Definition = "RelatedPerson.patient",
-                            Answer =
-                            {
-                                new() { Value = new ResourceReference($"Patient/{patientId}") }
-                            }
+                            Answer = { new() { Value = new ResourceReference($"Patient/{patientId}") } }
                         },
                         new()
                         {
@@ -1149,8 +1023,7 @@ public class ResourceMapperTests
                                 {
                                     Value = new Coding
                                     {
-                                        System =
-                                            "http://hl7.org/fhir/ValueSet/relatedperson-relationshiptype",
+                                        System = "http://hl7.org/fhir/ValueSet/relatedperson-relationshiptype",
                                         Code = "NOK",
                                         Display = "next of kin"
                                     }

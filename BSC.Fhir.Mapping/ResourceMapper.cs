@@ -6,6 +6,7 @@
  */
 
 using System.Reflection;
+using BSC.Fhir.Mapping.Core;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
 using FhirPath = Hl7.Fhir.FhirPath;
@@ -17,7 +18,8 @@ public static class ResourceMapper
     public static Bundle Extract(
         Questionnaire questionnaire,
         QuestionnaireResponse questionnaireResponse,
-        MappingContext extractionContext
+        MappingContext extractionContext,
+        IProfileLoader? profileLoader = null
     )
     {
         return ExtractByDefinition(questionnaire, questionnaireResponse, extractionContext);
@@ -26,7 +28,8 @@ public static class ResourceMapper
     private static Bundle ExtractByDefinition(
         Questionnaire questionnaire,
         QuestionnaireResponse questionnaireResponse,
-        MappingContext extractionContext
+        MappingContext extractionContext,
+        IProfileLoader? profileLoader = null
     )
     {
         extractionContext.Questionnaire = questionnaire;
@@ -37,7 +40,14 @@ public static class ResourceMapper
             extractionContext.SetCurrentContext(rootResource);
         }
 
-        ExtractByDefinition(questionnaire.Item, questionnaireResponse.Item, extractionContext, extractedResources);
+        ExtractByDefinition(
+            questionnaire.Item,
+            questionnaireResponse.Item,
+            extractionContext,
+            extractedResources,
+            // TODO: Make profile loader async?
+            (url) => profileLoader is null ? null : profileLoader.LoadProfile(url)
+        );
 
         if (rootResource is not null)
         {
@@ -57,7 +67,8 @@ public static class ResourceMapper
         IReadOnlyCollection<Questionnaire.ItemComponent> questionnaireItems,
         IReadOnlyCollection<QuestionnaireResponse.ItemComponent> questionnaireResponseItems,
         MappingContext extractionContext,
-        List<Resource> extractionResult
+        List<Resource> extractionResult,
+        Func<Canonical, StructureDefinition?> profileLoader
     )
     {
         var questionnaireItemsEnumarator = questionnaireItems.AsEnumerable().GetEnumerator();
@@ -77,7 +88,13 @@ public static class ResourceMapper
 
             if (currentQuestionnaireItem.LinkId == currentResponseItem.LinkId)
             {
-                ExtractByDefinition(currentQuestionnaireItem, currentResponseItem, extractionContext, extractionResult);
+                ExtractByDefinition(
+                    currentQuestionnaireItem,
+                    currentResponseItem,
+                    extractionContext,
+                    extractionResult,
+                    profileLoader
+                );
             }
         }
     }
@@ -86,7 +103,8 @@ public static class ResourceMapper
         Questionnaire.ItemComponent questionnaireItem,
         QuestionnaireResponse.ItemComponent questionnaireResponseItem,
         MappingContext extractionContext,
-        List<Resource> extractionResult
+        List<Resource> extractionResult,
+        Func<Canonical, StructureDefinition?> profileLoader
     )
     {
         if (questionnaireItem.Type is Questionnaire.QuestionnaireItemType.Group)
@@ -97,7 +115,8 @@ public static class ResourceMapper
                     questionnaireItem,
                     questionnaireResponseItem,
                     extractionContext,
-                    extractionResult
+                    extractionResult,
+                    profileLoader
                 );
             }
             else if (questionnaireItem.Definition is not null)
@@ -112,7 +131,8 @@ public static class ResourceMapper
                     questionnaireItem,
                     questionnaireResponseItem,
                     extractionContext,
-                    extractionResult
+                    extractionResult,
+                    profileLoader
                 );
             }
             else
@@ -121,7 +141,8 @@ public static class ResourceMapper
                     questionnaireItem.Item,
                     questionnaireResponseItem.Item,
                     extractionContext,
-                    extractionResult
+                    extractionResult,
+                    profileLoader
                 );
             }
         }
@@ -142,7 +163,8 @@ public static class ResourceMapper
         Questionnaire.ItemComponent questionnaireItem,
         QuestionnaireResponse.ItemComponent questionnaireResponseItem,
         MappingContext extractionContext,
-        List<Resource> extractionResult
+        List<Resource> extractionResult,
+        Func<Canonical, StructureDefinition?> profileLoader
     )
     {
         var resource = questionnaireItem.CreateResource(extractionContext);
@@ -158,7 +180,8 @@ public static class ResourceMapper
             questionnaireItem.Item,
             questionnaireResponseItem.Item,
             extractionContext,
-            extractionResult
+            extractionResult,
+            profileLoader
         );
 
         extractionResult.Add(resource);
@@ -169,7 +192,8 @@ public static class ResourceMapper
         Questionnaire.ItemComponent questionnaireItem,
         QuestionnaireResponse.ItemComponent questionnaireResponseItem,
         MappingContext extractionContext,
-        List<Resource> extractionResult
+        List<Resource> extractionResult,
+        Func<Canonical, StructureDefinition?> profileLoader
     )
     {
         if (extractionContext.CurrentContext is null)
@@ -210,7 +234,8 @@ public static class ResourceMapper
             questionnaireItem.Item,
             questionnaireResponseItem.Item,
             extractionContext,
-            extractionResult
+            extractionResult,
+            profileLoader
         );
 
         extractionContext.RemoveContext();
