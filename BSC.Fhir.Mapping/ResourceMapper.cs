@@ -283,14 +283,16 @@ public static class ResourceMapper
             return;
         }
 
-        var fieldName = FieldNameByDefinition(questionnaireItem.Definition, true);
+        var definition = questionnaireItem.Definition;
+
+        var fieldName = FieldNameByDefinition(definition, true);
 
         var contextType = context.CurrentContext.GetType();
         var field = contextType.GetProperty(fieldName);
 
         if (field is null)
         {
-            fieldName = FieldNameByDefinition(questionnaireItem.Definition, false);
+            fieldName = FieldNameByDefinition(definition, false);
             field = contextType.GetProperty(fieldName);
         }
 
@@ -316,32 +318,114 @@ public static class ResourceMapper
             return;
         }
 
-        var canonicalUrl = questionnaireItem.Definition.Substring(0, questionnaireItem.Definition.LastIndexOf('#'));
+        var poundIndex = definition.LastIndexOf('#');
+        var canonicalUrl = definition[..poundIndex];
         var profile = await profileLoader.LoadProfileAsync(new Canonical(canonicalUrl));
 
         if (profile is not null)
         {
-            if (fieldName.Contains(':'))
-            {
-                // TODO: Slicing
-            }
-            else
-            {
-                var extensionForType = questionnaireItem.Definition.Substring(
-                    questionnaireItem.Definition.LastIndexOf('#') + 1,
-                    questionnaireItem.Definition.LastIndexOf('.')
-                );
+            UseProfile(
+                questionnaireItem,
+                questionnaireResponseItem,
+                fieldName,
+                profile,
+                context,
+                definition,
+                poundIndex
+            );
+        }
+    }
 
-                if (IsExtensionSupportedByProfile(profile, extensionForType, fieldName))
-                {
-                    AddDefinitionBasedCustomExtension(
-                        questionnaireItem,
-                        questionnaireResponseItem,
-                        context.CurrentContext
-                    );
-                }
+    private static void UseProfile(
+        Questionnaire.ItemComponent questionnaireItem,
+        QuestionnaireResponse.ItemComponent questionnaireResponseItem,
+        string fieldName,
+        StructureDefinition profile,
+        MappingContext context,
+        string? definition = null,
+        int? poundIndex = null
+    )
+    {
+        if (context.CurrentContext is null)
+        {
+            throw new ArgumentException(nameof(context), "CurrentContext in MappingContext is null");
+        }
+
+        definition ??= questionnaireItem.Definition;
+        poundIndex ??= definition.LastIndexOf('#');
+
+        if (poundIndex is null)
+        {
+            throw new ArgumentException("Invalid definition");
+        }
+
+        if (fieldName.Contains(':'))
+        {
+            var colonIndex = definition.LastIndexOf(':');
+            var typeToCheck = definition[poundIndex.Value..colonIndex];
+
+            var sliceName = definition[colonIndex..];
+
+            if (IsSliceSupportedByProfile(profile, typeToCheck, sliceName))
+            {
+                ExtractSlice(questionnaireItem, questionnaireResponseItem, profile, context, typeToCheck, sliceName);
             }
         }
+        else
+        {
+            var extensionForType = definition[(poundIndex.Value + 1)..definition.LastIndexOf('.')];
+
+            if (IsExtensionSupportedByProfile(profile, extensionForType, fieldName))
+            {
+                AddDefinitionBasedCustomExtension(questionnaireItem, questionnaireResponseItem, context.CurrentContext);
+            }
+        }
+    }
+
+    private static void ExtractSlice(
+        Questionnaire.ItemComponent questionnaireItem,
+        QuestionnaireResponse.ItemComponent questionnaireResponseItem,
+        StructureDefinition profile,
+        MappingContext context,
+        string baseType,
+        string sliceName
+    )
+    {
+        var elementEnumerator = profile.Snapshot.Element.GetEnumerator();
+
+        // TODO: Check if this works
+        while (elementEnumerator.Current.Slicing is null && elementEnumerator.Current.Path != baseType)
+        {
+            elementEnumerator.MoveNext();
+        }
+
+        // TODO: check for slices with the name equal to `sliceName`
+        var discriminators = elementEnumerator.Current.Slicing!.Discriminator;
+
+        var slices = new List<ElementDefinition>();
+
+        while (elementEnumerator.Current.Path.StartsWith(baseType))
+        {
+            elementEnumerator.MoveNext();
+
+            if (string.IsNullOrEmpty(elementEnumerator.Current.SliceName))
+            {
+                throw new InvalidOperationException("Expected ElementDefinition with sliceName");
+            }
+
+            var slice = new SliceDefinition(elementEnumerator.Current.SliceName);
+
+            elementEnumerator.MoveNext();
+            while (string.IsNullOrEmpty(elementEnumerator.Current.SliceName))
+            {
+                slice.Fixed.Add(elementEnumerator.Current.Fixed);
+                slice.Pattern.Add(elementEnumerator.Current.Pattern);
+
+                elementEnumerator.MoveNext();
+            }
+        }
+
+        throw new NotImplementedException();
     }
 
     private static void UpdateField(Base resource, PropertyInfo field, IEnumerable<DataType> answers)
@@ -457,7 +541,7 @@ public static class ResourceMapper
     private static bool IsExtensionSupportedByProfile(
         StructureDefinition profile,
         string extensionForType,
-        string fieldName
+        ReadOnlySpan<char> fieldName
     )
     {
         var elementDefinitions = profile.Snapshot.Element.Where(
@@ -465,7 +549,37 @@ public static class ResourceMapper
         );
         foreach (var definition in elementDefinitions)
         {
-            if (definition.ElementId.Substring(definition.ElementId.LastIndexOf(':') + 1) == fieldName)
+            if (
+                MemoryExtensions.Equals(
+                    fieldName,
+                    definition.ElementId.AsSpan()[(definition.ElementId.LastIndexOf(':') + 1)..],
+                    StringComparison.Ordinal
+                )
+            )
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsSliceSupportedByProfile(
+        StructureDefinition profile,
+        string typeToCheck,
+        ReadOnlySpan<char> sliceName
+    )
+    {
+        var elementDefinitions = profile.Snapshot.Element.Where(element => element.Path == typeToCheck);
+        foreach (var definition in elementDefinitions)
+        {
+            if (
+                MemoryExtensions.Equals(
+                    sliceName,
+                    definition.ElementId.AsSpan()[(definition.ElementId.LastIndexOf(':') + 1)..],
+                    StringComparison.Ordinal
+                )
+            )
             {
                 return true;
             }
