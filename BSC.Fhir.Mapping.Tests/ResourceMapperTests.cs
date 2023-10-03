@@ -1,5 +1,7 @@
+using BSC.Fhir.Mapping.Core;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
+using Moq;
 using Task = System.Threading.Tasks.Task;
 
 namespace BSC.Fhir.Mapping.Tests;
@@ -31,7 +33,7 @@ public class ResourceMapperTests
 
         var bundle = await ResourceMapper.Extract(demoQuestionnaire, demoQuestionnaireResponse, new());
 
-        Console.WriteLine(bundle.ToJson(new FhirJsonSerializationSettings { Pretty = true }));
+        // Console.WriteLine(bundle.ToJson(new FhirJsonSerializationSettings { Pretty = true }));
 
         Assert.True(true);
     }
@@ -165,14 +167,68 @@ public class ResourceMapperTests
     }
 
     [Fact]
-    public void Extract_GivesCorrectBundleForGeneralNote()
+    public async Task Extract_GivesCorrectBundleForGeneralNote()
     {
         var questionnaire = CreateGeneralNoteQuestionnaire();
         var response = CreateGeneralNoteQuestionnaireResponse();
+        var profileLoaderMock = new Mock<IProfileLoader>();
+        profileLoaderMock
+            .Setup(x => x.LoadProfileAsync(It.IsAny<Canonical>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(CreateCompositionProfile());
 
-        // var extractionResult = ResourceMapper.Extract(questionnaire, response, new());
+        var extractionResult = await ResourceMapper.Extract(questionnaire, response, new(), profileLoaderMock.Object);
 
-        // Console.WriteLine(extractionResult.ToJson(new() { Pretty = true }));
+        profileLoaderMock.Verify(x => x.LoadProfileAsync(It.IsAny<Canonical>(), It.IsAny<CancellationToken>()));
+        Console.WriteLine(extractionResult.ToJson(new() { Pretty = true }));
+    }
+
+    private static StructureDefinition CreateCompositionProfile()
+    {
+        return new()
+        {
+            Name = "composition-definition",
+            Snapshot = new()
+            {
+                Element =
+                {
+                    new()
+                    {
+                        Path = "composition.section",
+                        Slicing = new()
+                        {
+                            Discriminator = { ElementDefinition.DiscriminatorComponent.ForValueSlice("code") },
+                            Rules = ElementDefinition.SlicingRules.Closed
+                        },
+                        Min = 3,
+                        Max = "3"
+                    },
+                    new()
+                    {
+                        Path = "composition.section",
+                        SliceName = "note",
+                        Min = 1,
+                        Max = "1"
+                    },
+                    new()
+                    {
+                        Path = "composition.section.code",
+                        Min = 1,
+                        Fixed = new CodeableConcept
+                        {
+                            Coding =
+                            {
+                                new()
+                                {
+                                    System = "https://1beat.care/fhir/coding-system",
+                                    Code = "12345",
+                                    Display = "Note"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        };
     }
 
     private static Questionnaire CreateGeneralNoteQuestionnaire()
@@ -239,26 +295,13 @@ public class ResourceMapperTests
                 {
                     LinkId = "noteSection",
                     Type = Questionnaire.QuestionnaireItemType.Group,
-                    Definition = "Composition.section",
-                    // Extension =
-                    // {
-                    //     new()
-                    //     {
-                    //         Url = ITEM_EXTRACTION_CONTEXT_EXTENSION_URL,
-                    //         Value = new Expression
-                    //         {
-                    //             Name = "noteSection",
-                    //             Language = "text/fhirpath",
-                    //             Expression_ = "%composition.section.where(title = 'Note')"
-                    //         }
-                    //     }
-                    // },
+                    Definition = "Composition#composition.section:note",
                     Item =
                     {
                         new()
                         {
                             LinkId = "noteSection.entry",
-                            Definition = "entry",
+                            Definition = "Composition.section.code",
                             Type = Questionnaire.QuestionnaireItemType.Reference,
                             Extension =
                             {
