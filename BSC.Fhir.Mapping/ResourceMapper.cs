@@ -6,6 +6,7 @@
  */
 
 using System.Reflection;
+using System.Text.Json;
 using BSC.Fhir.Mapping.Core;
 using Hl7.Fhir.Model;
 using FhirPath = Hl7.Fhir.FhirPath;
@@ -169,7 +170,7 @@ public static class ResourceMapper
                 );
             }
 
-            await ExtractPrimitiveTypeValueByDefinition(
+            ExtractPrimitiveTypeValueByDefinition(
                 questionnaireItem,
                 questionnaireResponseItem,
                 extractionContext,
@@ -227,11 +228,36 @@ public static class ResourceMapper
         var fieldName = FieldNameByDefinition(questionnaireItem.Definition);
         var fieldInfo = extractionContext.CurrentContext.GetType().GetProperty(fieldName);
 
+        var definition = questionnaireItem.Definition;
         if (fieldInfo is null)
         {
-            throw new InvalidOperationException(
-                $"No property {fieldName} on {extractionContext.CurrentContext.GetType().ToString()}"
-            );
+            var poundIndex = definition.LastIndexOf('#');
+            if (poundIndex < 0)
+            {
+                Console.WriteLine("Could not find pound index for [{0}]", definition);
+                return;
+            }
+            var canonicalUrl = definition[..poundIndex];
+            var profile = await profileLoader.LoadProfileAsync(new Canonical(canonicalUrl));
+
+            if (profile is not null)
+            {
+                UseProfile(
+                    questionnaireItem,
+                    questionnaireResponseItem,
+                    fieldName,
+                    profile,
+                    extractionContext,
+                    definition,
+                    poundIndex
+                );
+            }
+            else
+            {
+                Console.WriteLine("profile null for [{0}]", definition);
+            }
+
+            return;
         }
 
         var type = fieldInfo.NonParameterizedType();
@@ -265,7 +291,7 @@ public static class ResourceMapper
         extractionContext.RemoveContext();
     }
 
-    private static async Task ExtractPrimitiveTypeValueByDefinition(
+    private static void ExtractPrimitiveTypeValueByDefinition(
         Questionnaire.ItemComponent questionnaireItem,
         QuestionnaireResponse.ItemComponent questionnaireResponseItem,
         MappingContext context,
@@ -317,23 +343,6 @@ public static class ResourceMapper
 
             return;
         }
-
-        var poundIndex = definition.LastIndexOf('#');
-        var canonicalUrl = definition[..poundIndex];
-        var profile = await profileLoader.LoadProfileAsync(new Canonical(canonicalUrl));
-
-        if (profile is not null)
-        {
-            UseProfile(
-                questionnaireItem,
-                questionnaireResponseItem,
-                fieldName,
-                profile,
-                context,
-                definition,
-                poundIndex
-            );
-        }
     }
 
     private static void UseProfile(
@@ -362,9 +371,9 @@ public static class ResourceMapper
         if (fieldName.Contains(':'))
         {
             var colonIndex = definition.LastIndexOf(':');
-            var typeToCheck = definition[poundIndex.Value..colonIndex];
+            var typeToCheck = definition[(poundIndex.Value + 1)..colonIndex];
 
-            var sliceName = definition[colonIndex..];
+            var sliceName = definition[(colonIndex + 1)..];
 
             if (IsSliceSupportedByProfile(profile, typeToCheck, sliceName))
             {
@@ -391,38 +400,52 @@ public static class ResourceMapper
         string sliceName
     )
     {
+        Console.WriteLine("extracting slice");
         var elementEnumerator = profile.Snapshot.Element.GetEnumerator();
+        elementEnumerator.MoveNext();
 
         // TODO: Check if this works
-        while (elementEnumerator.Current.Slicing is null && elementEnumerator.Current.Path != baseType)
+        while (elementEnumerator.Current.Slicing is null || elementEnumerator.Current.Path != baseType)
         {
             elementEnumerator.MoveNext();
         }
 
         // TODO: check for slices with the name equal to `sliceName`
         var discriminators = elementEnumerator.Current.Slicing!.Discriminator;
+        Console.WriteLine(JsonSerializer.Serialize(discriminators, new JsonSerializerOptions { WriteIndented = true }));
 
-        var slices = new List<ElementDefinition>();
+        SliceDefinition? slice = null;
 
-        while (elementEnumerator.Current.Path.StartsWith(baseType))
+        while (elementEnumerator.Current is not null && elementEnumerator.Current.Path.StartsWith(baseType))
         {
             elementEnumerator.MoveNext();
+            var currentSliceName = elementEnumerator.Current.SliceName;
 
-            if (string.IsNullOrEmpty(elementEnumerator.Current.SliceName))
+            if (string.IsNullOrEmpty(currentSliceName))
             {
                 throw new InvalidOperationException("Expected ElementDefinition with sliceName");
             }
 
-            var slice = new SliceDefinition(elementEnumerator.Current.SliceName);
+            if (currentSliceName == sliceName)
+            {
+                slice = new SliceDefinition(elementEnumerator.Current.SliceName);
+            }
 
             elementEnumerator.MoveNext();
-            while (string.IsNullOrEmpty(elementEnumerator.Current.SliceName))
+            while (elementEnumerator.Current is not null && string.IsNullOrEmpty(elementEnumerator.Current.SliceName))
             {
-                slice.Fixed.Add(elementEnumerator.Current.Fixed);
-                slice.Pattern.Add(elementEnumerator.Current.Pattern);
+                slice?.Fixed.Add(elementEnumerator.Current.Fixed);
+                slice?.Pattern.Add(elementEnumerator.Current.Pattern);
 
                 elementEnumerator.MoveNext();
             }
+        }
+
+        Console.WriteLine(JsonSerializer.Serialize(slice, new JsonSerializerOptions { WriteIndented = true }));
+
+        if (slice is null)
+        {
+            throw new InvalidOperationException("Could not find matching slice in profile");
         }
 
         throw new NotImplementedException();
@@ -564,28 +587,13 @@ public static class ResourceMapper
         return false;
     }
 
-    private static bool IsSliceSupportedByProfile(
-        StructureDefinition profile,
-        string typeToCheck,
-        ReadOnlySpan<char> sliceName
-    )
+    private static bool IsSliceSupportedByProfile(StructureDefinition profile, string typeToCheck, string sliceName)
     {
-        var elementDefinitions = profile.Snapshot.Element.Where(element => element.Path == typeToCheck);
-        foreach (var definition in elementDefinitions)
-        {
-            if (
-                MemoryExtensions.Equals(
-                    sliceName,
-                    definition.ElementId.AsSpan()[(definition.ElementId.LastIndexOf(':') + 1)..],
-                    StringComparison.Ordinal
-                )
-            )
-            {
-                return true;
-            }
-        }
+        var val = profile.Snapshot.Element
+            .Where(element => element.Path == typeToCheck)
+            .Any(element => element.SliceName == sliceName);
 
-        return false;
+        return val;
     }
 
     private static void AddDefinitionBasedCustomExtension(
