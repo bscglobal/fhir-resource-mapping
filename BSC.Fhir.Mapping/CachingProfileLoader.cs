@@ -1,3 +1,4 @@
+using System.Text.Json;
 using BSC.Fhir.Mapping.Core;
 using Hl7.Fhir.Model;
 
@@ -24,7 +25,7 @@ internal class CachingProfileLoader : IProfileLoader
             return null;
         }
 
-        var key = url.ToString();
+        var key = url.Value;
         if (string.IsNullOrEmpty(key))
         {
             return null;
