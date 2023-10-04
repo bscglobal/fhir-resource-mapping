@@ -231,64 +231,47 @@ public static class ResourceMapper
         var definition = questionnaireItem.Definition;
         if (fieldInfo is null)
         {
-            var poundIndex = definition.LastIndexOf('#');
-            if (poundIndex < 0)
-            {
-                Console.WriteLine("Could not find pound index for [{0}]", definition);
-                return;
-            }
-            var canonicalUrl = definition[..poundIndex];
-            var profile = await profileLoader.LoadProfileAsync(new Canonical(canonicalUrl));
-
-            if (profile is not null)
-            {
-                UseProfile(
-                    questionnaireItem,
-                    questionnaireResponseItem,
-                    fieldName,
-                    profile,
-                    extractionContext,
-                    definition,
-                    poundIndex
-                );
-            }
-            else
-            {
-                Console.WriteLine("profile null for [{0}]", definition);
-            }
-
-            return;
-        }
-
-        var type = fieldInfo.NonParameterizedType();
-        var value = Activator.CreateInstance(type) as Base;
-        if (value is null)
-        {
-            throw new InvalidOperationException($"Unable to create instance of {type.Name}");
-        }
-
-        if (fieldInfo.IsNonStringEnumerable())
-        {
-            var val = fieldInfo.GetValue(extractionContext.CurrentContext);
-            fieldInfo.PropertyType.GetMethod("Add")?.Invoke(val, new[] { value });
+            await UseProfile(
+                questionnaireItem,
+                questionnaireResponseItem,
+                fieldName,
+                extractionContext,
+                extractionResult,
+                profileLoader
+            );
         }
         else
         {
-            fieldInfo.SetValue(extractionContext.CurrentContext, value);
+            var type = fieldInfo.NonParameterizedType();
+            var value = Activator.CreateInstance(type) as Base;
+            if (value is null)
+            {
+                throw new InvalidOperationException($"Unable to create instance of {type.Name}");
+            }
+
+            if (fieldInfo.IsNonStringEnumerable())
+            {
+                var val = fieldInfo.GetValue(extractionContext.CurrentContext);
+                fieldInfo.PropertyType.GetMethod("Add")?.Invoke(val, new[] { value });
+            }
+            else
+            {
+                fieldInfo.SetValue(extractionContext.CurrentContext, value);
+            }
+
+            extractionContext.SetCurrentContext(value);
+
+            await ExtractByDefinition(
+                questionnaireItem.Item,
+                questionnaireResponseItem.Item,
+                extractionContext,
+                extractionResult,
+                profileLoader,
+                cancellationToken
+            );
+
+            extractionContext.RemoveContext();
         }
-
-        extractionContext.SetCurrentContext(value);
-
-        await ExtractByDefinition(
-            questionnaireItem.Item,
-            questionnaireResponseItem.Item,
-            extractionContext,
-            extractionResult,
-            profileLoader,
-            cancellationToken
-        );
-
-        extractionContext.RemoveContext();
     }
 
     private static void ExtractPrimitiveTypeValueByDefinition(
@@ -345,14 +328,13 @@ public static class ResourceMapper
         }
     }
 
-    private static void UseProfile(
+    private static async Task UseProfile(
         Questionnaire.ItemComponent questionnaireItem,
         QuestionnaireResponse.ItemComponent questionnaireResponseItem,
         string fieldName,
-        StructureDefinition profile,
         MappingContext context,
-        string? definition = null,
-        int? poundIndex = null
+        List<Resource> extractionResult,
+        IProfileLoader profileLoader
     )
     {
         if (context.CurrentContext is null)
@@ -360,29 +342,45 @@ public static class ResourceMapper
             throw new ArgumentException(nameof(context), "CurrentContext in MappingContext is null");
         }
 
-        definition ??= questionnaireItem.Definition;
-        poundIndex ??= definition.LastIndexOf('#');
-
-        if (poundIndex is null)
+        var definition = questionnaireItem.Definition;
+        var poundIndex = definition.LastIndexOf('#');
+        if (poundIndex < 0)
         {
-            throw new ArgumentException("Invalid definition");
+            Console.WriteLine("Could not find pound index for [{0}]", definition);
+            return;
+        }
+        var canonicalUrl = definition[..poundIndex];
+        var profile = await profileLoader.LoadProfileAsync(new Canonical(canonicalUrl));
+
+        if (profile is null)
+        {
+            throw new InvalidOperationException($"Could not find profile for {canonicalUrl}");
         }
 
         if (fieldName.Contains(':'))
         {
             var colonIndex = definition.LastIndexOf(':');
-            var typeToCheck = definition[(poundIndex.Value + 1)..colonIndex];
+            var typeToCheck = definition[(poundIndex + 1)..colonIndex];
 
             var sliceName = definition[(colonIndex + 1)..];
 
             if (IsSliceSupportedByProfile(profile, typeToCheck, sliceName))
             {
-                ExtractSlice(questionnaireItem, questionnaireResponseItem, profile, context, typeToCheck, sliceName);
+                await ExtractSlice(
+                    questionnaireItem,
+                    questionnaireResponseItem,
+                    profile,
+                    typeToCheck,
+                    sliceName,
+                    context,
+                    extractionResult,
+                    profileLoader
+                );
             }
         }
         else
         {
-            var extensionForType = definition[(poundIndex.Value + 1)..definition.LastIndexOf('.')];
+            var extensionForType = definition[(poundIndex + 1)..definition.LastIndexOf('.')];
 
             if (IsExtensionSupportedByProfile(profile, extensionForType, fieldName))
             {
@@ -391,16 +389,30 @@ public static class ResourceMapper
         }
     }
 
-    private static void ExtractSlice(
+    private static async Task ExtractSlice(
         Questionnaire.ItemComponent questionnaireItem,
         QuestionnaireResponse.ItemComponent questionnaireResponseItem,
         StructureDefinition profile,
-        MappingContext context,
         string baseType,
-        string sliceName
+        string sliceName,
+        MappingContext context,
+        List<Resource> extractionResult,
+        IProfileLoader profileLoader,
+        CancellationToken cancellationToken = default
     )
     {
-        Console.WriteLine("extracting slice");
+        if (context.CurrentContext is null)
+        {
+            Console.WriteLine("Error: MappingContext.CurrentContext is null");
+            return;
+        }
+
+        if (questionnaireItem.Repeats == true)
+        {
+            Console.WriteLine("Error: QuestionnaireItem with slice definition should not repeat");
+            return;
+        }
+
         var elementEnumerator = profile.Snapshot.Element.GetEnumerator();
         elementEnumerator.MoveNext();
 
@@ -410,20 +422,30 @@ public static class ResourceMapper
             elementEnumerator.MoveNext();
         }
 
-        // TODO: check for slices with the name equal to `sliceName`
         var discriminators = elementEnumerator.Current.Slicing!.Discriminator;
-        Console.WriteLine(JsonSerializer.Serialize(discriminators, new JsonSerializerOptions { WriteIndented = true }));
+
+        var fieldName = FieldNameByDefinition(baseType);
+        var contextType = context.CurrentContext.GetType();
+        var fieldInfo = contextType.GetProperty(fieldName);
+
+        if (fieldInfo is null)
+        {
+            Console.WriteLine("Could not find property {0} on {1}", fieldName, contextType.ToString());
+            return;
+        }
+
+        var type = fieldInfo.NonParameterizedType();
 
         SliceDefinition? slice = null;
 
-        while (elementEnumerator.Current is not null && elementEnumerator.Current.Path.StartsWith(baseType))
+        while (elementEnumerator.MoveNext() && elementEnumerator.Current.Path.StartsWith(baseType))
         {
-            elementEnumerator.MoveNext();
             var currentSliceName = elementEnumerator.Current.SliceName;
 
             if (string.IsNullOrEmpty(currentSliceName))
             {
-                throw new InvalidOperationException("Expected ElementDefinition with sliceName");
+                Console.WriteLine("Error: expected ElementDefinition with sliceName set");
+                return;
             }
 
             if (currentSliceName == sliceName)
@@ -431,24 +453,66 @@ public static class ResourceMapper
                 slice = new SliceDefinition(elementEnumerator.Current.SliceName);
             }
 
-            elementEnumerator.MoveNext();
-            while (elementEnumerator.Current is not null && string.IsNullOrEmpty(elementEnumerator.Current.SliceName))
+            while (elementEnumerator.MoveNext() && string.IsNullOrEmpty(elementEnumerator.Current.SliceName))
             {
-                slice?.Fixed.Add(elementEnumerator.Current.Fixed);
-                slice?.Pattern.Add(elementEnumerator.Current.Pattern);
-
-                elementEnumerator.MoveNext();
+                var current = elementEnumerator.Current;
+                var fixedFieldName = FieldNameByDefinition(current.Path);
+                var propInfo = type.GetProperty(fixedFieldName);
+                if (propInfo is not null)
+                {
+                    if (current.Fixed is not null)
+                    {
+                        slice?.Fixed.Add(new SliceDefinition.SliceFilter(propInfo, current.Fixed));
+                    }
+                    else if (current.Pattern is not null)
+                    {
+                        slice?.Pattern.Add(new SliceDefinition.SliceFilter(propInfo, current.Pattern));
+                    }
+                }
             }
         }
 
-        Console.WriteLine(JsonSerializer.Serialize(slice, new JsonSerializerOptions { WriteIndented = true }));
-
         if (slice is null)
         {
-            throw new InvalidOperationException("Could not find matching slice in profile");
+            Console.WriteLine("Error: could not find matching slice in profile");
+            return;
         }
 
-        throw new NotImplementedException();
+        var value = Activator.CreateInstance(type) as Base;
+
+        if (value is null)
+        {
+            Console.WriteLine("Error: could not construct type [{0}]", type);
+            return;
+        }
+
+        foreach (var fixedVal in slice.Fixed)
+        {
+            fixedVal.PropertyInfo.SetValue(value, fixedVal.Value);
+        }
+
+        if (fieldInfo.IsNonStringEnumerable())
+        {
+            var val = fieldInfo.GetValue(context.CurrentContext);
+            fieldInfo.PropertyType.GetMethod("Add")?.Invoke(val, new[] { value });
+        }
+        else
+        {
+            fieldInfo.SetValue(context.CurrentContext, value);
+        }
+
+        context.SetCurrentContext(value);
+
+        await ExtractByDefinition(
+            questionnaireItem.Item,
+            questionnaireResponseItem.Item,
+            context,
+            extractionResult,
+            profileLoader,
+            cancellationToken
+        );
+
+        context.RemoveContext();
     }
 
     private static void UpdateField(Base resource, PropertyInfo field, IEnumerable<DataType> answers)
