@@ -161,8 +161,8 @@ public class ResourceMapperTests
         var documentReference = CreateGeneralNoteDocumentReference();
 
         // var response = ResourceMapper.Populate(questionnaire, documentReference, composition);
-
-        // Console.WriteLine(questionnaire.ToJson(new() { Pretty = true }));
+        //
+        // // Console.WriteLine(questionnaire.ToJson(new() { Pretty = true }));
         // Console.WriteLine(response.ToJson(new() { Pretty = true }));
     }
 
@@ -224,7 +224,8 @@ public class ResourceMapperTests
                                 }
                             }
                         }
-                    }
+                    },
+                    new() { Path = "composition.extension", ElementId = ":ExtraField" }
                 }
             }
         };
@@ -335,6 +336,13 @@ public class ResourceMapperTests
                             Initial = { new() { Value = new FhirString("Image") } }
                         }
                     }
+                },
+                new()
+                {
+                    LinkId = "composition.extension",
+                    Type = Questionnaire.QuestionnaireItemType.Text,
+                    Definition = "Composition#composition.extraField",
+                    Initial = { new() { Value = new FhirString("extension test") } }
                 },
                 // new()
                 // {
@@ -504,44 +512,53 @@ public class ResourceMapperTests
     {
         var json = """
             {
-              "resourceType": "QuestionnaireResponse",
-              "item": [
-                {
-                  "linkId": "composition.id",
-                  "answer": [
-                    {
-                      "valueString": "2e100b95-aa0b-42f0-b129-b648383638ac"
-                    }
-                  ]
-                },
-                {
-                  "linkId": "noteSection",
+                  "resourceType": "QuestionnaireResponse",
                   "item": [
                     {
-                      "linkId": "noteSection.title",
+                      "linkId": "composition.id",
                       "answer": [
                         {
-                          "valueString": "Note"
+                          "valueString": "2e100b95-aa0b-42f0-b129-b648383638ac"
                         }
                       ]
-                    }
-                  ]
-                },
-                {
-                  "linkId": "imageSection",
-                  "item": [
+                    },
                     {
-                      "linkId": "noteSection.entry",
+                      "linkId": "noteSection",
+                      "item": [
+                        {
+                          "linkId": "noteSection.title",
+                          "answer": [
+                            {
+                              "valueString": "Note"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "linkId": "imageSection",
+                      "item": [
+                        {
+                          "linkId": "noteSection.entry",
+                          "answer": [
+                            {
+                              "valueString": "Image"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "linkId": "composition.extension",
                       "answer": [
                         {
-                          "valueString": "Image"
+                          "valueString": "extension test"
                         }
                       ]
                     }
                   ]
                 }
-              ]
-            }
+
 """;
 
         var parser = new FhirJsonParser();
