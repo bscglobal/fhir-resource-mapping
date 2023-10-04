@@ -682,27 +682,12 @@ public static class ResourceMapper
     private static bool IsExtensionSupportedByProfile(
         StructureDefinition profile,
         string extensionForType,
-        ReadOnlySpan<char> fieldName
+        string fieldName
     )
     {
-        var elementDefinitions = profile.Snapshot.Element.Where(
-            element => element.Path == $"{extensionForType}.extension"
-        );
-        foreach (var definition in elementDefinitions)
-        {
-            if (
-                MemoryExtensions.Equals(
-                    fieldName,
-                    definition.ElementId.AsSpan()[(definition.ElementId.LastIndexOf(':') + 1)..],
-                    StringComparison.Ordinal
-                )
-            )
-            {
-                return true;
-            }
-        }
-
-        return false;
+        return profile.Snapshot.Element
+            .Where(element => element.Path == $"{extensionForType}.extension")
+            .Any(element => element.ElementId[(element.ElementId.LastIndexOf(':') + 1)..] == fieldName);
     }
 
     private static bool IsSliceSupportedByProfile(StructureDefinition profile, string typeToCheck, string sliceName)
