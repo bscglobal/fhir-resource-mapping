@@ -170,7 +170,7 @@ public static class ResourceMapper
                 );
             }
 
-            ExtractPrimitiveTypeValueByDefinition(
+            await ExtractPrimitiveTypeValueByDefinition(
                 questionnaireItem,
                 questionnaireResponseItem,
                 extractionContext,
@@ -231,13 +231,14 @@ public static class ResourceMapper
         var definition = questionnaireItem.Definition;
         if (fieldInfo is null)
         {
-            await UseProfile(
+            await UseSliceFromProfile(
                 questionnaireItem,
                 questionnaireResponseItem,
                 fieldName,
                 extractionContext,
                 extractionResult,
-                profileLoader
+                profileLoader,
+                cancellationToken
             );
         }
         else
@@ -274,7 +275,7 @@ public static class ResourceMapper
         }
     }
 
-    private static void ExtractPrimitiveTypeValueByDefinition(
+    private static async Task ExtractPrimitiveTypeValueByDefinition(
         Questionnaire.ItemComponent questionnaireItem,
         QuestionnaireResponse.ItemComponent questionnaireResponseItem,
         MappingContext context,
@@ -326,67 +327,120 @@ public static class ResourceMapper
 
             return;
         }
+
+        await UseExtensionFromProfile(questionnaireItem, questionnaireResponseItem, fieldName, context, profileLoader);
     }
 
-    private static async Task UseProfile(
+    private static async Task UseSliceFromProfile(
         Questionnaire.ItemComponent questionnaireItem,
         QuestionnaireResponse.ItemComponent questionnaireResponseItem,
         string fieldName,
         MappingContext context,
         List<Resource> extractionResult,
-        IProfileLoader profileLoader
+        IProfileLoader profileLoader,
+        CancellationToken cancellationToken = default
     )
     {
         if (context.CurrentContext is null)
         {
-            throw new ArgumentException(nameof(context), "CurrentContext in MappingContext is null");
+            Console.WriteLine("Error: CurrentContext is null");
+            return;
+        }
+
+        var definition = questionnaireItem.Definition;
+        var profileContext = await GetProfile(questionnaireItem, context, profileLoader, cancellationToken);
+
+        if (profileContext is null)
+        {
+            return;
+        }
+
+        if (fieldName.Contains(':'))
+        {
+            var colonIndex = definition.LastIndexOf(':');
+            var typeToCheck = definition[(profileContext.PoundIndex + 1)..colonIndex];
+
+            var sliceName = definition[(colonIndex + 1)..];
+
+            if (IsSliceSupportedByProfile(profileContext.Profile, typeToCheck, sliceName))
+            {
+                await ExtractSlice(
+                    questionnaireItem,
+                    questionnaireResponseItem,
+                    profileContext.Profile,
+                    typeToCheck,
+                    sliceName,
+                    context,
+                    extractionResult,
+                    profileLoader,
+                    cancellationToken
+                );
+            }
+        }
+    }
+
+    private static async Task UseExtensionFromProfile(
+        Questionnaire.ItemComponent questionnaireItem,
+        QuestionnaireResponse.ItemComponent questionnaireResponseItem,
+        string fieldName,
+        MappingContext context,
+        IProfileLoader profileLoader,
+        CancellationToken cancellationToken = default
+    )
+    {
+        if (context.CurrentContext is null)
+        {
+            Console.WriteLine("Error: CurrentContext is null");
+            return;
+        }
+
+        var profileContext = await GetProfile(questionnaireItem, context, profileLoader, cancellationToken);
+
+        if (profileContext is null)
+        {
+            return;
+        }
+
+        var definition = questionnaireItem.Definition;
+        var extensionForType = definition[(profileContext.PoundIndex + 1)..definition.LastIndexOf('.')];
+
+        if (IsExtensionSupportedByProfile(profileContext.Profile, extensionForType, fieldName))
+        {
+            AddDefinitionBasedCustomExtension(questionnaireItem, questionnaireResponseItem, context.CurrentContext);
+        }
+    }
+
+    private static async Task<ProfileContext?> GetProfile(
+        Questionnaire.ItemComponent questionnaireItem,
+        MappingContext context,
+        IProfileLoader profileLoader,
+        CancellationToken cancellationToken = default
+    )
+    {
+        if (context.CurrentContext is null)
+        {
+            Console.WriteLine("Error: CurrentContext is null");
+            return null;
         }
 
         var definition = questionnaireItem.Definition;
         var poundIndex = definition.LastIndexOf('#');
         if (poundIndex < 0)
         {
-            Console.WriteLine("Could not find pound index for [{0}]", definition);
-            return;
+            Console.WriteLine("Error: no pound sign in definition: [{0}]", definition);
+            return null;
         }
+
         var canonicalUrl = definition[..poundIndex];
         var profile = await profileLoader.LoadProfileAsync(new Canonical(canonicalUrl));
 
         if (profile is null)
         {
-            throw new InvalidOperationException($"Could not find profile for {canonicalUrl}");
+            Console.WriteLine("Error: could not find profile for url: {0}", canonicalUrl);
+            return null;
         }
 
-        if (fieldName.Contains(':'))
-        {
-            var colonIndex = definition.LastIndexOf(':');
-            var typeToCheck = definition[(poundIndex + 1)..colonIndex];
-
-            var sliceName = definition[(colonIndex + 1)..];
-
-            if (IsSliceSupportedByProfile(profile, typeToCheck, sliceName))
-            {
-                await ExtractSlice(
-                    questionnaireItem,
-                    questionnaireResponseItem,
-                    profile,
-                    typeToCheck,
-                    sliceName,
-                    context,
-                    extractionResult,
-                    profileLoader
-                );
-            }
-        }
-        else
-        {
-            var extensionForType = definition[(poundIndex + 1)..definition.LastIndexOf('.')];
-
-            if (IsExtensionSupportedByProfile(profile, extensionForType, fieldName))
-            {
-                AddDefinitionBasedCustomExtension(questionnaireItem, questionnaireResponseItem, context.CurrentContext);
-            }
-        }
+        return new ProfileContext(poundIndex, profile);
     }
 
     private static async Task ExtractSlice(
