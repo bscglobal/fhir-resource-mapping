@@ -105,14 +105,12 @@ public static class FhirPathMapping
         var start = expressionParts[0];
         if (start.StartsWith("%"))
         {
-            if (start.StartsWith("%resource"))
+            evaluationCtx = start switch
             {
-                evaluationCtx = ResourceEvaluationSource(expr, ctx);
-            }
-            else
-            {
-                evaluationCtx = VariableEvaluationSource(expressionParts, ctx);
-            }
+                "%resource" => ResourceEvaluationSource(expr, ctx),
+                "%questionnaire" => QuestionnaireEvaluationSource(expressionParts, ctx),
+                _ => VariableEvaluationSource(expressionParts, ctx)
+            };
         }
         else if (ctx.CurrentContext is not null)
         {
@@ -129,6 +127,14 @@ public static class FhirPathMapping
     private static EvaluationContext ResourceEvaluationSource(string expr, MappingContext ctx)
     {
         return new(expr, ctx.QuestionnaireResponse);
+    }
+
+    private static EvaluationContext QuestionnaireEvaluationSource(string[] exprParts, MappingContext ctx)
+    {
+        exprParts[0] = "%resource";
+        var execExpr = string.Join('.', exprParts);
+
+        return new(execExpr, ctx.Questionnaire);
     }
 
     private static EvaluationContext VariableEvaluationSource(string[] exprParts, MappingContext ctx)
