@@ -51,6 +51,7 @@ public partial class GeneralNote
                     Url = ITEM_POPULATION_CONTEXT,
                     Value = new Expression
                     {
+                        Name = "composition",
                         Language = "application/x-fhir-query",
                         Expression_ = "Composition?_id={{%compositionId}}"
                     }
@@ -219,8 +220,8 @@ public partial class GeneralNote
                 },
                 new()
                 {
-                    LinkId = "images",
-                    Text = "Images",
+                    LinkId = "image",
+                    Text = "Image",
                     Type = Questionnaire.QuestionnaireItemType.Group,
                     Repeats = true,
                     Extension =
@@ -232,7 +233,7 @@ public partial class GeneralNote
                             {
                                 Name = "images",
                                 Language = "application/x-fhir-query",
-                                Expression_ = "DocumentReference?_has:Composition:entry:_id={{%compositionId}}"
+                                Expression_ = "DocumentReference?_id={{%context.item.where(linkId='image.id')}}"
                             }
                         }
                     },

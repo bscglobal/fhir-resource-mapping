@@ -57,16 +57,28 @@ public partial class GeneralNote
       "linkId": "noteDocumentReference",
       "item": [
         {
-          "linkId": "note.id"
+          "linkId": "note.id",
+          "answer": [ 
+            {
+              "valueString": "test id"
+            }
+          ]
         },
         {
-          "linkId": "note.subject"
+          "linkId": "note.subject",
         },
         {
           "linkId": "note.content",
           "item": [
             {
-              "linkId": "documentReference.content.attachment"
+              "linkId": "documentReference.content.attachment",
+              "answer": [
+                  {
+                      "valueAttachment": {
+                          "data": "aGVsbG8gd29ybGQ="
+                      }
+                  }
+              ]
             }
           ]
         },
@@ -76,10 +88,13 @@ public partial class GeneralNote
       ]
     },
     {
-      "linkId": "images",
+      "linkId": "image",
       "item": [
         {
-          "linkId": "image.id"
+          "linkId": "image.id",
+          "answer": {
+              "valueString": "image test id",
+          }
         },
         {
           "linkId": "image.author"
@@ -88,7 +103,24 @@ public partial class GeneralNote
           "linkId": "image.subject"
         }
       ]
-    }
+    },
+    {
+      "linkId": "image",
+      "item": [
+        {
+          "linkId": "image.id",
+          "answer": {
+              "valueString": "image test id 2",
+          }
+        },
+        {
+          "linkId": "image.author"
+        },
+        {
+          "linkId": "image.subject"
+        }
+      ]
+    },
   ]
 }
 """;
