@@ -96,152 +96,116 @@ public static class ResourceMapper
 
             foreach (var responseItem in responseItems)
             {
-                await ExtractByDefinition(
-                    questionnaireItem,
-                    responseItem,
-                    extractionContext,
-                    extractionResult,
-                    profileLoader,
-                    cancellationToken
-                );
+                extractionContext.QuestionnaireItem = questionnaireItem;
+                extractionContext.QuestionnaireResponseItem = responseItem;
+                await ExtractByDefinition(extractionContext, extractionResult, profileLoader, cancellationToken);
             }
         }
     }
 
     private static async Task ExtractByDefinition(
-        Questionnaire.ItemComponent questionnaireItem,
-        QuestionnaireResponse.ItemComponent questionnaireResponseItem,
-        MappingContext extractionContext,
+        MappingContext ctx,
         List<Resource> extractionResult,
         IProfileLoader profileLoader,
         CancellationToken cancellationToken = default
     )
     {
-        if (questionnaireItem.Type == Questionnaire.QuestionnaireItemType.Group)
+        if (ctx.QuestionnaireItem.Type == Questionnaire.QuestionnaireItemType.Group)
         {
-            if (questionnaireItem.Extension.ItemExtractionContextExtractionValue() is not null)
+            if (ctx.QuestionnaireItem.Extension.ItemExtractionContextExtractionValue() is not null)
             {
-                await ExtractResourceByDefinition(
-                    questionnaireItem,
-                    questionnaireResponseItem,
-                    extractionContext,
-                    extractionResult,
-                    profileLoader,
-                    cancellationToken
-                );
+                await ExtractResourceByDefinition(ctx, extractionResult, profileLoader, cancellationToken);
             }
-            else if (questionnaireItem.Definition is not null)
+            else if (ctx.QuestionnaireItem.Definition is not null)
             {
-                if (extractionContext.CurrentContext is null)
+                if (ctx.CurrentContext is null)
                 {
                     throw new InvalidOperationException(
-                        $"No extraction context defined for {questionnaireItem.Definition}"
+                        $"No extraction context defined for {ctx.QuestionnaireItem.Definition}"
                     );
                 }
-                await ExtractComplexTypeValueByDefinition(
-                    questionnaireItem,
-                    questionnaireResponseItem,
-                    extractionContext,
-                    extractionResult,
-                    profileLoader,
-                    cancellationToken
-                );
+                await ExtractComplexTypeValueByDefinition(ctx, extractionResult, profileLoader, cancellationToken);
             }
             else
             {
                 await ExtractByDefinition(
-                    questionnaireItem.Item,
-                    questionnaireResponseItem.Item,
-                    extractionContext,
+                    ctx.QuestionnaireItem.Item,
+                    ctx.QuestionnaireResponseItem.Item,
+                    ctx,
                     extractionResult,
                     profileLoader,
                     cancellationToken
                 );
             }
         }
-        else if (questionnaireItem.Definition is not null)
+        else if (ctx.QuestionnaireItem.Definition is not null)
         {
-            if (extractionContext is null)
+            if (ctx.CurrentContext is null)
             {
                 throw new InvalidOperationException(
-                    $"No extraction context defined for {questionnaireItem.Definition}"
+                    $"No extraction context defined for {ctx.QuestionnaireItem.Definition}"
                 );
             }
 
-            await ExtractPrimitiveTypeValueByDefinition(
-                questionnaireItem,
-                questionnaireResponseItem,
-                extractionContext,
-                profileLoader,
-                cancellationToken
-            );
+            await ExtractPrimitiveTypeValueByDefinition(ctx, profileLoader, cancellationToken);
         }
         else
         {
-            Console.WriteLine("Error: Could not extract questionnaire item with LinkId {0}", questionnaireItem.LinkId);
+            Console.WriteLine(
+                "Error: Could not extract questionnaire item with LinkId {0}",
+                ctx.QuestionnaireItem.LinkId
+            );
         }
     }
 
     private static async Task ExtractResourceByDefinition(
-        Questionnaire.ItemComponent questionnaireItem,
-        QuestionnaireResponse.ItemComponent questionnaireResponseItem,
-        MappingContext extractionContext,
+        MappingContext ctx,
         List<Resource> extractionResult,
         IProfileLoader profileLoader,
         CancellationToken cancellationToken = default
     )
     {
-        var resource = questionnaireItem.CreateResource(extractionContext);
+        var resource = ctx.QuestionnaireItem.CreateResource(ctx);
 
         if (resource is null)
         {
             throw new InvalidOperationException("Unable to create a resource from questionnaire item");
         }
 
-        extractionContext.SetCurrentContext(resource);
+        ctx.SetCurrentContext(resource);
 
         await ExtractByDefinition(
-            questionnaireItem.Item,
-            questionnaireResponseItem.Item,
-            extractionContext,
+            ctx.QuestionnaireItem.Item,
+            ctx.QuestionnaireResponseItem.Item,
+            ctx,
             extractionResult,
             profileLoader,
             cancellationToken
         );
 
         extractionResult.Add(resource);
-        extractionContext.RemoveContext();
+        ctx.RemoveContext();
     }
 
     private static async Task ExtractComplexTypeValueByDefinition(
-        Questionnaire.ItemComponent questionnaireItem,
-        QuestionnaireResponse.ItemComponent questionnaireResponseItem,
-        MappingContext extractionContext,
+        MappingContext ctx,
         List<Resource> extractionResult,
         IProfileLoader profileLoader,
         CancellationToken cancellationToken = default
     )
     {
-        if (extractionContext.CurrentContext is null)
+        if (ctx.CurrentContext is null)
         {
-            throw new ArgumentException("ExtractionContext.CurrentContext is null", nameof(extractionContext));
+            throw new ArgumentException("ExtractionContext.CurrentContext is null", nameof(ctx));
         }
 
-        var fieldName = FieldNameByDefinition(questionnaireItem.Definition);
-        var fieldInfo = extractionContext.CurrentContext.GetType().GetProperty(fieldName);
+        var fieldName = FieldNameByDefinition(ctx.QuestionnaireItem.Definition);
+        var fieldInfo = ctx.CurrentContext.GetType().GetProperty(fieldName);
 
-        var definition = questionnaireItem.Definition;
+        var definition = ctx.QuestionnaireItem.Definition;
         if (fieldInfo is null)
         {
-            await UseSliceFromProfile(
-                questionnaireItem,
-                questionnaireResponseItem,
-                fieldName,
-                extractionContext,
-                extractionResult,
-                profileLoader,
-                cancellationToken
-            );
+            await UseSliceFromProfile(fieldName, ctx, extractionResult, profileLoader, cancellationToken);
         }
         else
         {
@@ -254,64 +218,62 @@ public static class ResourceMapper
 
             if (fieldInfo.IsNonStringEnumerable())
             {
-                var val = fieldInfo.GetValue(extractionContext.CurrentContext);
+                var val = fieldInfo.GetValue(ctx.CurrentContext);
                 fieldInfo.PropertyType.GetMethod("Add")?.Invoke(val, new[] { value });
             }
             else
             {
-                fieldInfo.SetValue(extractionContext.CurrentContext, value);
+                fieldInfo.SetValue(ctx.CurrentContext, value);
             }
 
-            extractionContext.SetCurrentContext(value);
+            ctx.SetCurrentContext(value);
 
             await ExtractByDefinition(
-                questionnaireItem.Item,
-                questionnaireResponseItem.Item,
-                extractionContext,
+                ctx.QuestionnaireItem.Item,
+                ctx.QuestionnaireResponseItem.Item,
+                ctx,
                 extractionResult,
                 profileLoader,
                 cancellationToken
             );
 
-            extractionContext.RemoveContext();
+            ctx.RemoveContext();
         }
     }
 
     private static async Task ExtractPrimitiveTypeValueByDefinition(
-        Questionnaire.ItemComponent questionnaireItem,
-        QuestionnaireResponse.ItemComponent questionnaireResponseItem,
-        MappingContext context,
+        MappingContext ctx,
         IProfileLoader profileLoader,
         CancellationToken cancellationToken = default
     )
     {
-        if (context.CurrentContext is null)
+        if (ctx.CurrentContext is null)
         {
-            throw new ArgumentException("ExtractionContext.CurrentContext is null", nameof(context));
+            throw new ArgumentException("ExtractionContext.CurrentContext is null", nameof(ctx));
         }
 
-        var calculatedValue = questionnaireItem.CalculatedExpressionResult(context);
-        if (calculatedValue is not null && questionnaireResponseItem.Answer.Count > 0)
+        var calculatedValue = ctx.QuestionnaireItem.CalculatedExpressionResult(ctx);
+        if (calculatedValue is not null && ctx.QuestionnaireResponseItem.Answer.Count > 0)
         {
             Console.WriteLine(
                 "Error: both calculated value and answer exist on QuestionnaireResponse item {0}",
-                questionnaireItem.LinkId
+                ctx.QuestionnaireItem.LinkId
             );
 
             return;
         }
 
-        if (questionnaireResponseItem.Answer.Count == 0 && calculatedValue?.Result.Length is 0 or null)
+        if (ctx.QuestionnaireResponseItem.Answer.Count == 0 && calculatedValue?.Result.Length is 0 or null)
         {
-            Console.WriteLine("Warning: no answer or calculated value for {0}", questionnaireItem.LinkId);
+            Console.WriteLine("Warning: no answer or calculated value for {0}", ctx.QuestionnaireItem.LinkId);
             return;
         }
 
-        var definition = questionnaireItem.Definition;
+        var definition = ctx.QuestionnaireItem.Definition;
 
         var fieldName = FieldNameByDefinition(definition, true);
 
-        var contextType = context.CurrentContext.GetType();
+        var contextType = ctx.CurrentContext.GetType();
         var field = contextType.GetProperty(fieldName);
 
         if (field is null)
@@ -324,13 +286,13 @@ public static class ResourceMapper
         {
             if (field.NonParameterizedType().IsEnum)
             {
-                UpdateFieldWithEnum(context.CurrentContext, field, questionnaireResponseItem.Answer.First().Value);
+                UpdateFieldWithEnum(ctx.CurrentContext, field, ctx.QuestionnaireResponseItem.Answer.First().Value);
             }
             else
             {
                 // NOTE: Should we overwrite submitted answer with calculated value or visa versa?
                 UpdateField(
-                    context.CurrentContext,
+                    ctx.CurrentContext,
                     field,
                     calculatedValue?.Result
                         .OfType<DataType>()
@@ -349,34 +311,32 @@ public static class ResourceMapper
                             {
                                 return answer;
                             }
-                        }) ?? questionnaireResponseItem.Answer.Select(ans => ans.Value)
+                        }) ?? ctx.QuestionnaireResponseItem.Answer.Select(ans => ans.Value)
                 );
             }
 
             return;
         }
 
-        await UseExtensionFromProfile(questionnaireItem, questionnaireResponseItem, fieldName, context, profileLoader);
+        await UseExtensionFromProfile(fieldName, ctx, profileLoader);
     }
 
     private static async Task UseSliceFromProfile(
-        Questionnaire.ItemComponent questionnaireItem,
-        QuestionnaireResponse.ItemComponent questionnaireResponseItem,
         string fieldName,
-        MappingContext context,
+        MappingContext ctx,
         List<Resource> extractionResult,
         IProfileLoader profileLoader,
         CancellationToken cancellationToken = default
     )
     {
-        if (context.CurrentContext is null)
+        if (ctx.CurrentContext is null)
         {
             Console.WriteLine("Error: CurrentContext is null");
             return;
         }
 
-        var definition = questionnaireItem.Definition;
-        var profileContext = await GetProfile(questionnaireItem, context, profileLoader, cancellationToken);
+        var definition = ctx.QuestionnaireItem.Definition;
+        var profileContext = await GetProfile(ctx, profileLoader, cancellationToken);
 
         if (profileContext is null)
         {
@@ -393,12 +353,10 @@ public static class ResourceMapper
             if (IsSliceSupportedByProfile(profileContext.Profile, typeToCheck, sliceName))
             {
                 await ExtractSlice(
-                    questionnaireItem,
-                    questionnaireResponseItem,
                     profileContext.Profile,
                     typeToCheck,
                     sliceName,
-                    context,
+                    ctx,
                     extractionResult,
                     profileLoader,
                     cancellationToken
@@ -410,65 +368,62 @@ public static class ResourceMapper
                     "Warning: slice '{0}' for field {1} is not defined in StructureDefinition for {2}, so field is ignored",
                     sliceName,
                     fieldName,
-                    ModelInfo.GetFhirTypeNameForType(context.CurrentContext.GetType())
+                    ModelInfo.GetFhirTypeNameForType(ctx.CurrentContext.GetType())
                 );
             }
         }
     }
 
     private static async Task UseExtensionFromProfile(
-        Questionnaire.ItemComponent questionnaireItem,
-        QuestionnaireResponse.ItemComponent questionnaireResponseItem,
         string fieldName,
-        MappingContext context,
+        MappingContext ctx,
         IProfileLoader profileLoader,
         CancellationToken cancellationToken = default
     )
     {
-        if (context.CurrentContext is null)
+        if (ctx.CurrentContext is null)
         {
             Console.WriteLine("Error: CurrentContext is null");
             return;
         }
 
-        var profileContext = await GetProfile(questionnaireItem, context, profileLoader, cancellationToken);
+        var profileContext = await GetProfile(ctx, profileLoader, cancellationToken);
 
         if (profileContext is null)
         {
             return;
         }
 
-        var definition = questionnaireItem.Definition;
+        var definition = ctx.QuestionnaireItem.Definition;
         var extensionForType = definition[(profileContext.PoundIndex + 1)..definition.LastIndexOf('.')];
 
         if (IsExtensionSupportedByProfile(profileContext.Profile, extensionForType, fieldName))
         {
-            AddDefinitionBasedCustomExtension(questionnaireItem, questionnaireResponseItem, context.CurrentContext);
+            AddDefinitionBasedCustomExtension(ctx);
         }
         else
         {
             Console.WriteLine(
                 "Warning: extension for field {0} is not defined in StructureDefinition for {1}, so field is ignored",
                 fieldName,
-                ModelInfo.GetFhirTypeNameForType(context.CurrentContext.GetType())
+                ModelInfo.GetFhirTypeNameForType(ctx.CurrentContext.GetType())
             );
         }
     }
 
     private static async Task<ProfileContext?> GetProfile(
-        Questionnaire.ItemComponent questionnaireItem,
-        MappingContext context,
+        MappingContext ctx,
         IProfileLoader profileLoader,
         CancellationToken cancellationToken = default
     )
     {
-        if (context.CurrentContext is null)
+        if (ctx.CurrentContext is null)
         {
             Console.WriteLine("Error: CurrentContext is null");
             return null;
         }
 
-        var definition = questionnaireItem.Definition;
+        var definition = ctx.QuestionnaireItem.Definition;
         var poundIndex = definition.LastIndexOf('#');
         if (poundIndex < 0)
         {
@@ -489,24 +444,22 @@ public static class ResourceMapper
     }
 
     private static async Task ExtractSlice(
-        Questionnaire.ItemComponent questionnaireItem,
-        QuestionnaireResponse.ItemComponent questionnaireResponseItem,
         StructureDefinition profile,
         string baseType,
         string sliceName,
-        MappingContext context,
+        MappingContext ctx,
         List<Resource> extractionResult,
         IProfileLoader profileLoader,
         CancellationToken cancellationToken = default
     )
     {
-        if (context.CurrentContext is null)
+        if (ctx.CurrentContext is null)
         {
             Console.WriteLine("Error: MappingContext.CurrentContext is null");
             return;
         }
 
-        if (questionnaireItem.Repeats == true)
+        if (ctx.QuestionnaireItem.Repeats == true)
         {
             Console.WriteLine("Error: QuestionnaireItem with slice definition should not repeat");
             return;
@@ -524,7 +477,7 @@ public static class ResourceMapper
         var discriminators = elementEnumerator.Current.Slicing!.Discriminator;
 
         var fieldName = FieldNameByDefinition(baseType);
-        var contextType = context.CurrentContext.GetType();
+        var contextType = ctx.CurrentContext.GetType();
         var fieldInfo = contextType.GetProperty(fieldName);
 
         if (fieldInfo is null)
@@ -592,26 +545,26 @@ public static class ResourceMapper
 
         if (fieldInfo.IsNonStringEnumerable())
         {
-            var val = fieldInfo.GetValue(context.CurrentContext);
+            var val = fieldInfo.GetValue(ctx.CurrentContext);
             fieldInfo.PropertyType.GetMethod("Add")?.Invoke(val, new[] { value });
         }
         else
         {
-            fieldInfo.SetValue(context.CurrentContext, value);
+            fieldInfo.SetValue(ctx.CurrentContext, value);
         }
 
-        context.SetCurrentContext(value);
+        ctx.SetCurrentContext(value);
 
         await ExtractByDefinition(
-            questionnaireItem.Item,
-            questionnaireResponseItem.Item,
-            context,
+            ctx.QuestionnaireItem.Item,
+            ctx.QuestionnaireResponseItem.Item,
+            ctx,
             extractionResult,
             profileLoader,
             cancellationToken
         );
 
-        context.RemoveContext();
+        ctx.RemoveContext();
     }
 
     private static void UpdateField(Base resource, PropertyInfo field, IEnumerable<DataType> answers)
@@ -744,19 +697,18 @@ public static class ResourceMapper
         return val;
     }
 
-    private static void AddDefinitionBasedCustomExtension(
-        Questionnaire.ItemComponent questionnaireItem,
-        QuestionnaireResponse.ItemComponent questionnaireResponseItem,
-        Base baseObj
-    )
+    private static void AddDefinitionBasedCustomExtension(MappingContext ctx)
     {
-        if (baseObj is DataType dataType)
+        if (ctx.CurrentContext is DataType dataType)
         {
-            dataType.AddExtension(questionnaireItem.Definition, questionnaireResponseItem.Answer.First().Value);
+            dataType.AddExtension(ctx.QuestionnaireItem.Definition, ctx.QuestionnaireResponseItem.Answer.First().Value);
         }
-        else if (baseObj is DomainResource domainResource)
+        else if (ctx.CurrentContext is DomainResource domainResource)
         {
-            domainResource.AddExtension(questionnaireItem.Definition, questionnaireResponseItem.Answer.First().Value);
+            domainResource.AddExtension(
+                ctx.QuestionnaireItem.Definition,
+                ctx.QuestionnaireResponseItem.Answer.First().Value
+            );
         }
     }
 

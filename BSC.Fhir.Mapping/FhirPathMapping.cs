@@ -137,6 +137,20 @@ public static class FhirPathMapping
         return new(execExpr, ctx.Questionnaire);
     }
 
+    private static EvaluationContext ContextEvaluationSource(string[] exprParts, MappingContext ctx)
+    {
+        exprParts[0] = "%resource";
+        var execExpr = string.Join('.', exprParts);
+
+        Base source = ctx.QuestionnaireResponseItem switch
+        {
+            null => ctx.QuestionnaireResponse,
+            _ => ctx.QuestionnaireResponseItem
+        };
+
+        return new(execExpr, source);
+    }
+
     private static EvaluationContext VariableEvaluationSource(string[] exprParts, MappingContext ctx)
     {
         EvaluationContext evaluationCtx;

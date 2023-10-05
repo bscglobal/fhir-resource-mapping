@@ -31,6 +31,10 @@ public class MappingContext : IDictionary<string, ContextValue>
     private readonly Stack<ContextValue> _context = new();
 
     public Base? CurrentContext => _context.TryPeek(out var context) ? context.Value.First() : null;
+
+    public Questionnaire.ItemComponent QuestionnaireItem { get; set; } = new();
+    public QuestionnaireResponse.ItemComponent QuestionnaireResponseItem { get; set; } = new();
+
     public Questionnaire Questionnaire { get; init; }
     public QuestionnaireResponse QuestionnaireResponse { get; init; }
 
