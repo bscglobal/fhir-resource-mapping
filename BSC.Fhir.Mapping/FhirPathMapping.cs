@@ -101,43 +101,17 @@ public static class FhirPathMapping
     private static EvaluationContext GetEvaluationContext(string expr, MappingContext ctx)
     {
         EvaluationContext evaluationCtx;
-        if (expr.StartsWith("%"))
+        var expressionParts = expr.Split('.');
+        var start = expressionParts[0];
+        if (start.StartsWith("%"))
         {
-            if (expr.StartsWith("%resource"))
+            if (start.StartsWith("%resource"))
             {
-                if (ctx.Questionnaire is null)
-                {
-                    throw new ArgumentException("Questionnaire in MappingContext is null");
-                }
-
-                return new(expr, ctx.Questionnaire);
+                evaluationCtx = ResourceEvaluationSource(expr, ctx);
             }
             else
             {
-                var expressionParts = expr.Split('.');
-                var variableName = expressionParts.First()[1..];
-
-                if (!ctx.TryGetValue(variableName, out var variable))
-                {
-                    expressionParts[0] = "%resource";
-                    var execExpr = string.Join('.', expressionParts);
-
-                    evaluationCtx = new(execExpr);
-                }
-                else
-                {
-                    if (variable.Value.Length == 0 || variable.Value.Length > 1)
-                    {
-                        throw new InvalidOperationException(
-                            $"Cannot use variable with any number of items other than 1. variableName: {variableName}"
-                        );
-                    }
-
-                    expressionParts[0] = "%resource";
-                    var execExpr = string.Join('.', expressionParts);
-
-                    evaluationCtx = new(execExpr, variable.Value.First());
-                }
+                evaluationCtx = VariableEvaluationSource(expressionParts, ctx);
             }
         }
         else if (ctx.CurrentContext is not null)
@@ -147,6 +121,39 @@ public static class FhirPathMapping
         else
         {
             throw new InvalidOperationException("Could not find evaluation context");
+        }
+
+        return evaluationCtx;
+    }
+
+    private static EvaluationContext ResourceEvaluationSource(string expr, MappingContext ctx)
+    {
+        return new(expr, ctx.QuestionnaireResponse);
+    }
+
+    private static EvaluationContext VariableEvaluationSource(string[] exprParts, MappingContext ctx)
+    {
+        EvaluationContext evaluationCtx;
+        var variableName = exprParts[0][1..];
+        if (!ctx.TryGetValue(variableName, out var variable))
+        {
+            exprParts[0] = "%resource";
+            var execExpr = string.Join('.', exprParts);
+
+            evaluationCtx = new(execExpr);
+        }
+        else
+        {
+            if (variable.Value.Length == 0 || variable.Value.Length > 1)
+            {
+                throw new InvalidOperationException(
+                    $"Cannot use variable with any number of items other than 1. variableName: {variableName}"
+                );
+            }
+
+            exprParts[0] = "%resource";
+            var execExpr = string.Join('.', exprParts);
+            evaluationCtx = new(execExpr, variable.Value.First());
         }
 
         return evaluationCtx;
