@@ -161,10 +161,10 @@ public class ResourceMapperTests
         var composition = GeneralNote.CreateComposition();
         var documentReference = NoteDocumentReference.CreateDocumentReference();
 
-        var response = ResourceMapper.Populate(questionnaire, documentReference, composition);
+        // var response = ResourceMapper.Populate(questionnaire, documentReference, composition);
 
         // Console.WriteLine(questionnaire.ToJson(new() { Pretty = true }));
-        Console.WriteLine(response.ToJson(new() { Pretty = true }));
+        // Console.WriteLine(response.ToJson(new() { Pretty = true }));
     }
 
     [Fact]
@@ -177,8 +177,20 @@ public class ResourceMapperTests
             .Setup(x => x.LoadProfileAsync(It.IsAny<Canonical>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(GeneralNote.CreateProfile());
 
-        var extractionResult = await ResourceMapper.Extract(questionnaire, response, new(), profileLoaderMock.Object);
+        var extractionResult = await ResourceMapper.Extract(
+            questionnaire,
+            response,
+            new()
+            {
+                { "patient", new(new Patient { Id = Guid.NewGuid().ToString() }, typeof(Patient), "patient") },
+                {
+                    "practitioner",
+                    new(new Practitioner { Id = Guid.NewGuid().ToString() }, typeof(Practitioner), "practitioner")
+                }
+            },
+            profileLoaderMock.Object
+        );
 
-        // Console.WriteLine(extractionResult.ToJson(new() { Pretty = true }));
+        Console.WriteLine(extractionResult.ToJson(new() { Pretty = true }));
     }
 }
