@@ -25,7 +25,7 @@ public class ExtensionsTests
             }
         );
 
-        var resource = questionaire.CreateResource(new());
+        var resource = questionaire.CreateResource(new(questionaire, new()));
 
         Assert.IsType(resourceType, resource);
     }

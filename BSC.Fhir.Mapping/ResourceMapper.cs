@@ -41,7 +41,6 @@ public static class ResourceMapper
         CancellationToken cancellationToken = default
     )
     {
-        extractionContext.Questionnaire = questionnaire;
         var rootResource = questionnaire.CreateResource(extractionContext);
         var extractedResources = new List<Resource>();
         if (rootResource is not null)
@@ -63,7 +62,6 @@ public static class ResourceMapper
             extractedResources.Add(rootResource);
             extractionContext.RemoveContext();
         }
-        extractionContext.Questionnaire = null;
 
         return new Bundle
         {
