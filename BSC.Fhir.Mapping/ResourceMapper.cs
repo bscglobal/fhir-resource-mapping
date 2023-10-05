@@ -119,7 +119,7 @@ public static class ResourceMapper
         CancellationToken cancellationToken = default
     )
     {
-        if (questionnaireItem.Type is Questionnaire.QuestionnaireItemType.Group)
+        if (questionnaireItem.Type == Questionnaire.QuestionnaireItemType.Group)
         {
             if (questionnaireItem.Extension.ItemExtractionContextExtractionValue() is not null)
             {
@@ -177,6 +177,10 @@ public static class ResourceMapper
                 profileLoader,
                 cancellationToken
             );
+        }
+        else
+        {
+            Console.WriteLine("Error: Could not extract questionnaire item with LinkId {0}", questionnaireItem.LinkId);
         }
     }
 
@@ -376,6 +380,15 @@ public static class ResourceMapper
                     cancellationToken
                 );
             }
+            else
+            {
+                Console.WriteLine(
+                    "Warning: slice '{0}' for field {1} is not defined in StructureDefinition for {2}, so field is ignored",
+                    sliceName,
+                    fieldName,
+                    ModelInfo.GetFhirTypeNameForType(context.CurrentContext.GetType())
+                );
+            }
         }
     }
 
@@ -407,6 +420,14 @@ public static class ResourceMapper
         if (IsExtensionSupportedByProfile(profileContext.Profile, extensionForType, fieldName))
         {
             AddDefinitionBasedCustomExtension(questionnaireItem, questionnaireResponseItem, context.CurrentContext);
+        }
+        else
+        {
+            Console.WriteLine(
+                "Warning: extension for field {0} is not defined in StructureDefinition for {1}, so field is ignored",
+                fieldName,
+                ModelInfo.GetFhirTypeNameForType(context.CurrentContext.GetType())
+            );
         }
     }
 
