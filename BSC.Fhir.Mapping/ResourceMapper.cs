@@ -292,8 +292,20 @@ public static class ResourceMapper
             throw new ArgumentException("ExtractionContext.CurrentContext is null", nameof(context));
         }
 
-        if (questionnaireResponseItem.Answer.Count == 0)
+        var calculatedValue = questionnaireItem.CalculatedExpressionResult(context);
+        if (calculatedValue is not null && questionnaireResponseItem.Answer.Count > 0)
         {
+            Console.WriteLine(
+                "Error: both calculated value and answer exist on QuestionnaireResponse item {0}",
+                questionnaireItem.LinkId
+            );
+
+            return;
+        }
+
+        if (questionnaireResponseItem.Answer.Count == 0 && calculatedValue?.Result.Length is 0 or null)
+        {
+            Console.WriteLine("Warning: no answer or calculated value for {0}", questionnaireItem.LinkId);
             return;
         }
 
@@ -309,8 +321,6 @@ public static class ResourceMapper
             fieldName = FieldNameByDefinition(definition, false);
             field = contextType.GetProperty(fieldName);
         }
-
-        var calculatedValue = questionnaireItem.CalculatedExpressionResult(context);
 
         if (field is not null)
         {
