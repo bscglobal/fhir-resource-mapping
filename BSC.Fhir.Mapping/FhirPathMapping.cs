@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Hl7.Fhir.ElementModel;
 using Hl7.Fhir.FhirPath;
 using Hl7.Fhir.Model;
@@ -6,6 +7,8 @@ using Hl7.FhirPath;
 using Hl7.FhirPath.Expressions;
 
 namespace BSC.Fhir.Mapping;
+
+public record EvaluationResult(Base SourceResource, Base[] Result);
 
 public static class FhirPathMapping
 {
@@ -21,7 +24,7 @@ public static class FhirPathMapping
         }
     }
 
-    public static Base[]? EvaluateExpr(string expr, MappingContext ctx)
+    public static EvaluationResult? EvaluateExpr(string expr, MappingContext ctx)
     {
         var evaluationCtx = GetEvaluationContext(expr, ctx);
         if (evaluationCtx?.Resource is null)
@@ -29,7 +32,32 @@ public static class FhirPathMapping
             return null;
         }
 
-        return FhirPathExtensions.Select(evaluationCtx.Resource, evaluationCtx.Expression).ToArray();
+        try
+        {
+            var result = FhirPathExtensions
+                .Select(
+                    evaluationCtx.Resource,
+                    evaluationCtx.Expression,
+                    new FhirEvaluationContext(
+                        ElementNodeExtensions.ToScopedNode(evaluationCtx.Resource.ToTypedElement())
+                    )
+                )
+                .ToArray();
+
+            return new EvaluationResult(evaluationCtx.Resource, result);
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine(
+                "\nException thrown: {0}\nMessage: {1}\nExpr: {2}\nResource: {3}\n\nStack Trace:\n\n{4}\n\n",
+                e.GetType().ToString(),
+                e.Message,
+                evaluationCtx.Expression,
+                JsonSerializer.Serialize(evaluationCtx.Resource),
+                e.StackTrace
+            );
+            return null;
+        }
     }
 
     public static Type? EvaluateTypeFromExpr(string expr, MappingContext ctx)
