@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Hl7.Fhir.FhirPath;
 using Hl7.Fhir.Model;
 
@@ -110,7 +111,7 @@ public static class QuestionnaireItemComponentExtensions
         return questionnaireItem.Item.Select(item => item.CreateQuestionnaireResponseItem());
     }
 
-    public static Base[]? CalculatedExpressionResult(
+    public static EvaluationResult? CalculatedExpressionResult(
         this Questionnaire.ItemComponent questionnaireItem,
         MappingContext context
     )
