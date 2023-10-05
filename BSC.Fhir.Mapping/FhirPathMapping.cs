@@ -109,6 +109,8 @@ public static class FhirPathMapping
             {
                 "%resource" => ResourceEvaluationSource(expr, ctx),
                 "%questionnaire" => QuestionnaireEvaluationSource(expressionParts, ctx),
+                "%context" => ContextEvaluationSource(expressionParts, ctx),
+                "%qitem" => QItemEvaluationSource(expressionParts, ctx),
                 _ => VariableEvaluationSource(expressionParts, ctx)
             };
         }
@@ -145,6 +147,23 @@ public static class FhirPathMapping
         Base source = ctx.QuestionnaireResponseItem switch
         {
             null => ctx.QuestionnaireResponse,
+            _ => ctx.QuestionnaireResponseItem
+        };
+
+        return new(execExpr, source);
+    }
+
+    private static EvaluationContext QItemEvaluationSource(string[] exprParts, MappingContext ctx)
+    {
+        exprParts[0] = "%resource";
+        var execExpr = string.Join('.', exprParts);
+
+        Base source = ctx.QuestionnaireResponseItem switch
+        {
+            null
+                => throw new InvalidOperationException(
+                    "Can not access QuestionnaireItem from expression not on QuestionnaireItem"
+                ),
             _ => ctx.QuestionnaireResponseItem
         };
 
