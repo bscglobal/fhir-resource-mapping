@@ -89,7 +89,10 @@ public static class ResourceMapper
 
             if (!questionnaireItem.Repeats ?? false && responseItems.Length > 1)
             {
-                Console.WriteLine("Error: QuestionnaireResponse should not have more than one (1) answer for '{0}'");
+                Console.WriteLine(
+                    "Error: QuestionnaireResponse should not have more than one (1) answer for '{0}'",
+                    questionnaireItem.LinkId
+                );
                 continue;
             }
 
