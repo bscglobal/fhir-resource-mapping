@@ -81,26 +81,23 @@ public static class ResourceMapper
         CancellationToken cancellationToken = default
     )
     {
-        var questionnaireItemsEnumarator = questionnaireItems.AsEnumerable().GetEnumerator();
-        var questionnaireResponseItemsEnumarator = questionnaireResponseItems.AsEnumerable().GetEnumerator();
-
-        while (questionnaireItemsEnumarator.MoveNext() && questionnaireResponseItemsEnumarator.MoveNext())
+        foreach (var questionnaireItem in questionnaireItems)
         {
-            var currentResponseItem = questionnaireResponseItemsEnumarator.Current;
-            var currentQuestionnaireItem = questionnaireItemsEnumarator.Current;
+            var responseItems = questionnaireResponseItems
+                .Where(responseItem => responseItem.LinkId == questionnaireItem.LinkId)
+                .ToArray();
 
-            while (
-                currentQuestionnaireItem.LinkId != currentResponseItem.LinkId && questionnaireItemsEnumarator.MoveNext()
-            )
+            if (!questionnaireItem.Repeats ?? false && responseItems.Length > 1)
             {
-                currentQuestionnaireItem = questionnaireItemsEnumarator.Current;
+                Console.WriteLine("Error: QuestionnaireResponse should not have more than one (1) answer for '{0}'");
+                continue;
             }
 
-            if (currentQuestionnaireItem.LinkId == currentResponseItem.LinkId)
+            foreach (var responseItem in responseItems)
             {
                 await ExtractByDefinition(
-                    currentQuestionnaireItem,
-                    currentResponseItem,
+                    questionnaireItem,
+                    responseItem,
                     extractionContext,
                     extractionResult,
                     profileLoader,
