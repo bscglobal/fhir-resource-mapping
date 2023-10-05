@@ -334,8 +334,24 @@ public static class ResourceMapper
                 UpdateField(
                     context.CurrentContext,
                     field,
-                    calculatedValue?.Select(calc => calc as DataType).OfType<DataType>()
-                        ?? questionnaireResponseItem.Answer.Select(ans => ans.Value)
+                    calculatedValue?.Result
+                        .OfType<DataType>()
+                        .Select(answer =>
+                        {
+                            if (
+                                field.PropertyType.NonParameterizedType() == typeof(ResourceReference)
+                                && answer is Id idAnswer
+                            )
+                            {
+                                return new ResourceReference(
+                                    $"{ModelInfo.GetFhirTypeNameForType(calculatedValue.SourceResource.GetType())}/{idAnswer.Value}"
+                                );
+                            }
+                            else
+                            {
+                                return answer;
+                            }
+                        }) ?? questionnaireResponseItem.Answer.Select(ans => ans.Value)
                 );
             }
 
