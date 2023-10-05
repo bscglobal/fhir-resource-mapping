@@ -32,7 +32,11 @@ public class ResourceMapperTests
         var demoQuestionnaire = Demographics.CreateQuestionnaire();
         var demoQuestionnaireResponse = Demographics.CreateQuestionnaireResponse();
 
-        var bundle = await ResourceMapper.Extract(demoQuestionnaire, demoQuestionnaireResponse, new());
+        var bundle = await ResourceMapper.Extract(
+            demoQuestionnaire,
+            demoQuestionnaireResponse,
+            new(demoQuestionnaire, demoQuestionnaireResponse)
+        );
 
         // Console.WriteLine(bundle.ToJson(new FhirJsonSerializationSettings { Pretty = true }));
 
@@ -180,7 +184,7 @@ public class ResourceMapperTests
         var extractionResult = await ResourceMapper.Extract(
             questionnaire,
             response,
-            new()
+            new(questionnaire, response)
             {
                 { "patient", new(new Patient { Id = Guid.NewGuid().ToString() }, typeof(Patient), "patient") },
                 {
