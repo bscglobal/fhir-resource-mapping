@@ -29,6 +29,9 @@ public partial class GeneralNote
               "valueString": "Note"
             }
           ]
+        },
+        {
+          "linkId": "noteSection.entry"
         }
       ]
     },
@@ -36,12 +39,15 @@ public partial class GeneralNote
       "linkId": "imageSection",
       "item": [
         {
-          "linkId": "noteSection.title",
+          "linkId": "imageSection.title",
           "answer": [
             {
               "valueString": "Image"
             }
           ]
+        },
+        {
+          "linkId": "imageSection.entry"
         }
       ]
     },

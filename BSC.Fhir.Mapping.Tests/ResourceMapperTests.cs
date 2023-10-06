@@ -187,10 +187,7 @@ public class ResourceMapperTests
             new(questionnaire, response)
             {
                 { "patient", new(new Patient { Id = Guid.NewGuid().ToString() }, typeof(Patient), "patient") },
-                {
-                    "practitioner",
-                    new(new Practitioner { Id = Guid.NewGuid().ToString() }, typeof(Practitioner), "practitioner")
-                }
+                { "user", new(new Practitioner { Id = Guid.NewGuid().ToString() }, typeof(Practitioner), "user") }
             },
             profileLoaderMock.Object
         );
