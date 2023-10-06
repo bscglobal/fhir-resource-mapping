@@ -1,0 +1,53 @@
+parameters:
+  - name: targetArtifactsFeed
+    type: string
+    default: bsclib/dotnet
+
+variables:
+  build_number: "0.0.1"
+
+trigger:
+- main
+
+pool:
+  vmImage: ubuntu-latest
+
+steps:
+  - task: UseDotNet@2
+    displayName: Set .NET Version
+    inputs:
+      version: 7.0.x
+  - task: DotNetCoreCLI@2
+    displayName: Restore
+    inputs:
+      command: restore
+  - task: DotNetCoreCLI@2
+    displayName: Build
+    inputs:
+      command: build
+      arguments: "--configuration Release"
+  - task: DotNetCoreCLI@2
+    displayName: Test
+    inputs:
+      command: test
+      arguments: "--configuration Release --verbosity normal"
+  - task: DotNetCoreCLI@2
+    displayName: Pack
+    inputs:
+      command: 'pack'
+      packagesToPack: '**/*.csproj;!**/*Test*.csproj'
+      configuration: 'Release'
+      versioningScheme: byEnvVar
+      versionEnvVar: BUILD_NUMBER
+      
+  - task: NuGetAuthenticate@1
+    displayName: NuGet Authenticate
+  - task: NuGetCommand@2
+    displayName: NuGet Push
+    inputs:
+          command: push
+          nuGetFeedType: internal
+          packagesToPush: '$(Build.ArtifactStagingDirectory)/*.nupkg'
+          publishPackageMetadata: true
+          publishVstsFeed: '${{ parameters.targetArtifactsFeed }}'
+          allowPackageConflicts: true
