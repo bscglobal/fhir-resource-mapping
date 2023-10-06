@@ -1,0 +1,69 @@
+parameters:
+  - name: targetArtifactsFeed
+    type: string
+    default: bsclib/dotnet
+  - name: prerelease
+    type: boolean
+    default: true
+
+trigger:
+  branches:
+    include:
+      - main
+
+pr: none
+
+pool:
+  vmImage: ubuntu-latest
+
+steps:
+  - task: Bash@3
+    displayName: Set Version Variables
+    inputs:
+      filePath: ./scripts/version.sh
+  - task: UseDotNet@2
+    displayName: Set .NET Version
+    inputs:
+      version: 7.0.x
+  - task: DotNetCoreCLI@2
+    displayName: Restore
+    inputs:
+      command: restore
+  - task: DotNetCoreCLI@2
+    displayName: Build
+    inputs:
+      command: build
+      configuration: Release
+  - task: DotNetCoreCLI@2
+    displayName: Test
+    inputs:
+      command: test
+      configuration: Release
+      arguments: "--verbosity normal"
+  - task: DotNetCoreCLI@2
+    displayName: Pack
+    inputs:
+      command: 'pack'
+      packagesToPack: './BSC.Fhir.Mapping/BSC.Fhir.Mapping.csproj'
+      configuration: 'Release'
+      majorVersion: $(proj_major)
+      minorVersion: $(proj_minor)
+      patchVersion: $(proj_patch)
+      versionEnvVar: SEMVER_VERSION
+
+      ${{if eq(parameters.prerelease, true)}}:
+        versioningScheme: byPrereleaseNumber
+
+      ${{if eq(parameters.prerelease, false)}}:
+        versioningScheme: byEnvVar
+
+  - task: NuGetAuthenticate@1
+    displayName: NuGet Authenticate
+  - task: NuGetCommand@2
+    displayName: NuGet Push
+    inputs:
+          command: push
+          nuGetFeedType: internal
+          packagesToPush: '$(Build.ArtifactStagingDirectory)/*.nupkg'
+          publishPackageMetadata: true
+          publishVstsFeed: '${{ parameters.targetArtifactsFeed }}'
