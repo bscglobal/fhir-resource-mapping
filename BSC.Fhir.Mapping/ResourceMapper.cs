@@ -290,29 +290,29 @@ public static class ResourceMapper
             }
             else
             {
-                // NOTE: Should we overwrite submitted answer with calculated value or visa versa?
-                UpdateField(
-                    ctx.CurrentContext,
-                    field,
-                    calculatedValue?.Result
-                        .OfType<DataType>()
-                        .Select(answer =>
-                        {
-                            if (
-                                field.PropertyType.NonParameterizedType() == typeof(ResourceReference)
-                                && answer is Id idAnswer
-                            )
-                            {
-                                return new ResourceReference(
-                                    $"{ModelInfo.GetFhirTypeNameForType(calculatedValue.SourceResource.GetType())}/{idAnswer.Value}"
-                                );
-                            }
-                            else
-                            {
-                                return answer;
-                            }
-                        }) ?? ctx.QuestionnaireResponseItem.Answer.Select(ans => ans.Value)
-                );
+                var propertyType = field.PropertyType.NonParameterizedType();
+                IEnumerable<DataType> answers;
+
+                if (calculatedValue is null)
+                {
+                    answers = ctx.QuestionnaireResponseItem.Answer.Select(ans => ans.Value);
+                }
+                else
+                {
+                    var calculatedValues = calculatedValue.Result.OfType<DataType>();
+
+                    if (field.PropertyType.NonParameterizedType() == typeof(ResourceReference))
+                    {
+                        var sourceType = calculatedValue.SourceResource.GetType();
+                        answers = calculatedValues.Select(value => CreateResourceReference(value, sourceType));
+                    }
+                    else
+                    {
+                        answers = calculatedValues;
+                    }
+                }
+
+                UpdateField(ctx.CurrentContext, field, answers);
             }
 
             return;
@@ -565,6 +565,26 @@ public static class ResourceMapper
         );
 
         ctx.RemoveContext();
+    }
+
+    private static ResourceReference CreateResourceReference(Base from, Type referenceType)
+    {
+        if (from is ResourceReference reference)
+        {
+            return reference;
+        }
+
+        var idStr = from switch
+        {
+            Id fromId => fromId.Value,
+            FhirString fhirStr => fhirStr.Value,
+            _
+                => throw new InvalidOperationException(
+                    $"Error: cannot create reference from {ModelInfo.GetFhirTypeNameForType(from.GetType())}"
+                )
+        };
+
+        return new ResourceReference($"{ModelInfo.GetFhirTypeNameForType(referenceType)}/{idStr}");
     }
 
     private static void UpdateField(Base resource, PropertyInfo field, IEnumerable<DataType> answers)

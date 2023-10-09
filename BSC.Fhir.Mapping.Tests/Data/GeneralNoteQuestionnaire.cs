@@ -14,6 +14,8 @@ public partial class GeneralNote
     private const string QUESTIONNAIRE_ITEM_CALCULATED_EXPRESSION =
         "http://hl7.org/fhir/uv/sdc/StructureDefinition-sdc-questionnaire-calculatedExpression.html";
     private const string VARIABLE_EXTENSION_URL = "http://hl7.org/fhir/StructureDefinition/variable";
+    private const string LAUNCH_CONTEXT_EXTENSION_URL =
+        "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-launchContext";
 
     public static Questionnaire CreateQuestionnaire()
     {
@@ -26,6 +28,42 @@ public partial class GeneralNote
             Status = PublicationStatus.Draft,
             Extension =
             {
+                new Extension
+                {
+                    Url = LAUNCH_CONTEXT_EXTENSION_URL,
+                    Extension =
+                    {
+                        new()
+                        {
+                            Url = "name",
+                            Value = new Coding
+                            {
+                                System = "http://hl7.org/fhir/uv/sdc/CodeSystem/launchContext",
+                                Code = "patient",
+                                Display = "Patient"
+                            }
+                        },
+                        new() { Url = "type", Value = new FhirString("patient") }
+                    }
+                },
+                new Extension
+                {
+                    Url = LAUNCH_CONTEXT_EXTENSION_URL,
+                    Extension =
+                    {
+                        new()
+                        {
+                            Url = "name",
+                            Value = new Coding
+                            {
+                                System = "http://hl7.org/fhir/uv/sdc/CodeSystem/launchContext",
+                                Code = "user",
+                                Display = "User"
+                            }
+                        },
+                        new() { Url = "type", Value = new FhirString("Practitioner") }
+                    }
+                },
                 new Extension
                 {
                     Url = VARIABLE_EXTENSION_URL,
@@ -87,24 +125,30 @@ public partial class GeneralNote
                         {
                             Definition = "Composition.section.title",
                             LinkId = "noteSection.title",
-                            // Extension =
-                            // {
-                            //     new() { Url = QUESTIONNAIRE_HIDDEN_URL, Value = new FhirBoolean(true) },
-                            //     new()
-                            //     {
-                            //         Url = QUESTIONNAIRE_ITEM_CALCULATED_EXPRESSION,
-                            //         Value = new Expression
-                            //         {
-                            //             Language = "text/fhirpath",
-                            //             Expression_ =
-                            //                 "%resource.item.where(LinkId = 'noteDocumentReference').first().item.where(LinkId = 'note.id').first()"
-                            //         }
-                            //     }
-                            // },
                             Type = Questionnaire.QuestionnaireItemType.Text,
                             Initial = { new() { Value = new FhirString("Note") } }
+                        },
+                        new()
+                        {
+                            Definition = "Composition.section.entry",
+                            LinkId = "noteSection.entry",
+                            Type = Questionnaire.QuestionnaireItemType.Reference,
+                            Extension =
+                            {
+                                new() { Url = QUESTIONNAIRE_HIDDEN_URL, Value = new FhirBoolean(true) },
+                                new()
+                                {
+                                    Url = QUESTIONNAIRE_ITEM_CALCULATED_EXPRESSION,
+                                    Value = new Expression
+                                    {
+                                        Language = "text/fhirpath",
+                                        Expression_ =
+                                            "%resource.item.where(linkId='noteDocumentReference').first().item.where(linkId='note.id').first().answer.value"
+                                    }
+                                }
+                            }
                         }
-                    }
+                    },
                 },
                 new()
                 {
@@ -115,10 +159,30 @@ public partial class GeneralNote
                     {
                         new()
                         {
-                            LinkId = "noteSection.title",
+                            LinkId = "imageSection.title",
                             Definition = "Composition.section.title",
                             Type = Questionnaire.QuestionnaireItemType.Text,
                             Initial = { new() { Value = new FhirString("Image") } }
+                        },
+                        new()
+                        {
+                            LinkId = "imageSection.entry",
+                            Definition = "Composition.section.entry",
+                            Type = Questionnaire.QuestionnaireItemType.Reference,
+                            Extension =
+                            {
+                                new() { Url = QUESTIONNAIRE_HIDDEN_URL, Value = new FhirBoolean(true) },
+                                new()
+                                {
+                                    Url = QUESTIONNAIRE_ITEM_CALCULATED_EXPRESSION,
+                                    Value = new Expression
+                                    {
+                                        Language = "text/fhirpath",
+                                        Expression_ =
+                                            "%resource.item.where(linkId='image').select(item.where(linkId='image.id').first().answer.value)"
+                                    }
+                                }
+                            }
                         }
                     }
                 },
@@ -206,11 +270,7 @@ public partial class GeneralNote
                                 new()
                                 {
                                     Url = QUESTIONNAIRE_ITEM_CALCULATED_EXPRESSION,
-                                    Value = new Expression
-                                    {
-                                        Language = "text/fhirpath",
-                                        Expression_ = "%practitioner.id"
-                                    }
+                                    Value = new Expression { Language = "text/fhirpath", Expression_ = "%user.id" }
                                 },
                                 new() { Url = "allow-duplicates", Value = new FhirBoolean(false) },
                                 new() { Url = QUESTIONNAIRE_HIDDEN_URL, Value = new FhirBoolean(true) }
@@ -260,11 +320,7 @@ public partial class GeneralNote
                                 new()
                                 {
                                     Url = QUESTIONNAIRE_ITEM_CALCULATED_EXPRESSION,
-                                    Value = new Expression
-                                    {
-                                        Language = "text/fhirpath",
-                                        Expression_ = "%practitioner.id"
-                                    }
+                                    Value = new Expression { Language = "text/fhirpath", Expression_ = "%user.id" }
                                 },
                                 new() { Url = QUESTIONNAIRE_HIDDEN_URL, Value = new FhirBoolean(true) }
                             },
