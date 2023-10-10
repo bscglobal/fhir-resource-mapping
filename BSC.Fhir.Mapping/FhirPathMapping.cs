@@ -2,9 +2,6 @@ using System.Text.Json;
 using Hl7.Fhir.ElementModel;
 using Hl7.Fhir.FhirPath;
 using Hl7.Fhir.Model;
-using Hl7.Fhir.Utility;
-using Hl7.FhirPath;
-using Hl7.FhirPath.Expressions;
 
 namespace BSC.Fhir.Mapping;
 
@@ -144,7 +141,7 @@ public static class FhirPathMapping
         exprParts[0] = "%resource";
         var execExpr = string.Join('.', exprParts);
 
-        Base source = ctx.QuestionnaireResponseItem switch
+        Base? source = ctx.QuestionnaireResponseItem switch
         {
             null => ctx.QuestionnaireResponse,
             _ => ctx.QuestionnaireResponseItem
@@ -158,13 +155,13 @@ public static class FhirPathMapping
         exprParts[0] = "%resource";
         var execExpr = string.Join('.', exprParts);
 
-        Base source = ctx.QuestionnaireResponseItem switch
+        Base source = ctx.QuestionnaireItem switch
         {
             null
                 => throw new InvalidOperationException(
                     "Can not access QuestionnaireItem from expression not on QuestionnaireItem"
                 ),
-            _ => ctx.QuestionnaireResponseItem
+            _ => ctx.QuestionnaireItem
         };
 
         return new(execExpr, source);
