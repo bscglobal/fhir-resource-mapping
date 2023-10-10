@@ -6,10 +6,8 @@
  */
 
 using System.Reflection;
-using System.Text.Json;
 using BSC.Fhir.Mapping.Core;
 using Hl7.Fhir.Model;
-using FhirPath = Hl7.Fhir.FhirPath;
 using Task = System.Threading.Tasks.Task;
 
 namespace BSC.Fhir.Mapping;
