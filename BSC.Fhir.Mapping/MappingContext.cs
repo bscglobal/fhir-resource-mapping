@@ -35,8 +35,8 @@ public class MappingContext : IDictionary<string, ContextValue>
     public Questionnaire.ItemComponent QuestionnaireItem { get; set; } = new();
     public QuestionnaireResponse.ItemComponent QuestionnaireResponseItem { get; set; } = new();
 
-    public Questionnaire Questionnaire { get; init; }
-    public QuestionnaireResponse QuestionnaireResponse { get; init; }
+    public Questionnaire Questionnaire { get; }
+    public QuestionnaireResponse QuestionnaireResponse { get; }
 
     public MappingContext(Questionnaire questionnaire, QuestionnaireResponse questionnaireResponse)
     {

@@ -83,7 +83,14 @@ public class ResourceMapperTests
             }
         };
 
-        var response = ResourceMapper.Populate(demoQuestionnaire, patient, relative);
+        var response = ResourceMapper.Populate(
+            demoQuestionnaire,
+            new(demoQuestionnaire, new())
+            {
+                { "patient", new(patient, patient.GetType(), "patient") },
+                { "relatedPerson", new(relative, relative.GetType(), "relatedPerson") }
+            }
+        );
 
         // Console.WriteLine();
         // Console.WriteLine("=================");
