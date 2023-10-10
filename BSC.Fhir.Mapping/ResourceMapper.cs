@@ -732,9 +732,9 @@ public static class ResourceMapper
         }
     }
 
-    public static QuestionnaireResponse Populate(Questionnaire questionnaire, params Resource[] resources)
+    public static QuestionnaireResponse Populate(Questionnaire questionnaire, MappingContext ctx)
     {
-        PopulateInitialValues(questionnaire.Item.ToArray(), resources);
+        PopulateInitialValues(questionnaire.Item.ToArray(), ctx);
 
         return new QuestionnaireResponse
         {
@@ -742,18 +742,19 @@ public static class ResourceMapper
         };
     }
 
-    private static void PopulateInitialValues(Questionnaire.ItemComponent[] questionnaireItems, Resource[] resources)
+    private static void PopulateInitialValues(Questionnaire.ItemComponent[] questionnaireItems, MappingContext ctx)
     {
         foreach (var item in questionnaireItems)
         {
-            PopulateInitalValue(item, resources);
+            ctx.QuestionnaireItem = item;
+            PopulateInitalValue(ctx);
         }
     }
 
-    private static void PopulateInitalValue(Questionnaire.ItemComponent questionnaireItem, Resource[] resources)
+    private static void PopulateInitalValue(MappingContext ctx)
     {
-        var initialExpression = questionnaireItem.InitialExpression();
-        if (!(questionnaireItem.Initial.Count == 0 || initialExpression is null))
+        var initialExpression = ctx.QuestionnaireItem.InitialExpression();
+        if (!(ctx.QuestionnaireItem.Initial.Count == 0 || initialExpression is null))
         {
             throw new InvalidOperationException(
                 "QuestionnaireItem is not allowed to have both intial.value and initial expression. See rule at http://build.fhir.org/ig/HL7/sdc/expressions.html#initialExpression"
@@ -762,45 +763,31 @@ public static class ResourceMapper
 
         if (initialExpression is not null)
         {
-            var populationContext = SelectPopulationContext(resources, initialExpression.Expression_);
-            if (populationContext is null)
-            {
-                return;
-            }
-
             // TODO: Should this return null if there is more than one result?
-            var exp = initialExpression.Expression_.TrimStart('%');
-            exp = exp[0..1].ToUpper() + exp[1..];
-            var evalResult = FhirPath.FhirPathExtensions.Select(populationContext, exp);
+            var evalResult = FhirPathMapping.EvaluateExpr(initialExpression.Expression_, ctx)?.Result;
 
-            questionnaireItem.Initial = (questionnaireItem.Repeats ?? false) switch
+            if (evalResult is null)
             {
-                false
-                    => evalResult.SingleOrDefault() switch
-                    {
-                        null => null,
-                        var x => new() { new() { Value = x.AsExpectedType() } }
-                    },
-                true
-                    => evalResult
-                        .Select(result => new Questionnaire.InitialComponent() { Value = result.AsExpectedType() })
-                        .ToList()
-            };
+                Console.WriteLine("Could not find a value for {0}", initialExpression.Expression_);
+            }
+            else
+            {
+                ctx.QuestionnaireItem.Initial = (ctx.QuestionnaireItem.Repeats ?? false) switch
+                {
+                    false
+                        => evalResult.SingleOrDefault() switch
+                        {
+                            null => null,
+                            var x => new() { new() { Value = x.AsExpectedType() } }
+                        },
+                    true
+                        => evalResult
+                            .Select(result => new Questionnaire.InitialComponent() { Value = result.AsExpectedType() })
+                            .ToList()
+                };
+            }
         }
 
-        PopulateInitialValues(questionnaireItem.Item.ToArray(), resources);
-    }
-
-    public static Resource? SelectPopulationContext(IReadOnlyCollection<Resource> resources, string initialExpression)
-    {
-        var resourceType = initialExpression.Split('.').FirstOrDefault()?.TrimStart('%');
-
-        if (resourceType is null)
-        {
-            return null;
-        }
-
-        return resources.SingleOrDefault(resource => resource.TypeName.ToLower() == resourceType.ToLower())
-            ?? resources.FirstOrDefault();
+        PopulateInitialValues(ctx.QuestionnaireItem.Item.ToArray(), ctx);
     }
 }

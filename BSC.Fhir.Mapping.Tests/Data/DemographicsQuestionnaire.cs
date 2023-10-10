@@ -35,10 +35,26 @@ public partial class Demographics
                   "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-launchContext"
                 },
                 {
+                  "extension": [
+                    {
+                      "url": "name",
+                      "valueCoding": {
+                        "system": "http://hl7.org/fhir/uv/sdc/CodeSystem/launchContext",
+                        "code": "user"
+                      }
+                    },
+                    {
+                      "url": "type",
+                      "valueCode": "Practitioner"
+                    }
+                  ],
+                  "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-launchContext"
+                },
+                {
                   "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-itemExtractionContext",
                   "valueExpression": {
                     "language": "application/x-fhir-query",
-                    "expression": "Patient?_id={{%25patient.id}}"
+                    "expression": "Patient?_id={{%patient.id}}"
                   }
                 }
               ],
@@ -166,7 +182,7 @@ public partial class Demographics
                     {
                       "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-itemPopulationContext",
                       "valueExpression": {
-                        "name": "relative",
+                        "name": "relatedPerson",
                         "language": "application/x-fhir-query",
                         "expression": "RelatedPerson?patient={{%patient.id}}"
                       }
