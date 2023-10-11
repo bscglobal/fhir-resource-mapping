@@ -4,22 +4,32 @@ using Hl7.Fhir.Model;
 
 namespace BSC.Fhir.Mapping;
 
-public class ContextValue
+public class ContextValue<T>
+    where T : Base
 {
-    public Base[] Value { get; set; }
+    public T[] Value { get; set; }
     public string? Name { get; set; }
 
-    public ContextValue(Base[] value, string? name = null)
+    public ContextValue(T[] value, string? name = null)
     {
         Value = value;
         Name = name;
     }
 
-    public ContextValue(Base value, string? name = null)
+    public ContextValue(T value, string? name = null)
     {
         Value = new[] { value };
         Name = name;
     }
+}
+
+public class ContextValue : ContextValue<Base>
+{
+    public ContextValue(Base[] value, string? name = null)
+        : base(value, name) { }
+
+    public ContextValue(Base value, string? name = null)
+        : base(value, name) { }
 }
 
 public class MappingContext : IDictionary<string, ContextValue>
