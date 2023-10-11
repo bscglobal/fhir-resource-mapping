@@ -34,7 +34,7 @@ public static class MappingExtenstions
 
         if (resource is not null && !string.IsNullOrEmpty(expression.Name))
         {
-            ctx.Add(expression.Name, new ContextValue(resource, resource.GetType(), expression.Name));
+            ctx.Add(expression.Name, new ContextValue(resource, expression.Name));
         }
 
         return resource;

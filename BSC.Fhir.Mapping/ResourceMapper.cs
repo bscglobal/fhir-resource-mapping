@@ -813,7 +813,7 @@ public static class ResourceMapper
                     return null;
                 }
 
-                context = new(result.Result, result.Result.GetType().NonParameterizedType(), populationContext.Name);
+                context = new(result.Result, populationContext.Name);
                 ctx.Add(populationContext.Name, context);
             }
 
