@@ -190,4 +190,21 @@ public static class MappingExtenstions
             return nestedExpessions.Concat(new[] { expression }).ToArray();
         }
     }
+
+    public static Expression? PopulationContext(this Questionnaire.ItemComponent questionnaireItem)
+    {
+        return (questionnaireItem as IExtendable).PopulationContext();
+    }
+
+    public static Expression? PopulationContext(this Questionnaire questionnaire)
+    {
+        return (questionnaire as IExtendable).PopulationContext();
+    }
+
+    public static Expression? PopulationContext(this IExtendable value)
+    {
+        var extension = value.GetExtension(ITEM_POPULATION_CONTEXT_EXTENSION_URL);
+
+        return extension?.Value as Expression;
+    }
 }

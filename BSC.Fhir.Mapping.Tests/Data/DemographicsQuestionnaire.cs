@@ -148,7 +148,7 @@ public partial class Demographics
                           "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-initialExpression",
                           "valueExpression": {
                             "language": "text/fhirpath",
-                            "expression": "%patient.name.family"
+                            "expression": "%patientName.family"
                           }
                         }
                       ],
@@ -164,7 +164,7 @@ public partial class Demographics
                           "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-initialExpression",
                           "valueExpression": {
                             "language": "text/fhirpath",
-                            "expression": "%patient.name.given"
+                            "expression": "%patientName.given"
                           }
                         }
                       ],
@@ -281,7 +281,7 @@ public partial class Demographics
                               "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-initialExpression",
                               "valueExpression": {
                                 "language": "text/fhirpath",
-                                "expression": "%relatedPerson.name.family"
+                                "expression": "%relativeName.family"
                               }
                             }
                           ],
@@ -297,7 +297,7 @@ public partial class Demographics
                               "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-initialExpression",
                               "valueExpression": {
                                 "language": "text/fhirpath",
-                                "expression": "%relatedPerson.name.given"
+                                "expression": "%relativeName.given"
                               }
                             }
                           ],

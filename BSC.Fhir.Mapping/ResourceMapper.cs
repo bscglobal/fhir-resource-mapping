@@ -6,6 +6,7 @@
  */
 
 using System.Reflection;
+using System.Text.Json;
 using BSC.Fhir.Mapping.Core;
 using Hl7.Fhir.Model;
 using Task = System.Threading.Tasks.Task;
@@ -732,25 +733,128 @@ public static class ResourceMapper
 
     public static QuestionnaireResponse Populate(Questionnaire questionnaire, MappingContext ctx)
     {
-        PopulateInitialValues(questionnaire.Item.ToArray(), ctx);
+        var response = new QuestionnaireResponse();
+        ctx.QuestionnaireResponse = response;
 
-        return new QuestionnaireResponse
-        {
-            Item = questionnaire.Item.Select(item => item.CreateQuestionnaireResponseItem()).ToList()
-        };
+        CreateQuestionnaireResponseItems(questionnaire.Item, response.Item, ctx);
+
+        return response;
     }
 
-    private static void PopulateInitialValues(Questionnaire.ItemComponent[] questionnaireItems, MappingContext ctx)
+    private static void CreateQuestionnaireResponseItems(
+        IReadOnlyCollection<Questionnaire.ItemComponent> questionnaireItems,
+        List<QuestionnaireResponse.ItemComponent> responseItems,
+        MappingContext ctx,
+        bool debug = false
+    )
     {
-        foreach (var item in questionnaireItems)
+        var responses = questionnaireItems.SelectMany(item =>
         {
+            if (debug)
+            {
+                Console.WriteLine("Debug: CreatingQuestionnaireResponseItems for {0}", item.LinkId);
+            }
             ctx.QuestionnaireItem = item;
-            PopulateInitalValue(ctx);
-        }
+            return GenerateQuestionnaireResponseItem(ctx);
+        });
+
+        responseItems.AddRange(responses);
     }
 
-    private static void PopulateInitalValue(MappingContext ctx)
+    private static QuestionnaireResponse.ItemComponent[] GenerateQuestionnaireResponseItem(MappingContext ctx)
     {
+        QuestionnaireResponse.ItemComponent[]? responseItems = null;
+        if (
+            ctx.QuestionnaireItem.Type == Questionnaire.QuestionnaireItemType.Group
+            && (ctx.QuestionnaireItem.Repeats ?? false)
+        )
+        {
+            responseItems = CreateRepeatingGroupQuestionnaireResponseItem(ctx);
+        }
+        else
+        {
+            var questionnaireResponseItem = new QuestionnaireResponse.ItemComponent
+            {
+                LinkId = ctx.QuestionnaireItem.LinkId,
+                Answer = CreateQuestionnaireResponseItemAnswers(ctx)
+            };
+
+            ctx.QuestionnaireResponseItem = questionnaireResponseItem;
+
+            if (ctx.QuestionnaireItem.Type == Questionnaire.QuestionnaireItemType.Group)
+            {
+                GenerateQuestionnaireResponseItem(ctx);
+            }
+
+            responseItems = new[] { questionnaireResponseItem };
+        }
+
+        return responseItems ?? Array.Empty<QuestionnaireResponse.ItemComponent>();
+    }
+
+    private static QuestionnaireResponse.ItemComponent[]? CreateRepeatingGroupQuestionnaireResponseItem(
+        MappingContext ctx
+    )
+    {
+        var populationContext = ctx.QuestionnaireItem.PopulationContext();
+
+        if (populationContext is not null)
+        {
+            if (!ctx.TryGetValue(populationContext.Name, out var context))
+            {
+                var result = FhirPathMapping.EvaluateExpr(populationContext.Expression_, ctx);
+                if (result is null)
+                {
+                    Console.WriteLine(
+                        "Warning: could not resolve expression {0} for {1}",
+                        populationContext.Expression_,
+                        ctx.QuestionnaireItem.LinkId
+                    );
+                    return null;
+                }
+
+                context = new(result.Result, result.Result.GetType().NonParameterizedType(), populationContext.Name);
+                ctx.Add(populationContext.Name, context);
+            }
+
+            var contextValues = context.Value;
+            var originalQuestionnaireItem = ctx.QuestionnaireItem;
+            var responseItems = contextValues.Select(value =>
+            {
+                var questionnaireResponseItem = new QuestionnaireResponse.ItemComponent
+                {
+                    LinkId = ctx.QuestionnaireItem.LinkId
+                };
+                ctx.QuestionnaireResponseItem = questionnaireResponseItem;
+
+                context.Value = new[] { value };
+
+                CreateQuestionnaireResponseItems(ctx.QuestionnaireItem.Item, questionnaireResponseItem.Item, ctx);
+                ctx.QuestionnaireItem = originalQuestionnaireItem;
+
+                return questionnaireResponseItem;
+            });
+            context.Value = contextValues;
+
+            return responseItems.ToArray();
+        }
+
+        Console.WriteLine(
+            "Warning: could not find population context for repeating group {0}",
+            ctx.QuestionnaireItem.LinkId
+        );
+        return null;
+    }
+
+    private static List<QuestionnaireResponse.AnswerComponent>? CreateQuestionnaireResponseItemAnswers(
+        MappingContext ctx
+    )
+    {
+        if (ctx.QuestionnaireItem.Type == Questionnaire.QuestionnaireItemType.Group)
+        {
+            return null;
+        }
+
         var initialExpression = ctx.QuestionnaireItem.InitialExpression();
         if (!(ctx.QuestionnaireItem.Initial.Count == 0 || initialExpression is null))
         {
@@ -761,7 +865,6 @@ public static class ResourceMapper
 
         if (initialExpression is not null)
         {
-            // TODO: Should this return null if there is more than one result?
             var evalResult = FhirPathMapping.EvaluateExpr(initialExpression.Expression_, ctx)?.Result;
 
             if (evalResult is null)
@@ -770,22 +873,34 @@ public static class ResourceMapper
             }
             else
             {
-                ctx.QuestionnaireItem.Initial = (ctx.QuestionnaireItem.Repeats ?? false) switch
+                if (ctx.QuestionnaireItem.Repeats ?? false)
                 {
-                    false
-                        => evalResult.SingleOrDefault() switch
-                        {
-                            null => null,
-                            var x => new() { new() { Value = x.AsExpectedType() } }
-                        },
-                    true
-                        => evalResult
-                            .Select(result => new Questionnaire.InitialComponent() { Value = result.AsExpectedType() })
-                            .ToList()
-                };
+                    return evalResult
+                        .Select(
+                            result => new QuestionnaireResponse.AnswerComponent() { Value = result.AsExpectedType() }
+                        )
+                        .ToList();
+                }
+                else if (evalResult.Length > 1)
+                {
+                    Console.WriteLine(
+                        "Warning: expression {0} resolved to more than one answer. LinkId: {1}",
+                        initialExpression.Expression_,
+                        ctx.QuestionnaireItem.LinkId
+                    );
+                }
+                else
+                {
+                    return evalResult.SingleOrDefault() switch
+                    {
+                        null => null,
+                        var x => new() { new() { Value = x.AsExpectedType() } }
+                    };
+                }
             }
         }
 
-        PopulateInitialValues(ctx.QuestionnaireItem.Item.ToArray(), ctx);
+        return null;
+        // CreateQuestionnaireResponseItems(ctx.QuestionnaireItem.Item.ToArray(), ctx);
     }
 }
