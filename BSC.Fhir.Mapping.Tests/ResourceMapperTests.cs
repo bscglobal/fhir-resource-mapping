@@ -89,8 +89,8 @@ public class ResourceMapperTests
             demoQuestionnaire,
             new(demoQuestionnaire, new())
             {
-                { "patient", new(patient, patient.GetType(), "patient") },
-                { "relatedPerson", new(relative, relative.GetType(), "relatedPerson") }
+                { "patient", new(patient, "patient") },
+                { "relatedPerson", new(relative, "relatedPerson") }
             }
         );
 
@@ -197,8 +197,8 @@ public class ResourceMapperTests
             response,
             new(questionnaire, response)
             {
-                { "patient", new(new Patient { Id = Guid.NewGuid().ToString() }, typeof(Patient), "patient") },
-                { "user", new(new Practitioner { Id = Guid.NewGuid().ToString() }, typeof(Practitioner), "user") }
+                { "patient", new(new Patient { Id = Guid.NewGuid().ToString() }, "patient") },
+                { "user", new(new Practitioner { Id = Guid.NewGuid().ToString() }, "user") }
             },
             profileLoaderMock.Object
         );
