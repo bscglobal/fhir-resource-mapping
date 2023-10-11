@@ -7,20 +7,17 @@ namespace BSC.Fhir.Mapping;
 public class ContextValue
 {
     public Base[] Value { get; set; }
-    public Type ValueType { get; set; }
     public string? Name { get; set; }
 
-    public ContextValue(Base[] value, Type valueType, string? name = null)
+    public ContextValue(Base[] value, string? name = null)
     {
         Value = value;
-        ValueType = valueType;
         Name = name;
     }
 
-    public ContextValue(Base value, Type valueType, string? name = null)
+    public ContextValue(Base value, string? name = null)
     {
         Value = new[] { value };
-        ValueType = valueType;
         Name = name;
     }
 }
@@ -52,7 +49,7 @@ public class MappingContext : IDictionary<string, ContextValue>
 
     public void SetCurrentContext(Base context)
     {
-        _context.Push(new(context, context.GetType()));
+        _context.Push(new(context));
     }
 
     public void RemoveContext()
