@@ -40,7 +40,8 @@ public static class ResourceMapper
         CancellationToken cancellationToken = default
     )
     {
-        var rootResource = questionnaire.CreateResource(extractionContext);
+        var rootResource = questionnaire.CreateResource(extractionContext)?.SingleOrDefault();
+        // Console.WriteLine("Debug: root: {0}", rootResource?.ToString() ?? "null");
         var extractedResources = new List<Resource>();
         if (rootResource is not null)
         {
@@ -84,7 +85,13 @@ public static class ResourceMapper
                 .Where(responseItem => responseItem.LinkId == questionnaireItem.LinkId)
                 .ToArray();
 
-            if (!questionnaireItem.Repeats ?? false && responseItems.Length > 1)
+            if (responseItems.Length == 0)
+            {
+                Console.WriteLine("Debug: could not find responseItem for LinkId {0}", questionnaireItem.LinkId);
+                continue;
+            }
+
+            if (!(questionnaireItem.Repeats ?? false) && responseItems.Length > 1)
             {
                 Console.WriteLine(
                     "Error: QuestionnaireResponse should not have more than one (1) answer for '{0}'",
@@ -93,10 +100,24 @@ public static class ResourceMapper
                 continue;
             }
 
-            foreach (var responseItem in responseItems)
+            extractionContext.QuestionnaireItem = questionnaireItem;
+            if (
+                questionnaireItem.Type == Questionnaire.QuestionnaireItemType.Group
+                && (questionnaireItem.Repeats ?? false)
+                && extractionContext.QuestionnaireItem.Extension.ItemExtractionContextExtractionValue() is not null
+            )
             {
-                extractionContext.QuestionnaireItem = questionnaireItem;
-                extractionContext.QuestionnaireResponseItem = responseItem;
+                await ExtractResourcesByDefinition(
+                    responseItems,
+                    extractionContext,
+                    extractionResult,
+                    profileLoader,
+                    cancellationToken
+                );
+            }
+            else
+            {
+                extractionContext.QuestionnaireResponseItem = responseItems.First();
                 await ExtractByDefinition(extractionContext, extractionResult, profileLoader, cancellationToken);
             }
         }
@@ -164,15 +185,14 @@ public static class ResourceMapper
         CancellationToken cancellationToken = default
     )
     {
-        var resource = ctx.QuestionnaireItem.CreateResource(ctx);
+        var contexts = ctx.QuestionnaireItem.CreateResource(ctx);
 
-        if (resource is null)
+        if (contexts is null || contexts.Length == 0)
         {
             throw new InvalidOperationException("Unable to create a resource from questionnaire item");
         }
 
-        ctx.SetCurrentContext(resource);
-
+        ctx.SetCurrentContext(contexts.First());
         await ExtractByDefinition(
             ctx.QuestionnaireItem.Item,
             ctx.QuestionnaireResponseItem.Item,
@@ -182,7 +202,39 @@ public static class ResourceMapper
             cancellationToken
         );
 
-        extractionResult.Add(resource);
+        extractionResult.AddRange(contexts);
+        ctx.RemoveContext();
+    }
+
+    private static async Task ExtractResourcesByDefinition(
+        IReadOnlyCollection<QuestionnaireResponse.ItemComponent> responseItems,
+        MappingContext ctx,
+        List<Resource> extractionResult,
+        IProfileLoader profileLoader,
+        CancellationToken cancellationToken = default
+    )
+    {
+        var contexts = ctx.QuestionnaireItem.CreateResource(ctx);
+
+        if (contexts is null || contexts.Length == 0)
+        {
+            throw new InvalidOperationException("Unable to create a resource from questionnaire item");
+        }
+
+        ctx.SetCurrentContext(contexts);
+        foreach (var responseItem in responseItems)
+        {
+            await ExtractByDefinition(
+                ctx.QuestionnaireItem.Item,
+                responseItem.Item,
+                ctx,
+                extractionResult,
+                profileLoader,
+                cancellationToken
+            );
+        }
+
+        extractionResult.AddRange(contexts);
         ctx.RemoveContext();
     }
 

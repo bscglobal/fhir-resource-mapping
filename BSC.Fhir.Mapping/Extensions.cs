@@ -21,26 +21,34 @@ public static class MappingExtenstions
         return extension?.Value;
     }
 
-    public static Resource? CreateResource(this Questionnaire questionnaire, MappingContext ctx)
+    public static Resource[]? CreateResource(this Questionnaire questionnaire, MappingContext ctx)
     {
-        var extensionValue = questionnaire.Extension.ItemExtractionContextExtractionValue();
-
-        if (extensionValue is not Expression expression)
-        {
-            return null;
-        }
-
-        var resource = CreateResourceFromExtension(expression.Expression_);
-
-        if (resource is not null && !string.IsNullOrEmpty(expression.Name))
-        {
-            ctx.Add(expression.Name, new ContextValue(resource, expression.Name));
-        }
-
-        return resource;
+        return questionnaire.CreateResource("root", ctx);
     }
 
-    public static Resource? CreateResource(this Questionnaire.ItemComponent item, MappingContext ctx)
+    public static Resource[]? CreateResource(this Questionnaire.ItemComponent item, MappingContext ctx)
+    {
+        // var extensionValue = item.Extension.ItemExtractionContextExtractionValue();
+        //
+        // if (extensionValue is not Expression expression)
+        // {
+        //     return null;
+        // }
+        //
+        // if (
+        //     !string.IsNullOrEmpty(expression.Name)
+        //     && ctx.TryGetValue(expression.Name, out var contextValue)
+        //     && contextValue.Value.GetType().NonParameterizedType() == typeof(Resource)
+        // )
+        // {
+        //     return contextValue.Value as Resource[];
+        // }
+        //
+        // return CreateResourceFromExtension(expression.Expression_);
+        return item.CreateResource(item.LinkId, ctx);
+    }
+
+    private static Resource[]? CreateResource(this IExtendable item, string linkId, MappingContext ctx)
     {
         var extensionValue = item.Extension.ItemExtractionContextExtractionValue();
 
@@ -49,7 +57,27 @@ public static class MappingExtenstions
             return null;
         }
 
-        return CreateResourceFromExtension(expression.Expression_);
+        var extractionContextName = $"extraction_{linkId}";
+        if (ctx.TryGetValue(extractionContextName, out var contextValue))
+        {
+            Console.WriteLine("Debug: found existing context value for {0}", extractionContextName);
+            return contextValue.Value.OfType<Resource>().ToArray();
+        }
+
+        Console.WriteLine("Debug: creating new context value for {0}", extractionContextName);
+        var resource = CreateResourceFromExtension(expression.Expression_);
+
+        if (resource is null)
+        {
+            return null;
+        }
+
+        if (!string.IsNullOrEmpty(expression.Name))
+        {
+            ctx.Add(expression.Name, new ContextValue(resource, expression.Name));
+        }
+
+        return new[] { resource };
     }
 
     private static Resource? CreateResourceFromExtension(string extensionValue)
