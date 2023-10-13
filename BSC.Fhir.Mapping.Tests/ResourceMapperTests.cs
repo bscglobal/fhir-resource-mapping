@@ -21,24 +21,39 @@ public class ResourceMapperTests
     private const string VARIABLE_EXTENSION_URL = "http://hl7.org/fhir/StructureDefinition/variable";
 
     [Fact]
-    public async Task Extract_GivesCorrectBundle()
+    public async Task Extract_GivesCorrectBundleForDemo()
     {
-        // Console.WriteLine();
-        // Console.WriteLine("=================");
-        // Console.WriteLine("Extract");
-        // Console.WriteLine("=================");
-        // Console.WriteLine();
+        Console.WriteLine();
+        Console.WriteLine("=================");
+        Console.WriteLine("Extract");
+        Console.WriteLine("=================");
+        Console.WriteLine();
 
         var demoQuestionnaire = Demographics.CreateQuestionnaire();
         var demoQuestionnaireResponse = Demographics.CreateQuestionnaireResponse();
+        var familyName = "Smith";
+        var patient = new Patient
+        {
+            Id = Guid.NewGuid().ToString(),
+            BirthDate = "2006-04-05",
+            Name =
+            {
+                new() { Family = familyName, Given = new[] { "Jane", "Rebecca" } },
+                new() { Family = familyName, Given = new[] { "Elisabeth", "Charlotte" } }
+            }
+        };
 
         var bundle = await ResourceMapper.Extract(
             demoQuestionnaire,
             demoQuestionnaireResponse,
-            new(demoQuestionnaire, demoQuestionnaireResponse)
+            new MappingContext(demoQuestionnaire, demoQuestionnaireResponse)
+            {
+                { "extraction_root", new(patient, "extraction_root") },
+                { "user", new(new Practitioner { Id = Guid.NewGuid().ToString() }, "user") }
+            }
         );
 
-        // Console.WriteLine(bundle.ToJson(new FhirJsonSerializationSettings { Pretty = true }));
+        Console.WriteLine(bundle.ToJson(new FhirJsonSerializationSettings { Pretty = true }));
 
         Assert.True(true);
     }

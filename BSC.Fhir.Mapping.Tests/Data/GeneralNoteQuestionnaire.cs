@@ -195,6 +195,7 @@ public partial class GeneralNote
                 },
                 new()
                 {
+                    // noteDocumentReference/note.content/note.content.attachment
                     LinkId = "noteDocumentReference",
                     Type = Questionnaire.QuestionnaireItemType.Group,
                     Extension =
@@ -235,7 +236,7 @@ public partial class GeneralNote
                             {
                                 new()
                                 {
-                                    Url = QUESTIONNAIRE_ITEM_CALCULATED_EXPRESSION,
+                                    Url = ITEM_INITIAL_EXPRESSION,
                                     Value = new Expression { Language = "text/fhirpath", Expression_ = "%patient.id" }
                                 },
                                 new() { Url = QUESTIONNAIRE_HIDDEN_URL, Value = new FhirBoolean(true) }
@@ -255,6 +256,10 @@ public partial class GeneralNote
                                     Definition = "DocumentReference.content.attachment",
                                     Text = "Note",
                                     Type = Questionnaire.QuestionnaireItemType.Attachment,
+                                    Extension =
+                                    {
+                                        new() { Url = "attachment-type", Value = new FhirString("Text") }
+                                    }
                                 },
                             }
                         },
@@ -313,7 +318,7 @@ public partial class GeneralNote
                         new()
                         {
                             LinkId = "image.author",
-                            Definition = "DocumentReference.subject",
+                            Definition = "DocumentReference.author",
                             Type = Questionnaire.QuestionnaireItemType.Reference,
                             Extension =
                             {

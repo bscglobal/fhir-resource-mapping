@@ -141,11 +141,7 @@ public static class FhirPathMapping
         exprParts[0] = "%resource";
         var execExpr = string.Join('.', exprParts);
 
-        Base? source = ctx.QuestionnaireResponseItem switch
-        {
-            null => ctx.QuestionnaireResponse,
-            _ => ctx.QuestionnaireResponseItem
-        };
+        Base? source = ctx.QuestionnaireResponseItem as Base ?? ctx.QuestionnaireResponse;
 
         return new(execExpr, source);
     }

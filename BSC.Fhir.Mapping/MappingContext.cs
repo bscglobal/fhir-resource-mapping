@@ -45,6 +45,7 @@ public class MappingContext : IDictionary<string, ContextValue>
     public Questionnaire Questionnaire { get; private set; }
     public QuestionnaireResponse? QuestionnaireResponse { get; set; }
 
+    // somethign
     public MappingContext(Questionnaire questionnaire, QuestionnaireResponse? questionnaireResponse = null)
     {
         QuestionnaireResponse = questionnaireResponse;
@@ -58,6 +59,11 @@ public class MappingContext : IDictionary<string, ContextValue>
     }
 
     public void SetCurrentContext(Base context)
+    {
+        _context.Push(new(context));
+    }
+
+    public void SetCurrentContext(Base[] context)
     {
         _context.Push(new(context));
     }

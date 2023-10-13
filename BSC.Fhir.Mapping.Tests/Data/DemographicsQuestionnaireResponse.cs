@@ -20,12 +20,6 @@ public partial class Demographics
                 },
                 new()
                 {
-                    LinkId = "patient.birthDate",
-                    Definition = "Patient.birthDate",
-                    Answer = { new() { Value = new Date(2023, 05, 07) } }
-                },
-                new()
-                {
                     LinkId = "patient.name",
                     Definition = "Patient.name",
                     Item =
@@ -62,30 +56,6 @@ public partial class Demographics
                             Definition = "RelatedPerson.id",
                             Text = "(internal use)",
                             Answer = { new() { Value = new FhirString(Guid.NewGuid().ToString()) } }
-                        },
-                        new()
-                        {
-                            LinkId = "relative.patient",
-                            Definition = "RelatedPerson.patient",
-                            Answer = { new() { Value = new ResourceReference($"Patient/{patientId}") } }
-                        },
-                        new()
-                        {
-                            LinkId = "relative.relationship",
-                            Definition = "RelatedPerson.relationship",
-                            Text = "Name(s)",
-                            Answer =
-                            {
-                                new()
-                                {
-                                    Value = new Coding
-                                    {
-                                        System = "http://hl7.org/fhir/ValueSet/relatedperson-relationshiptype",
-                                        Code = "NOK",
-                                        Display = "next of kin"
-                                    }
-                                }
-                            }
                         },
                         new()
                         {
