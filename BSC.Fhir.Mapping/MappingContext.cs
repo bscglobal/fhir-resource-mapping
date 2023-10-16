@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Diagnostics.CodeAnalysis;
+using System.Reflection;
 using Hl7.Fhir.Model;
 
 namespace BSC.Fhir.Mapping;
@@ -32,12 +33,23 @@ public class ContextValue : ContextValue<Base>
         : base(value, name) { }
 }
 
+public class Context
+{
+    public Base Value { get; }
+    public HashSet<PropertyInfo> DirtyFields { get; } = new();
+
+    public Context(Base value)
+    {
+        Value = value;
+    }
+}
+
 public class MappingContext : IDictionary<string, ContextValue>
 {
     private readonly Dictionary<string, ContextValue> _namedExpressions = new();
-    private readonly Stack<ContextValue> _context = new();
+    private readonly Stack<Context> _context = new();
 
-    public Base? CurrentContext => _context.TryPeek(out var context) ? context.Value.First() : null;
+    public Context? CurrentContext => _context.TryPeek(out var context) ? context : null;
 
     public Questionnaire.ItemComponent QuestionnaireItem { get; set; } = new();
     public QuestionnaireResponse.ItemComponent QuestionnaireResponseItem { get; set; } = new();
@@ -59,11 +71,6 @@ public class MappingContext : IDictionary<string, ContextValue>
     }
 
     public void SetCurrentContext(Base context)
-    {
-        _context.Push(new(context));
-    }
-
-    public void SetCurrentContext(Base[] context)
     {
         _context.Push(new(context));
     }

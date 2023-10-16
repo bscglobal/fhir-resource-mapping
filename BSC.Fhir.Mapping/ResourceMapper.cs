@@ -223,7 +223,7 @@ public static class ResourceMapper
         {
             throw new InvalidOperationException("Unable to create a resource from questionnaire item");
         }
-        Console.WriteLine("Debug: {0} - {1}", ctx.QuestionnaireItem.LinkId, responseItems.Count);
+
         var contexts = new List<Resource>();
 
         var questionnaireItem = ctx.QuestionnaireItem;
@@ -231,14 +231,6 @@ public static class ResourceMapper
         {
             ctx.QuestionnaireResponseItem = responseItem;
             ctx.QuestionnaireItem = questionnaireItem;
-            // var currentContext
-            // ctx.SetCurrentContext(contexts);
-            // TODO:get the correct context for the response item
-
-            // Console.WriteLine(
-            //     "Debug: {0}",
-            //     JsonSerializer.Serialize(responseItem, new JsonSerializerOptions { WriteIndented = true })
-            // );
 
             var contextResource = GetContextResource(contextResult.Resources, ctx) ?? contextResult.CreateNewResource();
 
@@ -250,10 +242,6 @@ public static class ResourceMapper
                 );
                 continue;
             }
-            Console.WriteLine(
-                "Debug: {0}",
-                JsonSerializer.Serialize(contextResource, new JsonSerializerOptions { WriteIndented = true })
-            );
 
             ctx.SetCurrentContext(contextResource);
 
@@ -345,7 +333,7 @@ public static class ResourceMapper
         }
 
         var fieldName = FieldNameByDefinition(ctx.QuestionnaireItem.Definition);
-        var fieldInfo = ctx.CurrentContext.GetType().GetProperty(fieldName);
+        var fieldInfo = ctx.CurrentContext.Value.GetType().GetProperty(fieldName);
 
         var definition = ctx.QuestionnaireItem.Definition;
         if (fieldInfo is null)
@@ -363,13 +351,21 @@ public static class ResourceMapper
 
             if (fieldInfo.IsNonStringEnumerable())
             {
-                var val = fieldInfo.GetValue(ctx.CurrentContext);
-                fieldInfo.PropertyType.GetMethod("Add")?.Invoke(val, new[] { value });
+                var val = fieldInfo.GetValue(ctx.CurrentContext.Value) as List<object>;
+
+                if (val is not null && !ctx.CurrentContext.DirtyFields.Contains(fieldInfo))
+                {
+                    val.Clear();
+                }
+
+                val?.Add(value);
             }
             else
             {
-                fieldInfo.SetValue(ctx.CurrentContext, value);
+                fieldInfo.SetValue(ctx.CurrentContext.Value, value);
             }
+
+            ctx.CurrentContext.DirtyFields.Add(fieldInfo);
 
             ctx.SetCurrentContext(value);
 
@@ -418,7 +414,7 @@ public static class ResourceMapper
 
         var fieldName = FieldNameByDefinition(definition, true);
 
-        var contextType = ctx.CurrentContext.GetType();
+        var contextType = ctx.CurrentContext.Value.GetType();
         var field = contextType.GetProperty(fieldName);
 
         if (field is null)
@@ -431,7 +427,11 @@ public static class ResourceMapper
         {
             if (field.NonParameterizedType().IsEnum)
             {
-                UpdateFieldWithEnum(ctx.CurrentContext, field, ctx.QuestionnaireResponseItem.Answer.First().Value);
+                UpdateFieldWithEnum(
+                    ctx.CurrentContext.Value,
+                    field,
+                    ctx.QuestionnaireResponseItem.Answer.First().Value
+                );
             }
             else
             {
@@ -457,8 +457,10 @@ public static class ResourceMapper
                     }
                 }
 
-                UpdateField(ctx.CurrentContext, field, answers);
+                UpdateField(ctx.CurrentContext.Value, field, answers);
             }
+
+            ctx.CurrentContext.DirtyFields.Add(field);
 
             return;
         }
@@ -513,7 +515,7 @@ public static class ResourceMapper
                     "Warning: slice '{0}' for field {1} is not defined in StructureDefinition for {2}, so field is ignored",
                     sliceName,
                     fieldName,
-                    ModelInfo.GetFhirTypeNameForType(ctx.CurrentContext.GetType())
+                    ModelInfo.GetFhirTypeNameForType(ctx.CurrentContext.Value.GetType())
                 );
             }
         }
@@ -551,7 +553,7 @@ public static class ResourceMapper
             Console.WriteLine(
                 "Warning: extension for field {0} is not defined in StructureDefinition for {1}, so field is ignored",
                 fieldName,
-                ModelInfo.GetFhirTypeNameForType(ctx.CurrentContext.GetType())
+                ModelInfo.GetFhirTypeNameForType(ctx.CurrentContext.Value.GetType())
             );
         }
     }
@@ -622,7 +624,7 @@ public static class ResourceMapper
         var discriminators = elementEnumerator.Current.Slicing!.Discriminator;
 
         var fieldName = FieldNameByDefinition(baseType);
-        var contextType = ctx.CurrentContext.GetType();
+        var contextType = ctx.CurrentContext.Value.GetType();
         var fieldInfo = contextType.GetProperty(fieldName);
 
         if (fieldInfo is null)
@@ -690,13 +692,19 @@ public static class ResourceMapper
 
         if (fieldInfo.IsNonStringEnumerable())
         {
-            var val = fieldInfo.GetValue(ctx.CurrentContext);
-            fieldInfo.PropertyType.GetMethod("Add")?.Invoke(val, new[] { value });
+            var val = fieldInfo.GetValue(ctx.CurrentContext.Value) as List<object>;
+            if (val is not null && !ctx.CurrentContext.DirtyFields.Contains(fieldInfo))
+            {
+                val.Clear();
+            }
+            val?.Add(value);
         }
         else
         {
-            fieldInfo.SetValue(ctx.CurrentContext, value);
+            fieldInfo.SetValue(ctx.CurrentContext.Value, value);
         }
+
+        ctx.CurrentContext.DirtyFields.Add(fieldInfo);
 
         ctx.SetCurrentContext(value);
 
@@ -759,18 +767,14 @@ public static class ResourceMapper
     )
     {
         var propName = fieldInfo.Name;
-        var field = fieldInfo.GetValue(baseResource);
-        var method = field?.GetType().GetMethod("Add");
+        var field = fieldInfo.GetValue(baseResource) as List<object>;
 
-        if (method is null)
+        if (field is null)
         {
             return;
         }
 
-        foreach (var answer in answerValue)
-        {
-            method.Invoke(field, new[] { answer });
-        }
+        field.AddRange(answerValue);
     }
 
     private static void UpdateFieldWithEnum(Base baseResource, PropertyInfo field, Base value)
@@ -864,11 +868,11 @@ public static class ResourceMapper
 
     private static void AddDefinitionBasedCustomExtension(MappingContext ctx)
     {
-        if (ctx.CurrentContext is DataType dataType)
+        if (ctx.CurrentContext?.Value is DataType dataType)
         {
             dataType.AddExtension(ctx.QuestionnaireItem.Definition, ctx.QuestionnaireResponseItem.Answer.First().Value);
         }
-        else if (ctx.CurrentContext is DomainResource domainResource)
+        else if (ctx.CurrentContext?.Value is DomainResource domainResource)
         {
             domainResource.AddExtension(
                 ctx.QuestionnaireItem.Definition,
