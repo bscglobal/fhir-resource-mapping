@@ -113,7 +113,7 @@ public static class FhirPathMapping
         }
         else if (ctx.CurrentContext is not null)
         {
-            evaluationCtx = new(expr, ctx.CurrentContext);
+            evaluationCtx = new(expr, ctx.CurrentContext.Value);
         }
         else
         {

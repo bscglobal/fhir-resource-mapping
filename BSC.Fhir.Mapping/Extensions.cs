@@ -160,7 +160,7 @@ public static class MappingExtenstions
             return false;
         }
 
-        return typeof(IEnumerable).IsAssignableFrom(type);
+        return typeof(IList).IsAssignableFrom(type);
     }
 
     public static Expression? InitialExpression(this Questionnaire.ItemComponent questionnaireItem)
