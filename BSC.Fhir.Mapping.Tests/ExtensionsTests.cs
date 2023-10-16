@@ -13,7 +13,7 @@ public class ExtensionsTests
     [InlineData("Patient", typeof(Patient))]
     [InlineData("Composition", typeof(Composition))]
     [InlineData("Observation", typeof(Observation))]
-    public void CreateResource_CreatesCorrectResourceType(string expressionType, Type resourceType)
+    public void GetContext_CreatesCorrectResourceType(string expressionType, Type resourceType)
     {
         var questionaire = new Questionnaire();
         questionaire.SetExtension(
@@ -27,7 +27,7 @@ public class ExtensionsTests
 
         var resource = questionaire.GetContext(new(questionaire, new()));
 
-        Assert.IsType(resourceType, resource);
+        Assert.IsType(resourceType, resource?.CreateNewResource());
     }
 
     [Fact]
