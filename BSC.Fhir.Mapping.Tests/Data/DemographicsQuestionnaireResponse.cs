@@ -4,9 +4,8 @@ namespace BSC.Fhir.Mapping.Tests.Data;
 
 public partial class Demographics
 {
-    public static QuestionnaireResponse CreateQuestionnaireResponse()
+    public static QuestionnaireResponse CreateQuestionnaireResponse(string patientId, string[] relativeIds)
     {
-        var patientId = Guid.NewGuid().ToString();
         var response = new QuestionnaireResponse
         {
             Status = QuestionnaireResponse.QuestionnaireResponseStatus.Completed,
@@ -44,10 +43,14 @@ public partial class Demographics
                         }
                     }
                 },
-                new()
+            }
+        };
+
+        var relatives = relativeIds.Select(
+            id =>
+                new QuestionnaireResponse.ItemComponent
                 {
                     LinkId = "relative",
-                    Text = "Relatives, caregivers and other personal relationships",
                     Item =
                     {
                         new()
@@ -55,7 +58,7 @@ public partial class Demographics
                             LinkId = "relative.id",
                             Definition = "RelatedPerson.id",
                             Text = "(internal use)",
-                            Answer = { new() { Value = new FhirString(Guid.NewGuid().ToString()) } }
+                            Answer = { new() { Value = new FhirString(id) } }
                         },
                         new()
                         {
@@ -86,8 +89,9 @@ public partial class Demographics
                         }
                     }
                 }
-            }
-        };
+        );
+
+        response.Item.AddRange(relatives);
 
         return response;
     }

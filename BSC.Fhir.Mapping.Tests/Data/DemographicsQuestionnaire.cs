@@ -193,6 +193,13 @@ public partial class Demographics
                         "language": "application/x-fhir-query",
                         "expression": "RelatedPerson?patient={{%patient.id}}"
                       }
+                    },
+                    {
+                      "url": "extractionContextId",
+                      "valueExpression": {
+                        "language": "text/fhirpath",
+                        "expression": "%context.item.where(linkId='relative.id').answer.value"
+                      }
                     }
                   ],
                   "linkId": "relative",

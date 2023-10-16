@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Reflection;
+using BSC.Fhir.Mapping.Core;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Utility;
 
@@ -21,12 +22,12 @@ public static class MappingExtenstions
         return extension?.Value;
     }
 
-    public static Resource[]? CreateResource(this Questionnaire questionnaire, MappingContext ctx)
+    public static ContextResult? GetContext(this Questionnaire questionnaire, MappingContext ctx)
     {
-        return questionnaire.CreateResource("root", ctx);
+        return questionnaire.GetContext("root", ctx);
     }
 
-    public static Resource[]? CreateResource(this Questionnaire.ItemComponent item, MappingContext ctx)
+    public static ContextResult? GetContext(this Questionnaire.ItemComponent item, MappingContext ctx)
     {
         // var extensionValue = item.Extension.ItemExtractionContextExtractionValue();
         //
@@ -45,10 +46,10 @@ public static class MappingExtenstions
         // }
         //
         // return CreateResourceFromExtension(expression.Expression_);
-        return item.CreateResource(item.LinkId, ctx);
+        return item.GetContext(item.LinkId, ctx);
     }
 
-    private static Resource[]? CreateResource(this IExtendable item, string linkId, MappingContext ctx)
+    private static ContextResult? GetContext(this IExtendable item, string linkId, MappingContext ctx)
     {
         var extensionValue = item.Extension.ItemExtractionContextExtractionValue();
 
@@ -58,29 +59,38 @@ public static class MappingExtenstions
         }
 
         var extractionContextName = $"extraction_{linkId}";
+        Resource[] values = Array.Empty<Resource>();
         if (ctx.TryGetValue(extractionContextName, out var contextValue))
         {
             Console.WriteLine("Debug: found existing context value for {0}", extractionContextName);
-            return contextValue.Value.OfType<Resource>().ToArray();
+
+            values = contextValue.Value.OfType<Resource>().ToArray();
         }
 
-        Console.WriteLine("Debug: creating new context value for {0}", extractionContextName);
-        var resource = CreateResourceFromExtension(expression.Expression_);
-
-        if (resource is null)
+        return new()
         {
-            return null;
-        }
+            Resources = values,
+            CreateNewResource = () => CreateResourceFromExtension(expression.Expression_)
+        };
 
-        if (!string.IsNullOrEmpty(expression.Name))
-        {
-            ctx.Add(expression.Name, new ContextValue(resource, expression.Name));
-        }
-
-        return new[] { resource };
+        // Console.WriteLine("Debug: creating new context value for {0}", extractionContextName);
+        //
+        // var resource = CreateResourceFromExtension(expression.Expression_);
+        //
+        // if (resource is null)
+        // {
+        //     return null;
+        // }
+        //
+        // if (!string.IsNullOrEmpty(expression.Name))
+        // {
+        //     ctx.Add(expression.Name, new ContextValue(resource, expression.Name));
+        // }
+        //
+        // return new[] { resource };
     }
 
-    private static Resource? CreateResourceFromExtension(string extensionValue)
+    public static Resource? CreateResourceFromExtension(string extensionValue)
     {
         var resourceName = extensionValue.Split('?').First();
 
