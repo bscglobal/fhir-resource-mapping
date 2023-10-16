@@ -40,9 +40,11 @@ public static class ResourceMapper
         CancellationToken cancellationToken = default
     )
     {
-        var rootResource = questionnaire.CreateResource(extractionContext)?.SingleOrDefault();
+        var context = questionnaire.GetContext(extractionContext);
+        var rootResource = context?.Resources.SingleOrDefault() ?? context?.CreateNewResource();
         // Console.WriteLine("Debug: root: {0}", rootResource?.ToString() ?? "null");
         var extractedResources = new List<Resource>();
+
         if (rootResource is not null)
         {
             extractionContext.SetCurrentContext(rootResource);
@@ -185,14 +187,15 @@ public static class ResourceMapper
         CancellationToken cancellationToken = default
     )
     {
-        var contexts = ctx.QuestionnaireItem.CreateResource(ctx);
+        var contextResult = ctx.QuestionnaireItem.GetContext(ctx);
+        var context = contextResult?.Resources.FirstOrDefault() ?? contextResult?.CreateNewResource();
 
-        if (contexts is null || contexts.Length == 0)
+        if (context is null)
         {
             throw new InvalidOperationException("Unable to create a resource from questionnaire item");
         }
 
-        ctx.SetCurrentContext(contexts.First());
+        ctx.SetCurrentContext(context);
         await ExtractByDefinition(
             ctx.QuestionnaireItem.Item,
             ctx.QuestionnaireResponseItem.Item,
@@ -202,7 +205,7 @@ public static class ResourceMapper
             cancellationToken
         );
 
-        extractionResult.AddRange(contexts);
+        extractionResult.Add(context);
         ctx.RemoveContext();
     }
 
@@ -214,16 +217,46 @@ public static class ResourceMapper
         CancellationToken cancellationToken = default
     )
     {
-        var contexts = ctx.QuestionnaireItem.CreateResource(ctx);
+        var contextResult = ctx.QuestionnaireItem.GetContext(ctx);
 
-        if (contexts is null || contexts.Length == 0)
+        if (contextResult is null)
         {
             throw new InvalidOperationException("Unable to create a resource from questionnaire item");
         }
+        Console.WriteLine("Debug: {0} - {1}", ctx.QuestionnaireItem.LinkId, responseItems.Count);
+        var contexts = new List<Resource>();
 
-        ctx.SetCurrentContext(contexts);
+        var questionnaireItem = ctx.QuestionnaireItem;
         foreach (var responseItem in responseItems)
         {
+            ctx.QuestionnaireResponseItem = responseItem;
+            ctx.QuestionnaireItem = questionnaireItem;
+            // var currentContext
+            // ctx.SetCurrentContext(contexts);
+            // TODO:get the correct context for the response item
+
+            // Console.WriteLine(
+            //     "Debug: {0}",
+            //     JsonSerializer.Serialize(responseItem, new JsonSerializerOptions { WriteIndented = true })
+            // );
+
+            var contextResource = GetContextResource(contextResult.Resources, ctx) ?? contextResult.CreateNewResource();
+
+            if (contextResource is null)
+            {
+                Console.WriteLine(
+                    "Warning: could not find resource for context in QuestionnaireItem {0}. Skipping this QuestionnaireResponseItem",
+                    ctx.QuestionnaireItem.LinkId
+                );
+                continue;
+            }
+            Console.WriteLine(
+                "Debug: {0}",
+                JsonSerializer.Serialize(contextResource, new JsonSerializerOptions { WriteIndented = true })
+            );
+
+            ctx.SetCurrentContext(contextResource);
+
             await ExtractByDefinition(
                 ctx.QuestionnaireItem.Item,
                 responseItem.Item,
@@ -232,10 +265,71 @@ public static class ResourceMapper
                 profileLoader,
                 cancellationToken
             );
+
+            ctx.RemoveContext();
+
+            contexts.Add(contextResource);
         }
 
         extractionResult.AddRange(contexts);
-        ctx.RemoveContext();
+    }
+
+    private static Resource? GetContextResource(IReadOnlyCollection<Resource> resources, MappingContext ctx)
+    {
+        var keyExtension = ctx.QuestionnaireItem.GetExtension("extractionContextId");
+
+        if (keyExtension?.Value is not Expression idExpression)
+        {
+            Console.WriteLine(
+                "Warning: could not find key on extractionContext for QuestionnaireItem {0}",
+                ctx.QuestionnaireItem.LinkId
+            );
+            return null;
+        }
+
+        var result = FhirPathMapping.EvaluateExpr(idExpression.Expression_, ctx);
+
+        if (result is null || result.Result.Length == 0)
+        {
+            Console.WriteLine(
+                "Warning: could not resolve expression {0} on QuestionnaireItem {1}",
+                idExpression.Expression_,
+                ctx.QuestionnaireItem.LinkId
+            );
+            return null;
+        }
+
+        if (result.Result.Length > 1)
+        {
+            Console.WriteLine(
+                "Warning: key expression {0} resolved to more than one value for {1}",
+                idExpression.Expression_,
+                ctx.QuestionnaireItem.LinkId
+            );
+            return null;
+        }
+
+        if (result.Result.First() is not FhirString str)
+        {
+            return null;
+        }
+
+        var resource = resources.FirstOrDefault(resource => resource.Id == str.Value);
+
+        if (resource is null)
+        {
+            Console.WriteLine(
+                "Debug: {0}",
+                JsonSerializer.Serialize(resources, new JsonSerializerOptions { WriteIndented = true })
+            );
+            Console.WriteLine(
+                "Warning: could not find extractionContext resource with key {0} for QuestionnaireItem {1}",
+                str,
+                ctx.QuestionnaireItem.LinkId
+            );
+        }
+
+        return resource;
     }
 
     private static async Task ExtractComplexTypeValueByDefinition(

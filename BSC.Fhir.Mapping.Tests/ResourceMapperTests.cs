@@ -29,12 +29,14 @@ public class ResourceMapperTests
         Console.WriteLine("=================");
         Console.WriteLine();
 
+        var patientId = Guid.NewGuid().ToString();
+        var relativeIds = new[] { Guid.NewGuid().ToString(), Guid.NewGuid().ToString() };
         var demoQuestionnaire = Demographics.CreateQuestionnaire();
-        var demoQuestionnaireResponse = Demographics.CreateQuestionnaireResponse();
+        var demoQuestionnaireResponse = Demographics.CreateQuestionnaireResponse(patientId, relativeIds);
         var familyName = "Smith";
         var patient = new Patient
         {
-            Id = Guid.NewGuid().ToString(),
+            Id = patientId,
             BirthDate = "2006-04-05",
             Name =
             {
@@ -42,6 +44,18 @@ public class ResourceMapperTests
                 new() { Family = familyName, Given = new[] { "Elisabeth", "Charlotte" } }
             }
         };
+        var relatives = relativeIds.Select(
+            id =>
+                new RelatedPerson
+                {
+                    Id = id,
+                    Patient = new ResourceReference($"Patient/{patientId}"),
+                    Name =
+                    {
+                        new() { Family = "Paul", Given = new[] { "Annabel" } }
+                    }
+                }
+        );
 
         var bundle = await ResourceMapper.Extract(
             demoQuestionnaire,
@@ -49,6 +63,7 @@ public class ResourceMapperTests
             new MappingContext(demoQuestionnaire, demoQuestionnaireResponse)
             {
                 { "extraction_root", new(patient, "extraction_root") },
+                { "extraction_relative", new(relatives.ToArray(), "extraction_relative") },
                 { "user", new(new Practitioner { Id = Guid.NewGuid().ToString() }, "user") }
             }
         );
