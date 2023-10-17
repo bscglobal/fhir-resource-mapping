@@ -44,15 +44,17 @@ public class Context
     }
 }
 
-public class MappingContext : IDictionary<string, ContextValue>
+public class MappingContext
 {
-    private readonly Dictionary<string, ContextValue> _namedExpressions = new();
-    private readonly Stack<Context> _context = new();
+    private readonly Stack<Context> _extractionContext = new();
+    private readonly Stack<Questionnaire.ItemComponent> _questionnaireItems = new();
+    private readonly Stack<QuestionnaireResponse.ItemComponent> _questionnaireResponseItems = new();
 
-    public Context? CurrentContext => _context.TryPeek(out var context) ? context : null;
+    public Context? CurrentContext => _extractionContext.TryPeek(out var context) ? context : null;
+    public Questionnaire.ItemComponent QuestionnaireItem => _questionnaireItems.Peek();
+    public QuestionnaireResponse.ItemComponent QuestionnaireResponseItem => _questionnaireResponseItems.Peek();
 
-    public Questionnaire.ItemComponent QuestionnaireItem { get; set; } = new();
-    public QuestionnaireResponse.ItemComponent QuestionnaireResponseItem { get; set; } = new();
+    public Dictionary<string, ContextValue> NamedExpressions { get; } = new();
 
     public Questionnaire Questionnaire { get; private set; }
     public QuestionnaireResponse? QuestionnaireResponse { get; set; }
@@ -64,82 +66,33 @@ public class MappingContext : IDictionary<string, ContextValue>
         Questionnaire = questionnaire;
     }
 
-    public ContextValue this[string key]
+    public void SetCurrentExtractionContext(Base context)
     {
-        get => _namedExpressions[key];
-        set => _namedExpressions[key] = value;
+        _extractionContext.Push(new(context));
     }
 
-    public void SetCurrentContext(Base context)
+    public void PopCurrentExtractionContext()
     {
-        _context.Push(new(context));
+        _extractionContext.Pop();
     }
 
-    public void RemoveContext()
+    public void SetQuestionnaireItem(Questionnaire.ItemComponent item)
     {
-        _context.Pop();
+        _questionnaireItems.Push(item);
     }
 
-    public ICollection<string> Keys => _namedExpressions.Keys;
-
-    public ICollection<ContextValue> Values => _namedExpressions.Values;
-
-    public int Count => ((ICollection<KeyValuePair<string, ContextValue>>)_namedExpressions).Count;
-
-    public bool IsReadOnly => ((ICollection<KeyValuePair<string, ContextValue>>)_namedExpressions).IsReadOnly;
-
-    public void Add(string key, ContextValue value)
+    public void PopQuestionnaireItem()
     {
-        _namedExpressions.Add(key, value);
+        _questionnaireItems.Pop();
     }
 
-    public void Add(KeyValuePair<string, ContextValue> item)
+    public void SetQuestionnaireResponseItem(QuestionnaireResponse.ItemComponent item)
     {
-        ((ICollection<KeyValuePair<string, ContextValue>>)_namedExpressions).Add(item);
+        _questionnaireResponseItems.Push(item);
     }
 
-    public void Clear()
+    public void PopQuestionnaireResponseItem()
     {
-        _namedExpressions.Clear();
-    }
-
-    public bool Contains(KeyValuePair<string, ContextValue> item)
-    {
-        return ((ICollection<KeyValuePair<string, ContextValue>>)_namedExpressions).Contains(item);
-    }
-
-    public bool ContainsKey(string key)
-    {
-        return _namedExpressions.ContainsKey(key);
-    }
-
-    public void CopyTo(KeyValuePair<string, ContextValue>[] array, int arrayIndex)
-    {
-        ((ICollection<KeyValuePair<string, ContextValue>>)_namedExpressions).CopyTo(array, arrayIndex);
-    }
-
-    public IEnumerator<KeyValuePair<string, ContextValue>> GetEnumerator()
-    {
-        return ((IEnumerable<KeyValuePair<string, ContextValue>>)_namedExpressions).GetEnumerator();
-    }
-
-    public bool Remove(string key)
-    {
-        return _namedExpressions.Remove(key);
-    }
-
-    public bool Remove(KeyValuePair<string, ContextValue> item)
-    {
-        return ((ICollection<KeyValuePair<string, ContextValue>>)_namedExpressions).Remove(item);
-    }
-
-    public bool TryGetValue(string key, [MaybeNullWhen(false)] out ContextValue value)
-    {
-        return _namedExpressions.TryGetValue(key, out value);
-    }
-
-    IEnumerator IEnumerable.GetEnumerator()
-    {
-        return _namedExpressions.GetEnumerator();
+        _questionnaireResponseItems.Pop();
     }
 }
