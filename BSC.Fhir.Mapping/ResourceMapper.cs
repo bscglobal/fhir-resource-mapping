@@ -351,6 +351,15 @@ public static class ResourceMapper
             throw new ArgumentException("ExtractionContext.CurrentContext is null", nameof(ctx));
         }
 
+        if (ctx.QuestionnaireResponseItem.Item.Count == 0)
+        {
+            Console.WriteLine(
+                "Debug: QuestionnaireResponseItem {LinkId} has no child items. Skipping extraction of complex type...",
+                ctx.QuestionnaireResponseItem.LinkId
+            );
+            return;
+        }
+
         var fieldName = FieldNameByDefinition(ctx.QuestionnaireItem.Definition);
         var fieldInfo = ctx.CurrentContext.Value.GetType().GetProperty(fieldName);
 
@@ -972,6 +981,8 @@ public static class ResourceMapper
             {
                 GenerateQuestionnaireResponseItem(ctx);
             }
+
+            ctx.PopQuestionnaireResponseItem();
 
             responseItems = new[] { questionnaireResponseItem };
         }
