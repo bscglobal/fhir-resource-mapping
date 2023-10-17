@@ -354,7 +354,7 @@ public static class ResourceMapper
         if (ctx.QuestionnaireResponseItem.Item.Count == 0)
         {
             Console.WriteLine(
-                "Debug: QuestionnaireResponseItem {LinkId} has no child items. Skipping extraction of complex type...",
+                "Debug: QuestionnaireResponseItem {0} has no child items. Skipping extraction of complex type...",
                 ctx.QuestionnaireResponseItem.LinkId
             );
             return;
