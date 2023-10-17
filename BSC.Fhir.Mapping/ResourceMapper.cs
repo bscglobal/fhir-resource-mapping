@@ -5,6 +5,7 @@
  *
  */
 
+using System.Collections;
 using System.Reflection;
 using System.Text.Json;
 using BSC.Fhir.Mapping.Core;
@@ -299,6 +300,7 @@ public static class ResourceMapper
 
         if (result.Result.First() is not FhirString str)
         {
+            Console.WriteLine("Warning: key does not resolve to string");
             return null;
         }
 
@@ -312,11 +314,16 @@ public static class ResourceMapper
             );
             Console.WriteLine(
                 "Warning: could not find extractionContext resource with key {0} for QuestionnaireItem {1}",
-                str,
+                str.Value,
                 ctx.QuestionnaireItem.LinkId
             );
         }
 
+        Console.WriteLine(
+            "Debug: context resource found for LinkId {0}. Key: {1}",
+            ctx.QuestionnaireItem.LinkId,
+            str.Value
+        );
         return resource;
     }
 
@@ -351,7 +358,7 @@ public static class ResourceMapper
 
             if (fieldInfo.IsNonStringEnumerable())
             {
-                var val = fieldInfo.GetValue(ctx.CurrentContext.Value) as List<object>;
+                var val = fieldInfo.GetValue(ctx.CurrentContext.Value) as IList;
 
                 if (val is not null && !ctx.CurrentContext.DirtyFields.Contains(fieldInfo))
                 {
@@ -457,7 +464,7 @@ public static class ResourceMapper
                     }
                 }
 
-                UpdateField(ctx.CurrentContext.Value, field, answers);
+                UpdateField(ctx.CurrentContext.Value, field, answers, ctx);
             }
 
             ctx.CurrentContext.DirtyFields.Add(field);
@@ -476,6 +483,7 @@ public static class ResourceMapper
         CancellationToken cancellationToken = default
     )
     {
+        Console.WriteLine("Debug: Checking slice for fieldName {0}", fieldName);
         if (ctx.CurrentContext is null)
         {
             Console.WriteLine("Error: CurrentContext is null");
@@ -692,7 +700,7 @@ public static class ResourceMapper
 
         if (fieldInfo.IsNonStringEnumerable())
         {
-            var val = fieldInfo.GetValue(ctx.CurrentContext.Value) as List<object>;
+            var val = fieldInfo.GetValue(ctx.CurrentContext.Value) as IList;
             if (val is not null && !ctx.CurrentContext.DirtyFields.Contains(fieldInfo))
             {
                 val.Clear();
@@ -740,14 +748,19 @@ public static class ResourceMapper
         return new ResourceReference($"{ModelInfo.GetFhirTypeNameForType(referenceType)}/{idStr}");
     }
 
-    private static void UpdateField(Base resource, PropertyInfo field, IEnumerable<DataType> answers)
+    private static void UpdateField(
+        Base resource,
+        PropertyInfo field,
+        IEnumerable<DataType> answers,
+        MappingContext ctx
+    )
     {
         var fieldType = field.PropertyType;
         var answersOfFieldType = answers.Select(ans => WrapAnswerInFieldType(ans, fieldType)).ToArray();
 
         if (field.IsParameterized() && fieldType.IsNonStringEnumerable())
         {
-            AddAnswerToListField(resource, field, answersOfFieldType);
+            AddAnswerToListField(resource, field, answersOfFieldType, ctx);
         }
         else
         {
@@ -763,18 +776,27 @@ public static class ResourceMapper
     private static void AddAnswerToListField(
         Base baseResource,
         PropertyInfo fieldInfo,
-        IReadOnlyCollection<DataType> answerValue
+        IReadOnlyCollection<DataType> answerValue,
+        MappingContext ctx
     )
     {
         var propName = fieldInfo.Name;
-        var field = fieldInfo.GetValue(baseResource) as List<object>;
+        var field = fieldInfo.GetValue(baseResource) as IList;
 
         if (field is null)
         {
             return;
         }
 
-        field.AddRange(answerValue);
+        if (ctx.CurrentContext?.DirtyFields.Contains(fieldInfo) == true)
+        {
+            field.Clear();
+        }
+
+        foreach (var answer in answerValue)
+        {
+            field.Add(answer);
+        }
     }
 
     private static void UpdateFieldWithEnum(Base baseResource, PropertyInfo field, Base value)

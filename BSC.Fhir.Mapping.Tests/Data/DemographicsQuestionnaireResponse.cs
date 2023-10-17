@@ -43,6 +43,32 @@ public partial class Demographics
                         }
                     }
                 },
+                new()
+                {
+                    LinkId = "patient.name",
+                    Definition = "Patient.name",
+                    Item =
+                    {
+                        new()
+                        {
+                            LinkId = "patient.name.family",
+                            Definition = "Patient.name.family",
+                            Text = "Family name",
+                            Answer = { new() { Value = new FhirString("Smith") } }
+                        },
+                        new()
+                        {
+                            LinkId = "patient.name.given",
+                            Definition = "Patient.name.given",
+                            Text = "Given name(s)",
+                            Answer =
+                            {
+                                new() { Value = new FhirString("Matthew") },
+                                new() { Value = new FhirString("William") }
+                            }
+                        }
+                    }
+                },
             }
         };
 
