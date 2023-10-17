@@ -48,7 +48,7 @@ public static class ResourceMapper
 
         if (rootResource is not null)
         {
-            extractionContext.SetCurrentContext(rootResource);
+            extractionContext.SetCurrentExtractionContext(rootResource);
         }
 
         await ExtractByDefinition(
@@ -63,7 +63,7 @@ public static class ResourceMapper
         if (rootResource is not null)
         {
             extractedResources.Add(rootResource);
-            extractionContext.RemoveContext();
+            extractionContext.PopCurrentExtractionContext();
         }
 
         return new Bundle
@@ -103,7 +103,7 @@ public static class ResourceMapper
                 continue;
             }
 
-            extractionContext.QuestionnaireItem = questionnaireItem;
+            extractionContext.SetQuestionnaireItem(questionnaireItem);
             if (
                 questionnaireItem.Type == Questionnaire.QuestionnaireItemType.Group
                 && (questionnaireItem.Repeats ?? false)
@@ -120,9 +120,22 @@ public static class ResourceMapper
             }
             else
             {
-                extractionContext.QuestionnaireResponseItem = responseItems.First();
-                await ExtractByDefinition(extractionContext, extractionResult, profileLoader, cancellationToken);
+                if (responseItems.Length > 1)
+                {
+                    Console.WriteLine(
+                        "Debug: ResponseItems length for {0} - {1}",
+                        questionnaireItem.LinkId,
+                        responseItems.Length
+                    );
+                }
+                foreach (var responseItem in responseItems)
+                {
+                    extractionContext.SetQuestionnaireResponseItem(responseItem);
+                    await ExtractByDefinition(extractionContext, extractionResult, profileLoader, cancellationToken);
+                    extractionContext.PopQuestionnaireResponseItem();
+                }
             }
+            extractionContext.PopQuestionnaireItem();
         }
     }
 
@@ -196,7 +209,7 @@ public static class ResourceMapper
             throw new InvalidOperationException("Unable to create a resource from questionnaire item");
         }
 
-        ctx.SetCurrentContext(context);
+        ctx.SetCurrentExtractionContext(context);
         await ExtractByDefinition(
             ctx.QuestionnaireItem.Item,
             ctx.QuestionnaireResponseItem.Item,
@@ -207,7 +220,7 @@ public static class ResourceMapper
         );
 
         extractionResult.Add(context);
-        ctx.RemoveContext();
+        ctx.PopCurrentExtractionContext();
     }
 
     private static async Task ExtractResourcesByDefinition(
@@ -227,11 +240,9 @@ public static class ResourceMapper
 
         var contexts = new List<Resource>();
 
-        var questionnaireItem = ctx.QuestionnaireItem;
         foreach (var responseItem in responseItems)
         {
-            ctx.QuestionnaireResponseItem = responseItem;
-            ctx.QuestionnaireItem = questionnaireItem;
+            ctx.SetQuestionnaireResponseItem(responseItem);
 
             var contextResource = GetContextResource(contextResult.Resources, ctx) ?? contextResult.CreateNewResource();
 
@@ -244,7 +255,7 @@ public static class ResourceMapper
                 continue;
             }
 
-            ctx.SetCurrentContext(contextResource);
+            ctx.SetCurrentExtractionContext(contextResource);
 
             await ExtractByDefinition(
                 ctx.QuestionnaireItem.Item,
@@ -255,7 +266,8 @@ public static class ResourceMapper
                 cancellationToken
             );
 
-            ctx.RemoveContext();
+            ctx.PopCurrentExtractionContext();
+            ctx.PopQuestionnaireResponseItem();
 
             contexts.Add(contextResource);
         }
@@ -362,6 +374,7 @@ public static class ResourceMapper
 
                 if (val is not null && !ctx.CurrentContext.DirtyFields.Contains(fieldInfo))
                 {
+                    Console.WriteLine("Debug: clearing list for field {0}", fieldInfo.Name);
                     val.Clear();
                 }
 
@@ -374,7 +387,7 @@ public static class ResourceMapper
 
             ctx.CurrentContext.DirtyFields.Add(fieldInfo);
 
-            ctx.SetCurrentContext(value);
+            ctx.SetCurrentExtractionContext(value);
 
             await ExtractByDefinition(
                 ctx.QuestionnaireItem.Item,
@@ -385,7 +398,7 @@ public static class ResourceMapper
                 cancellationToken
             );
 
-            ctx.RemoveContext();
+            ctx.PopCurrentExtractionContext();
         }
     }
 
@@ -405,7 +418,7 @@ public static class ResourceMapper
         {
             Console.WriteLine(
                 "Error: both calculated value and answer exist on QuestionnaireResponse item {0}",
-                ctx.QuestionnaireItem.LinkId
+                ctx.QuestionnaireResponseItem.LinkId
             );
 
             return;
@@ -413,7 +426,7 @@ public static class ResourceMapper
 
         if (ctx.QuestionnaireResponseItem.Answer.Count == 0 && calculatedValue?.Result.Length is 0 or null)
         {
-            Console.WriteLine("Warning: no answer or calculated value for {0}", ctx.QuestionnaireItem.LinkId);
+            Console.WriteLine("Warning: no answer or calculated value for {0}", ctx.QuestionnaireResponseItem.LinkId);
             return;
         }
 
@@ -714,7 +727,7 @@ public static class ResourceMapper
 
         ctx.CurrentContext.DirtyFields.Add(fieldInfo);
 
-        ctx.SetCurrentContext(value);
+        ctx.SetCurrentExtractionContext(value);
 
         await ExtractByDefinition(
             ctx.QuestionnaireItem.Item,
@@ -725,7 +738,7 @@ public static class ResourceMapper
             cancellationToken
         );
 
-        ctx.RemoveContext();
+        ctx.PopCurrentExtractionContext();
     }
 
     private static ResourceReference CreateResourceReference(Base from, Type referenceType)
@@ -926,8 +939,10 @@ public static class ResourceMapper
             {
                 Console.WriteLine("Debug: CreatingQuestionnaireResponseItems for {0}", item.LinkId);
             }
-            ctx.QuestionnaireItem = item;
-            return GenerateQuestionnaireResponseItem(ctx);
+            ctx.SetQuestionnaireItem(item);
+            var responseItem = GenerateQuestionnaireResponseItem(ctx);
+            ctx.PopQuestionnaireItem();
+            return responseItem;
         });
 
         responseItems.AddRange(responses);
@@ -951,7 +966,7 @@ public static class ResourceMapper
                 Answer = CreateQuestionnaireResponseItemAnswers(ctx)
             };
 
-            ctx.QuestionnaireResponseItem = questionnaireResponseItem;
+            ctx.SetQuestionnaireResponseItem(questionnaireResponseItem);
 
             if (ctx.QuestionnaireItem.Type == Questionnaire.QuestionnaireItemType.Group)
             {
@@ -972,7 +987,7 @@ public static class ResourceMapper
 
         if (populationContext is not null)
         {
-            if (!ctx.TryGetValue(populationContext.Name, out var context))
+            if (!ctx.NamedExpressions.TryGetValue(populationContext.Name, out var context))
             {
                 var result = FhirPathMapping.EvaluateExpr(populationContext.Expression_, ctx);
                 if (result is null)
@@ -986,23 +1001,22 @@ public static class ResourceMapper
                 }
 
                 context = new(result.Result, populationContext.Name);
-                ctx.Add(populationContext.Name, context);
+                ctx.NamedExpressions.Add(populationContext.Name, context);
             }
 
             var contextValues = context.Value;
-            var originalQuestionnaireItem = ctx.QuestionnaireItem;
             var responseItems = contextValues.Select(value =>
             {
                 var questionnaireResponseItem = new QuestionnaireResponse.ItemComponent
                 {
                     LinkId = ctx.QuestionnaireItem.LinkId
                 };
-                ctx.QuestionnaireResponseItem = questionnaireResponseItem;
+                ctx.SetQuestionnaireResponseItem(questionnaireResponseItem);
 
                 context.Value = new[] { value };
 
                 CreateQuestionnaireResponseItems(ctx.QuestionnaireItem.Item, questionnaireResponseItem.Item, ctx);
-                ctx.QuestionnaireItem = originalQuestionnaireItem;
+                ctx.PopQuestionnaireResponseItem();
 
                 return questionnaireResponseItem;
             });

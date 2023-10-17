@@ -167,7 +167,7 @@ public static class FhirPathMapping
     {
         EvaluationContext evaluationCtx;
         var variableName = exprParts[0][1..];
-        if (!ctx.TryGetValue(variableName, out var variable))
+        if (!ctx.NamedExpressions.TryGetValue(variableName, out var variable))
         {
             exprParts[0] = "%resource";
             var execExpr = string.Join('.', exprParts);

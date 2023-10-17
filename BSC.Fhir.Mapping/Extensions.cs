@@ -60,7 +60,7 @@ public static class MappingExtenstions
 
         var extractionContextName = $"extraction_{linkId}";
         Resource[] values = Array.Empty<Resource>();
-        if (ctx.TryGetValue(extractionContextName, out var contextValue))
+        if (ctx.NamedExpressions.TryGetValue(extractionContextName, out var contextValue))
         {
             Console.WriteLine("Debug: found existing context value for {0}", extractionContextName);
 

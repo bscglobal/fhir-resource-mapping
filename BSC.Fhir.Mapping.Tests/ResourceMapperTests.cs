@@ -58,16 +58,12 @@ public class ResourceMapperTests
                 }
         );
 
-        var bundle = await ResourceMapper.Extract(
-            demoQuestionnaire,
-            demoQuestionnaireResponse,
-            new MappingContext(demoQuestionnaire, demoQuestionnaireResponse)
-            {
-                { "extraction_root", new(patient, "extraction_root") },
-                { "extraction_relative", new(relatives.ToArray(), "extraction_relative") },
-                { "user", new(new Practitioner { Id = Guid.NewGuid().ToString() }, "user") }
-            }
-        );
+        var context = new MappingContext(demoQuestionnaire, demoQuestionnaireResponse);
+        context.NamedExpressions.Add("extraction_root", new(patient, "extraction_root"));
+        context.NamedExpressions.Add("extraction_relative", new(relatives.ToArray(), "extraction_relative"));
+        context.NamedExpressions.Add("user", new(new Practitioner { Id = Guid.NewGuid().ToString() }, "user"));
+
+        var bundle = await ResourceMapper.Extract(demoQuestionnaire, demoQuestionnaireResponse, context);
 
         Console.WriteLine(bundle.ToJson(new FhirJsonSerializationSettings { Pretty = true }));
 
@@ -116,14 +112,11 @@ public class ResourceMapperTests
             }
         };
 
-        var response = ResourceMapper.Populate(
-            demoQuestionnaire,
-            new(demoQuestionnaire, new())
-            {
-                { "patient", new(patient, "patient") },
-                { "relatedPerson", new(relative, "relatedPerson") }
-            }
-        );
+        var context = new MappingContext(demoQuestionnaire, new());
+        context.NamedExpressions.Add("patient", new(patient, "patient"));
+        context.NamedExpressions.Add("relatedPerson", new(relative, "relatedPerson"));
+
+        var response = ResourceMapper.Populate(demoQuestionnaire, context);
 
         // Console.WriteLine();
         // Console.WriteLine("=================");
@@ -223,16 +216,10 @@ public class ResourceMapperTests
             .Setup(x => x.LoadProfileAsync(It.IsAny<Canonical>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(GeneralNote.CreateProfile());
 
-        var extractionResult = await ResourceMapper.Extract(
-            questionnaire,
-            response,
-            new(questionnaire, response)
-            {
-                { "patient", new(new Patient { Id = Guid.NewGuid().ToString() }, "patient") },
-                { "user", new(new Practitioner { Id = Guid.NewGuid().ToString() }, "user") }
-            },
-            profileLoaderMock.Object
-        );
+        var context = new MappingContext(questionnaire, response);
+        context.NamedExpressions.Add("patient", new(new Patient { Id = Guid.NewGuid().ToString() }, "patient"));
+        context.NamedExpressions.Add("user", new(new Practitioner { Id = Guid.NewGuid().ToString() }, "user"));
+        var extractionResult = await ResourceMapper.Extract(questionnaire, response, context, profileLoaderMock.Object);
 
         Console.WriteLine(extractionResult.ToJson(new() { Pretty = true }));
     }
