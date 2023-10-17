@@ -50,6 +50,7 @@ public class ResourceMapperTests
                 {
                     Id = id,
                     Patient = new ResourceReference($"Patient/{patientId}"),
+                    BirthDate = "1964-06-01",
                     Name =
                     {
                         new() { Family = "Paul", Given = new[] { "Annabel" } }
