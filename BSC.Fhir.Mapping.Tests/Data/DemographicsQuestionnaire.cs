@@ -244,7 +244,7 @@ public partial class Demographics
                       "linkId": "relative.patient",
                       "definition": "RelatedPerson.patient",
                       "text": "(internal use)",
-                      "type": "string",
+                      "type": "reference",
                       "readOnly": true
                     },
                     {
