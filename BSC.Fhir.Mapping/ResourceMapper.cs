@@ -321,21 +321,20 @@ public static class ResourceMapper
         if (resource is null)
         {
             Console.WriteLine(
-                "Debug: {0}",
-                JsonSerializer.Serialize(resources, new JsonSerializerOptions { WriteIndented = true })
-            );
-            Console.WriteLine(
-                "Warning: could not find extractionContext resource with key {0} for QuestionnaireItem {1}",
+                "Debug: could not find extractionContext resource with key {0} for QuestionnaireItem {1}",
                 str.Value,
                 ctx.QuestionnaireItem.LinkId
             );
         }
+        else
+        {
+            Console.WriteLine(
+                "Debug: context resource found for LinkId {0}. Key: {1}",
+                ctx.QuestionnaireItem.LinkId,
+                str.Value
+            );
+        }
 
-        Console.WriteLine(
-            "Debug: context resource found for LinkId {0}. Key: {1}",
-            ctx.QuestionnaireItem.LinkId,
-            str.Value
-        );
         return resource;
     }
 
@@ -1062,7 +1061,7 @@ public static class ResourceMapper
 
         if (initialExpression is not null)
         {
-            var evalResult = FhirPathMapping.EvaluateExpr(initialExpression.Expression_, ctx)?.Result;
+            var evalResult = FhirPathMapping.EvaluateExpr(initialExpression.Expression_, ctx);
 
             if (evalResult is null)
             {
@@ -1072,13 +1071,19 @@ public static class ResourceMapper
             {
                 if (ctx.QuestionnaireItem.Repeats ?? false)
                 {
-                    return evalResult
+                    return evalResult.Result
                         .Select(
-                            result => new QuestionnaireResponse.AnswerComponent() { Value = result.AsExpectedType() }
+                            result =>
+                                new QuestionnaireResponse.AnswerComponent()
+                                {
+                                    Value = result.AsExpectedType(
+                                        evalResult.SourceResource is Resource resource ? resource.GetType() : null
+                                    )
+                                }
                         )
                         .ToList();
                 }
-                else if (evalResult.Length > 1)
+                else if (evalResult.Result.Length > 1)
                 {
                     Console.WriteLine(
                         "Warning: expression {0} resolved to more than one answer. LinkId: {1}",
@@ -1088,7 +1093,7 @@ public static class ResourceMapper
                 }
                 else
                 {
-                    return evalResult.SingleOrDefault() switch
+                    return evalResult.Result.SingleOrDefault() switch
                     {
                         null => null,
                         var x => new() { new() { Value = x.AsExpectedType() } }
