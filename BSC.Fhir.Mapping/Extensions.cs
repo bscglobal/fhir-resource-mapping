@@ -170,12 +170,14 @@ public static class MappingExtenstions
                 ?.Value as Expression;
     }
 
-    public static DataType? AsExpectedType(this Base baseObj)
+    public static DataType? AsExpectedType(this Base baseObj, Type? sourceType = null)
     {
         // TODO(jaco): we should look at doing further parsing of values that turn into codings
         if (baseObj is Id id)
         {
-            return new FhirString(id.Value);
+            return sourceType is null
+                ? new FhirString(id.Value)
+                : new ResourceReference($"{ModelInfo.GetFhirTypeNameForType(sourceType)}/{id.Value}");
         }
         else if (baseObj is CodeableConcept codeableConcept)
         {
