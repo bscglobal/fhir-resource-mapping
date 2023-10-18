@@ -993,53 +993,55 @@ public static class ResourceMapper
         MappingContext ctx
     )
     {
-        var populationContext = ctx.QuestionnaireItem.PopulationContext();
+        var populationContextExpression = ctx.QuestionnaireItem.PopulationContext();
 
-        if (populationContext is not null)
+        if (populationContextExpression is not null)
         {
             var tempContext = false;
-            if (!ctx.NamedExpressions.TryGetValue(populationContext.Name, out var context))
+            if (!ctx.NamedExpressions.TryGetValue(populationContextExpression.Name, out var context))
             {
-                var result = FhirPathMapping.EvaluateExpr(populationContext.Expression_, ctx);
+                var result = FhirPathMapping.EvaluateExpr(populationContextExpression.Expression_, ctx);
                 if (result is null)
                 {
                     Console.WriteLine(
                         "Warning: could not resolve expression {0} for {1}",
-                        populationContext.Expression_,
+                        populationContextExpression.Expression_,
                         ctx.QuestionnaireItem.LinkId
                     );
                     return null;
                 }
 
-                context = new(result.Result, populationContext.Name);
-                ctx.NamedExpressions.Add(populationContext.Name, context);
+                context = new(result.Result, populationContextExpression.Name);
+                ctx.NamedExpressions.Add(populationContextExpression.Name, context);
                 tempContext = true;
             }
 
             var contextValues = context.Value;
-            var responseItems = contextValues.Select(value =>
-            {
-                var questionnaireResponseItem = new QuestionnaireResponse.ItemComponent
+            var responseItems = contextValues
+                .Select(value =>
                 {
-                    LinkId = ctx.QuestionnaireItem.LinkId
-                };
-                ctx.SetQuestionnaireResponseItem(questionnaireResponseItem);
+                    var questionnaireResponseItem = new QuestionnaireResponse.ItemComponent
+                    {
+                        LinkId = ctx.QuestionnaireItem.LinkId
+                    };
+                    ctx.SetQuestionnaireResponseItem(questionnaireResponseItem);
 
-                context.Value = new[] { value };
+                    context.Value = new[] { value };
 
-                CreateQuestionnaireResponseItems(ctx.QuestionnaireItem.Item, questionnaireResponseItem.Item, ctx);
-                ctx.PopQuestionnaireResponseItem();
+                    CreateQuestionnaireResponseItems(ctx.QuestionnaireItem.Item, questionnaireResponseItem.Item, ctx);
+                    ctx.PopQuestionnaireResponseItem();
 
-                return questionnaireResponseItem;
-            });
+                    return questionnaireResponseItem;
+                })
+                .ToArray();
             context.Value = contextValues;
 
             if (tempContext)
             {
-                ctx.NamedExpressions.Remove(populationContext.Expression_);
+                ctx.NamedExpressions.Remove(populationContextExpression.Name);
             }
 
-            return responseItems.ToArray();
+            return responseItems;
         }
 
         Console.WriteLine(
