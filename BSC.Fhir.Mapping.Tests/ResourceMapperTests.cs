@@ -1,3 +1,4 @@
+using System.Text.Json;
 using BSC.Fhir.Mapping.Core;
 using BSC.Fhir.Mapping.Tests.Data;
 using Hl7.Fhir.Model;
@@ -111,10 +112,34 @@ public class ResourceMapperTests
                 new() { Family = familyName, Given = new[] { "Another", "Name" } }
             }
         };
+        var relative2 = new RelatedPerson
+        {
+            Id = Guid.NewGuid().ToString(),
+            Patient = new ResourceReference($"Patient/{patient.Id}"),
+            Relationship =
+            {
+                new CodeableConcept
+                {
+                    Coding =
+                    {
+                        new Coding
+                        {
+                            System = "http://hl7.org/fhir/ValueSet/relatedperson-relationshiptype",
+                            Code = "NOK",
+                            Display = "next of kin"
+                        }
+                    }
+                }
+            },
+            Name =
+            {
+                new() { Family = familyName, Given = new[] { "Elizabeth" } },
+            }
+        };
 
         var context = new MappingContext(demoQuestionnaire, new());
         context.NamedExpressions.Add("patient", new(patient, "patient"));
-        context.NamedExpressions.Add("relatedPerson", new(relative, "relatedPerson"));
+        context.NamedExpressions.Add("relatedPerson", new(new[] { relative, relative2 }, "relatedPerson"));
 
         var response = ResourceMapper.Populate(demoQuestionnaire, context);
 
@@ -153,44 +178,91 @@ public class ResourceMapperTests
         //     ?.Answer.Select(answer => answer.Value.ToString());
         // Assert.Equivalent(new[] { "Jane", "Rebecca" }, actualPatientGivenNamesAnswer);
 
-        var actualRelativeIdAnswer = response.Item
-            .SingleOrDefault(item => item.LinkId == "relative")
-            ?.Item.SingleOrDefault(item => item.LinkId == "relative.id")
+        var actualRelativeAnswers = response.Item.Where(item => item.LinkId == "relative").ToArray();
+        // Console.WriteLine(
+        //     JsonSerializer.Serialize(actualRelativeAnswers, new JsonSerializerOptions { WriteIndented = true })
+        // );
+
+        var actualRelative1IdAnswer = actualRelativeAnswers[0]?.Item
+            .SingleOrDefault(item => item.LinkId == "relative.id")
             ?.Answer.FirstOrDefault()
             ?.Value.ToString();
-        Assert.Equal(actualRelativeIdAnswer, relative.Id);
 
-        var actualRelativePatientAnswer = (
-            response.Item
-                .SingleOrDefault(item => item.LinkId == "relative")
-                ?.Item.SingleOrDefault(item => item.LinkId == "relative.patient")
+        Assert.Equal(actualRelative1IdAnswer, relative.Id);
+
+        var actualRelative2IdAnswer = actualRelativeAnswers[1]?.Item
+            .SingleOrDefault(item => item.LinkId == "relative.id")
+            ?.Answer.FirstOrDefault()
+            ?.Value.ToString();
+
+        Assert.Equal(actualRelative2IdAnswer, relative2.Id);
+
+        var actualRelative1PatientAnswer = (
+            actualRelativeAnswers[0].Item
+                .SingleOrDefault(item => item.LinkId == "relative.patient")
                 ?.Answer.FirstOrDefault()
                 ?.Value as ResourceReference
         )?.Reference;
-        Assert.Equal(actualRelativePatientAnswer, $"Patient/{patient.Id}");
+        Assert.Equal(actualRelative1PatientAnswer, $"Patient/{patient.Id}");
 
-        var actualRelativeRelationshipAnswer =
-            response.Item
-                .SingleOrDefault(item => item.LinkId == "relative")
-                ?.Item.SingleOrDefault(item => item.LinkId == "relative.relationship")
+        var actualRelative2PatientAnswer = (
+            actualRelativeAnswers[1]?.Item
+                .SingleOrDefault(item => item.LinkId == "relative.patient")
+                ?.Answer.FirstOrDefault()
+                ?.Value as ResourceReference
+        )?.Reference;
+        Assert.Equal(actualRelative2PatientAnswer, $"Patient/{patient.Id}");
+
+        var actualRelative1RelationshipAnswer =
+            actualRelativeAnswers[0].Item
+                .SingleOrDefault(item => item.LinkId == "relative.relationship")
                 ?.Answer.FirstOrDefault()
                 ?.Value as Coding;
-        Assert.Equivalent(relative.Relationship.First().Coding.First(), actualRelativeRelationshipAnswer);
+        Assert.Equivalent(relative.Relationship.First().Coding.First(), actualRelative1RelationshipAnswer);
 
-        // var actualRelativeFamilyNameAnswer = response.Item
-        //     .SingleOrDefault(item => item.LinkId == "relative")
-        //     ?.Item.SingleOrDefault(item => item.LinkId == "relative.name")
-        //     ?.Item.SingleOrDefault(item => item.LinkId == "relative.name.family")
-        //     ?.Answer.FirstOrDefault()
-        //     ?.Value.ToString();
-        // Assert.Equal(familyName, actualRelativeFamilyNameAnswer);
-        //
-        // var actualRelativeGivenNamesAnswer = response.Item
-        //     .SingleOrDefault(item => item.LinkId == "relative")
-        //     ?.Item.SingleOrDefault(item => item.LinkId == "relative.name")
-        //     ?.Item.SingleOrDefault(item => item.LinkId == "relative.name.given")
-        //     ?.Answer.Select(answer => answer.Value.ToString());
-        // Assert.Equivalent(new[] { "John", "Mark" }, actualRelativeGivenNamesAnswer);
+        var actualRelative2RelationshipAnswer =
+            actualRelativeAnswers[1].Item
+                .SingleOrDefault(item => item.LinkId == "relative.relationship")
+                ?.Answer.FirstOrDefault()
+                ?.Value as Coding;
+        Assert.Equivalent(relative2.Relationship.First().Coding.First(), actualRelative2RelationshipAnswer);
+
+        var actualRelative1FamilyNameAnswer = actualRelativeAnswers[0].Item
+            .FirstOrDefault(item => item.LinkId == "relative.name")
+            ?.Item.SingleOrDefault(item => item.LinkId == "relative.name.family")
+            ?.Answer.FirstOrDefault()
+            ?.Value.ToString();
+        Assert.Equal(familyName, actualRelative1FamilyNameAnswer);
+
+        var actualRelative1GivenNamesAnswer = actualRelativeAnswers[0].Item
+            .Where(item => item.LinkId == "relative.name")
+            .Select(
+                item =>
+                    item.Item
+                        .SingleOrDefault(item => item.LinkId == "relative.name.given")
+                        ?.Answer.Select(answer => answer.Value.ToString())
+            );
+        Assert.Equivalent(
+            new[] { new[] { "John", "Mark" }, new[] { "Another", "Name" } },
+            actualRelative1GivenNamesAnswer
+        );
+
+        var actualRelative2FamilyNameAnswer = actualRelativeAnswers[1].Item
+            .SingleOrDefault(item => item.LinkId == "relative.name")
+            ?.Item.SingleOrDefault(item => item.LinkId == "relative.name.family")
+            ?.Answer.FirstOrDefault()
+            ?.Value.ToString();
+        Assert.Equal(familyName, actualRelative2FamilyNameAnswer);
+
+        var actualRelative2GivenNamesAnswer = actualRelativeAnswers[1].Item
+            .Where(item => item.LinkId == "relative.name")
+            .Select(
+                item =>
+                    item.Item
+                        .SingleOrDefault(item => item.LinkId == "relative.name.given")
+                        ?.Answer.Select(answer => answer.Value.ToString())
+            );
+        Assert.Equivalent(new[] { new[] { "Elizabeth" } }, actualRelative2GivenNamesAnswer);
     }
 
     [Fact]
