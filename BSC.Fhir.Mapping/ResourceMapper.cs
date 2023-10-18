@@ -997,6 +997,7 @@ public static class ResourceMapper
 
         if (populationContext is not null)
         {
+            var tempContext = false;
             if (!ctx.NamedExpressions.TryGetValue(populationContext.Name, out var context))
             {
                 var result = FhirPathMapping.EvaluateExpr(populationContext.Expression_, ctx);
@@ -1012,6 +1013,7 @@ public static class ResourceMapper
 
                 context = new(result.Result, populationContext.Name);
                 ctx.NamedExpressions.Add(populationContext.Name, context);
+                tempContext = true;
             }
 
             var contextValues = context.Value;
@@ -1031,6 +1033,11 @@ public static class ResourceMapper
                 return questionnaireResponseItem;
             });
             context.Value = contextValues;
+
+            if (tempContext)
+            {
+                ctx.NamedExpressions.Remove(populationContext.Expression_);
+            }
 
             return responseItems.ToArray();
         }
