@@ -170,23 +170,39 @@ public static class MappingExtenstions
                 ?.Value as Expression;
     }
 
-    public static DataType? AsExpectedType(this Base baseObj, Type? sourceType = null)
+    public static DataType? AsExpectedType(
+        this Base baseObj,
+        Questionnaire.QuestionnaireItemType questionnaireItemType,
+        Type? sourceType = null
+    )
     {
         // TODO(jaco): we should look at doing further parsing of values that turn into codings
-        if (baseObj is Id id)
+        return questionnaireItemType switch
         {
-            return sourceType is null
-                ? new FhirString(id.Value)
-                : new ResourceReference($"{ModelInfo.GetFhirTypeNameForType(sourceType)}/{id.Value}");
-        }
-        else if (baseObj is CodeableConcept codeableConcept)
-        {
-            return codeableConcept.Coding.First();
-        }
-        else
-        {
-            return baseObj as DataType;
-        }
+            Questionnaire.QuestionnaireItemType.Text when baseObj is Id id => new FhirString(id.Value),
+            Questionnaire.QuestionnaireItemType.Reference when baseObj is Id id && sourceType is not null
+                => new ResourceReference($"{ModelInfo.GetFhirTypeNameForType(sourceType)}/{id.Value}"),
+            Questionnaire.QuestionnaireItemType.Reference when baseObj is FhirString str && sourceType is not null
+                => new ResourceReference($"{ModelInfo.GetFhirTypeNameForType(sourceType)}/{str.Value}"),
+            Questionnaire.QuestionnaireItemType.Reference when sourceType is null
+                => throw new InvalidOperationException("Could not create ResourceReference"),
+            _ when baseObj is CodeableConcept codeableConcept => codeableConcept.Coding.First(),
+            _ => baseObj as DataType,
+        };
+        // if (baseObj is Id id)
+        // {
+        //     return sourceType is null
+        //         ? new FhirString(id.Value)
+        //         : new ResourceReference($"{ModelInfo.GetFhirTypeNameForType(sourceType)}/{id.Value}");
+        // }
+        // else if (baseObj is CodeableConcept codeableConcept)
+        // {
+        //     return codeableConcept.Coding.First();
+        // }
+        // else
+        // {
+        //     return baseObj as DataType;
+        // }
     }
 
     public static IReadOnlyCollection<Expression> GetPopulationContextExpressions(this Questionnaire questionnaire)

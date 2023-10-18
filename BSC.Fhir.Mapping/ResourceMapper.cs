@@ -1077,6 +1077,7 @@ public static class ResourceMapper
                                 new QuestionnaireResponse.AnswerComponent()
                                 {
                                     Value = result.AsExpectedType(
+                                        ctx.QuestionnaireItem.Type ?? Questionnaire.QuestionnaireItemType.Text,
                                         evalResult.SourceResource is Resource resource ? resource.GetType() : null
                                     )
                                 }
@@ -1096,7 +1097,17 @@ public static class ResourceMapper
                     return evalResult.Result.SingleOrDefault() switch
                     {
                         null => null,
-                        var x => new() { new() { Value = x.AsExpectedType() } }
+                        var x
+                            => new()
+                            {
+                                new()
+                                {
+                                    Value = x.AsExpectedType(
+                                        ctx.QuestionnaireItem.Type ?? Questionnaire.QuestionnaireItemType.Text,
+                                        evalResult.SourceResource is Resource resource ? resource.GetType() : null
+                                    )
+                                }
+                            }
                     };
                 }
             }
