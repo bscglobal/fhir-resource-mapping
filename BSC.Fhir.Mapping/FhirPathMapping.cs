@@ -5,7 +5,7 @@ using Hl7.Fhir.Model;
 
 namespace BSC.Fhir.Mapping;
 
-public record EvaluationResult(Base SourceResource, Base[] Result);
+public record EvaluationResult(Base SourceResource, Base[] Result, string? Name);
 
 public static class FhirPathMapping
 {
@@ -21,7 +21,7 @@ public static class FhirPathMapping
         }
     }
 
-    public static EvaluationResult? EvaluateExpr(string expr, MappingContext ctx)
+    public static EvaluationResult? EvaluateExpr(string expr, MappingContext ctx, string? expressionName = null)
     {
         var evaluationCtx = GetEvaluationContext(expr, ctx);
         if (evaluationCtx?.Resource is null)
@@ -41,7 +41,7 @@ public static class FhirPathMapping
                 )
                 .ToArray();
 
-            return new EvaluationResult(evaluationCtx.Resource, result);
+            return new EvaluationResult(evaluationCtx.Resource, result, expressionName);
         }
         catch (Exception e)
         {
@@ -111,13 +111,13 @@ public static class FhirPathMapping
                 _ => VariableEvaluationSource(expressionParts, ctx)
             };
         }
-        else if (ctx.CurrentContext is not null)
+        else if (ctx.CurrentExtractionContext is not null)
         {
-            evaluationCtx = new(expr, ctx.CurrentContext.Value);
+            evaluationCtx = new(expr, ctx.CurrentExtractionContext.Value);
         }
         else
         {
-            throw new InvalidOperationException("Could not find evaluation context");
+            throw new InvalidOperationException($"Could not find evaluation context for expression {expr}");
         }
 
         return evaluationCtx;
@@ -167,7 +167,7 @@ public static class FhirPathMapping
     {
         EvaluationContext evaluationCtx;
         var variableName = exprParts[0][1..];
-        if (!ctx.NamedExpressions.TryGetValue(variableName, out var variable))
+        if (!ctx.CurrentContext.TryGetValue(variableName, out var variable))
         {
             exprParts[0] = "%resource";
             var execExpr = string.Join('.', exprParts);

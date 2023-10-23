@@ -6,26 +6,52 @@ public static class QuestionnaireItemComponentExtensions
 {
     private const string QUESTIONNAIRE_ITEM_CALCULATED_EXPRESSION =
         "http://hl7.org/fhir/uv/sdc/StructureDefinition-sdc-questionnaire-calculatedExpression.html";
+    private const string VARIABLE_EXPRESSION = "http://hl7.org/fhir/StructureDefinition/variable";
 
     public static EvaluationResult? CalculatedExpressionResult(
         this Questionnaire.ItemComponent questionnaireItem,
         MappingContext context
     )
     {
-        var extension = questionnaireItem.Extension.FirstOrDefault(
-            e => e.Url == QUESTIONNAIRE_ITEM_CALCULATED_EXPRESSION
-        );
+        return questionnaireItem.ExpressionResult(QUESTIONNAIRE_ITEM_CALCULATED_EXPRESSION, context).SingleOrDefault();
+    }
 
-        if (extension is null || !(extension.Value is Expression expression))
+    public static EvaluationResult[] VariableExpressionResult(
+        this Questionnaire.ItemComponent questionnaireItem,
+        MappingContext context
+    )
+    {
+        return questionnaireItem.ExpressionResult(VARIABLE_EXPRESSION, context);
+    }
+
+    private static EvaluationResult[] ExpressionResult(
+        this Questionnaire.ItemComponent questionnaireItem,
+        string url,
+        MappingContext ctx
+    )
+    {
+        var extensions = questionnaireItem.GetExtensions(url).ToArray();
+        var results = new List<EvaluationResult>(extensions.Length);
+
+        foreach (var extension in extensions)
         {
-            return null;
+            if (!(extension.Value is Expression expression))
+            {
+                continue;
+            }
+
+            if (expression.Language != "text/fhirpath")
+            {
+                continue;
+            }
+
+            var result = FhirPathMapping.EvaluateExpr(expression.Expression_, ctx, expression.Name);
+            if (result is not null)
+            {
+                results.Add(result);
+            }
         }
 
-        if (expression.Language != "text/fhirpath")
-        {
-            return null;
-        }
-
-        return FhirPathMapping.EvaluateExpr(expression.Expression_, context);
+        return results.ToArray();
     }
 }
