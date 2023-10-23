@@ -61,9 +61,9 @@ public class ResourceMapperTests
         );
 
         var context = new MappingContext(demoQuestionnaire, demoQuestionnaireResponse);
-        context.NamedExpressions.Add("extraction_root", new(patient, "extraction_root"));
-        context.NamedExpressions.Add("extraction_relative", new(relatives.ToArray(), "extraction_relative"));
-        context.NamedExpressions.Add("user", new(new Practitioner { Id = Guid.NewGuid().ToString() }, "user"));
+        context.AddContext("extraction_root", new(patient, "extraction_root"));
+        context.AddContext("extraction_relative", new(relatives.ToArray(), "extraction_relative"));
+        context.AddContext("user", new(new Practitioner { Id = Guid.NewGuid().ToString() }, "user"));
 
         var bundle = await ResourceMapper.Extract(demoQuestionnaire, demoQuestionnaireResponse, context);
 
@@ -186,8 +186,8 @@ public class ResourceMapperTests
         };
 
         var context = new MappingContext(demoQuestionnaire, new());
-        context.NamedExpressions.Add("patient", new(patient, "patient"));
-        context.NamedExpressions.Add("relatedPerson", new(new[] { relative, relative2 }, "relatedPerson"));
+        context.AddContext("patient", new(patient, "patient"));
+        context.AddContext("relatedPerson", new(new[] { relative, relative2 }, "relatedPerson"));
 
         var response = ResourceMapper.Populate(demoQuestionnaire, context);
 
@@ -343,8 +343,8 @@ public class ResourceMapperTests
             .ReturnsAsync(GeneralNote.CreateProfile());
 
         var context = new MappingContext(questionnaire, response);
-        context.NamedExpressions.Add("patient", new(new Patient { Id = Guid.NewGuid().ToString() }, "patient"));
-        context.NamedExpressions.Add("user", new(new Practitioner { Id = Guid.NewGuid().ToString() }, "user"));
+        context.AddContext("patient", new(new Patient { Id = Guid.NewGuid().ToString() }, "patient"));
+        context.AddContext("user", new(new Practitioner { Id = Guid.NewGuid().ToString() }, "user"));
         var extractionResult = await ResourceMapper.Extract(questionnaire, response, context, profileLoaderMock.Object);
 
         Console.WriteLine(extractionResult.ToJson(new() { Pretty = true }));

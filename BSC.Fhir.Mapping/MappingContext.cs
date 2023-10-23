@@ -1,5 +1,3 @@
-using System.Collections;
-using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using Hl7.Fhir.Model;
 
@@ -48,18 +46,23 @@ public class MappingContext
 {
     private readonly Stack<Context> _extractionContext = new();
     private readonly Stack<Questionnaire.ItemComponent> _questionnaireItems = new();
-    private readonly Stack<QuestionnaireResponse.ItemComponent> _questionnaireResponseItems = new();
+    private readonly Stack<(
+        QuestionnaireResponse.ItemComponent ResponseItem,
+        Dictionary<string, ContextValue> Context
+    )> _questionnaireResponseItems = new();
+    private readonly Dictionary<string, ContextValue> _globalContext = new Dictionary<string, ContextValue>();
 
-    public Context? CurrentContext => _extractionContext.TryPeek(out var context) ? context : null;
+    public Context? CurrentExtractionContext => _extractionContext.TryPeek(out var context) ? context : null;
     public Questionnaire.ItemComponent QuestionnaireItem => _questionnaireItems.Peek();
-    public QuestionnaireResponse.ItemComponent QuestionnaireResponseItem => _questionnaireResponseItems.Peek();
+    public QuestionnaireResponse.ItemComponent QuestionnaireResponseItem =>
+        _questionnaireResponseItems.Peek().ResponseItem;
 
-    public Dictionary<string, ContextValue> NamedExpressions { get; } = new();
+    public IReadOnlyDictionary<string, ContextValue> CurrentContext =>
+        _questionnaireResponseItems.TryPeek(out var currentResponseItem) ? currentResponseItem.Context : _globalContext;
 
     public Questionnaire Questionnaire { get; private set; }
     public QuestionnaireResponse? QuestionnaireResponse { get; set; }
 
-    // somethign
     public MappingContext(Questionnaire questionnaire, QuestionnaireResponse? questionnaireResponse = null)
     {
         QuestionnaireResponse = questionnaireResponse;
@@ -88,11 +91,53 @@ public class MappingContext
 
     public void SetQuestionnaireResponseItem(QuestionnaireResponse.ItemComponent item)
     {
-        _questionnaireResponseItems.Push(item);
+        var context = ResolveVariables();
+        _questionnaireResponseItems.Push((item, context));
     }
 
     public void PopQuestionnaireResponseItem()
     {
         _questionnaireResponseItems.Pop();
+    }
+
+    public void AddContext(string name, ContextValue value)
+    {
+        var currentContext = _questionnaireResponseItems.TryPeek(out var currentResponseItem)
+            ? currentResponseItem.Context
+            : _globalContext;
+        if (currentContext is not null)
+        {
+            currentContext.Add(name, value);
+        }
+    }
+
+    public void RemoveContext(string name)
+    {
+        var currentContext = _questionnaireResponseItems.TryPeek(out var currentResponseItem)
+            ? currentResponseItem.Context
+            : _globalContext;
+        if (currentContext is not null)
+        {
+            currentContext.Remove(name);
+        }
+    }
+
+    private Dictionary<string, ContextValue> ResolveVariables()
+    {
+        Dictionary<string, ContextValue> context = _questionnaireResponseItems.TryPeek(out var oldResponseItem)
+            ? new(oldResponseItem.Context)
+            : new(_globalContext);
+
+        var variableResults = QuestionnaireItem.VariableExpressionResult(this);
+
+        foreach (var result in variableResults)
+        {
+            if (!string.IsNullOrEmpty(result.Name))
+            {
+                context.Add(result.Name, new(result.Result, result.Name));
+            }
+        }
+
+        return context;
     }
 }

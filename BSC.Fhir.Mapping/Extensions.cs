@@ -29,23 +29,6 @@ public static class MappingExtenstions
 
     public static ContextResult? GetContext(this Questionnaire.ItemComponent item, MappingContext ctx)
     {
-        // var extensionValue = item.Extension.ItemExtractionContextExtractionValue();
-        //
-        // if (extensionValue is not Expression expression)
-        // {
-        //     return null;
-        // }
-        //
-        // if (
-        //     !string.IsNullOrEmpty(expression.Name)
-        //     && ctx.TryGetValue(expression.Name, out var contextValue)
-        //     && contextValue.Value.GetType().NonParameterizedType() == typeof(Resource)
-        // )
-        // {
-        //     return contextValue.Value as Resource[];
-        // }
-        //
-        // return CreateResourceFromExtension(expression.Expression_);
         return item.GetContext(item.LinkId, ctx);
     }
 
@@ -60,7 +43,7 @@ public static class MappingExtenstions
 
         var extractionContextName = $"extraction_{linkId}";
         Resource[] values = Array.Empty<Resource>();
-        if (ctx.NamedExpressions.TryGetValue(extractionContextName, out var contextValue))
+        if (ctx.CurrentContext.TryGetValue(extractionContextName, out var contextValue))
         {
             Console.WriteLine("Debug: found existing context value for {0}", extractionContextName);
 
@@ -72,22 +55,6 @@ public static class MappingExtenstions
             Resources = values,
             CreateNewResource = () => CreateResourceFromExtension(expression.Expression_)
         };
-
-        // Console.WriteLine("Debug: creating new context value for {0}", extractionContextName);
-        //
-        // var resource = CreateResourceFromExtension(expression.Expression_);
-        //
-        // if (resource is null)
-        // {
-        //     return null;
-        // }
-        //
-        // if (!string.IsNullOrEmpty(expression.Name))
-        // {
-        //     ctx.Add(expression.Name, new ContextValue(resource, expression.Name));
-        // }
-        //
-        // return new[] { resource };
     }
 
     public static Resource? CreateResourceFromExtension(string extensionValue)

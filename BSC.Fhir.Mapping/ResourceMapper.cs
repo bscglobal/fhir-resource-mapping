@@ -156,7 +156,7 @@ public static class ResourceMapper
             }
             else if (ctx.QuestionnaireItem.Definition is not null)
             {
-                if (ctx.CurrentContext is null)
+                if (ctx.CurrentExtractionContext is null)
                 {
                     throw new InvalidOperationException(
                         $"No extraction context defined for {ctx.QuestionnaireItem.Definition}"
@@ -178,7 +178,7 @@ public static class ResourceMapper
         }
         else if (ctx.QuestionnaireItem.Definition is not null)
         {
-            if (ctx.CurrentContext is null)
+            if (ctx.CurrentExtractionContext is null)
             {
                 throw new InvalidOperationException(
                     $"No extraction context defined for {ctx.QuestionnaireItem.Definition}"
@@ -347,7 +347,7 @@ public static class ResourceMapper
         CancellationToken cancellationToken = default
     )
     {
-        if (ctx.CurrentContext is null)
+        if (ctx.CurrentExtractionContext is null)
         {
             throw new ArgumentException("ExtractionContext.CurrentContext is null", nameof(ctx));
         }
@@ -362,7 +362,7 @@ public static class ResourceMapper
         }
 
         var fieldName = FieldNameByDefinition(ctx.QuestionnaireItem.Definition);
-        var fieldInfo = ctx.CurrentContext.Value.GetType().GetProperty(fieldName);
+        var fieldInfo = ctx.CurrentExtractionContext.Value.GetType().GetProperty(fieldName);
 
         var definition = ctx.QuestionnaireItem.Definition;
         if (fieldInfo is null)
@@ -403,9 +403,9 @@ public static class ResourceMapper
 
             if (fieldInfo.IsNonStringEnumerable())
             {
-                var val = fieldInfo.GetValue(ctx.CurrentContext.Value) as IList;
+                var val = fieldInfo.GetValue(ctx.CurrentExtractionContext.Value) as IList;
 
-                if (val is not null && !ctx.CurrentContext.DirtyFields.Contains(fieldInfo))
+                if (val is not null && !ctx.CurrentExtractionContext.DirtyFields.Contains(fieldInfo))
                 {
                     Console.WriteLine("Debug: clearing list for field {0}", fieldInfo.Name);
                     val.Clear();
@@ -415,10 +415,10 @@ public static class ResourceMapper
             }
             else
             {
-                fieldInfo.SetValue(ctx.CurrentContext.Value, value);
+                fieldInfo.SetValue(ctx.CurrentExtractionContext.Value, value);
             }
 
-            ctx.CurrentContext.DirtyFields.Add(fieldInfo);
+            ctx.CurrentExtractionContext.DirtyFields.Add(fieldInfo);
 
             ctx.SetCurrentExtractionContext(value);
 
@@ -441,7 +441,7 @@ public static class ResourceMapper
         CancellationToken cancellationToken = default
     )
     {
-        if (ctx.CurrentContext is null)
+        if (ctx.CurrentExtractionContext is null)
         {
             throw new ArgumentException("ExtractionContext.CurrentContext is null", nameof(ctx));
         }
@@ -467,7 +467,7 @@ public static class ResourceMapper
 
         var fieldName = FieldNameByDefinition(definition, true);
 
-        var contextType = ctx.CurrentContext.Value.GetType();
+        var contextType = ctx.CurrentExtractionContext.Value.GetType();
         var field = contextType.GetProperty(fieldName);
 
         if (field is null)
@@ -481,7 +481,7 @@ public static class ResourceMapper
             if (field.NonParameterizedType().IsEnum)
             {
                 UpdateFieldWithEnum(
-                    ctx.CurrentContext.Value,
+                    ctx.CurrentExtractionContext.Value,
                     field,
                     ctx.QuestionnaireResponseItem.Answer.First().Value
                 );
@@ -510,10 +510,10 @@ public static class ResourceMapper
                     }
                 }
 
-                UpdateField(ctx.CurrentContext.Value, field, answers, ctx);
+                UpdateField(ctx.CurrentExtractionContext.Value, field, answers, ctx);
             }
 
-            ctx.CurrentContext.DirtyFields.Add(field);
+            ctx.CurrentExtractionContext.DirtyFields.Add(field);
 
             return;
         }
@@ -530,7 +530,7 @@ public static class ResourceMapper
     )
     {
         Console.WriteLine("Debug: Checking slice for fieldName {0}", fieldName);
-        if (ctx.CurrentContext is null)
+        if (ctx.CurrentExtractionContext is null)
         {
             Console.WriteLine("Error: CurrentContext is null");
             return;
@@ -569,7 +569,7 @@ public static class ResourceMapper
                     "Warning: slice '{0}' for field {1} is not defined in StructureDefinition for {2}, so field is ignored",
                     sliceName,
                     fieldName,
-                    ModelInfo.GetFhirTypeNameForType(ctx.CurrentContext.Value.GetType())
+                    ModelInfo.GetFhirTypeNameForType(ctx.CurrentExtractionContext.Value.GetType())
                 );
             }
         }
@@ -582,7 +582,7 @@ public static class ResourceMapper
         CancellationToken cancellationToken = default
     )
     {
-        if (ctx.CurrentContext is null)
+        if (ctx.CurrentExtractionContext is null)
         {
             Console.WriteLine("Error: CurrentContext is null");
             return;
@@ -607,7 +607,7 @@ public static class ResourceMapper
             Console.WriteLine(
                 "Warning: extension for field {0} is not defined in StructureDefinition for {1}, so field is ignored",
                 fieldName,
-                ModelInfo.GetFhirTypeNameForType(ctx.CurrentContext.Value.GetType())
+                ModelInfo.GetFhirTypeNameForType(ctx.CurrentExtractionContext.Value.GetType())
             );
         }
     }
@@ -618,7 +618,7 @@ public static class ResourceMapper
         CancellationToken cancellationToken = default
     )
     {
-        if (ctx.CurrentContext is null)
+        if (ctx.CurrentExtractionContext is null)
         {
             Console.WriteLine("Error: CurrentContext is null");
             return null;
@@ -654,7 +654,7 @@ public static class ResourceMapper
         CancellationToken cancellationToken = default
     )
     {
-        if (ctx.CurrentContext is null)
+        if (ctx.CurrentExtractionContext is null)
         {
             Console.WriteLine("Error: MappingContext.CurrentContext is null");
             return;
@@ -678,7 +678,7 @@ public static class ResourceMapper
         var discriminators = elementEnumerator.Current.Slicing!.Discriminator;
 
         var fieldName = FieldNameByDefinition(baseType);
-        var contextType = ctx.CurrentContext.Value.GetType();
+        var contextType = ctx.CurrentExtractionContext.Value.GetType();
         var fieldInfo = contextType.GetProperty(fieldName);
 
         if (fieldInfo is null)
@@ -755,8 +755,8 @@ public static class ResourceMapper
 
         if (fieldInfo.IsNonStringEnumerable())
         {
-            var val = fieldInfo.GetValue(ctx.CurrentContext.Value) as IList;
-            if (val is not null && !ctx.CurrentContext.DirtyFields.Contains(fieldInfo))
+            var val = fieldInfo.GetValue(ctx.CurrentExtractionContext.Value) as IList;
+            if (val is not null && !ctx.CurrentExtractionContext.DirtyFields.Contains(fieldInfo))
             {
                 val.Clear();
             }
@@ -764,10 +764,10 @@ public static class ResourceMapper
         }
         else
         {
-            fieldInfo.SetValue(ctx.CurrentContext.Value, value);
+            fieldInfo.SetValue(ctx.CurrentExtractionContext.Value, value);
         }
 
-        ctx.CurrentContext.DirtyFields.Add(fieldInfo);
+        ctx.CurrentExtractionContext.DirtyFields.Add(fieldInfo);
 
         ctx.SetCurrentExtractionContext(value);
 
@@ -850,7 +850,7 @@ public static class ResourceMapper
             return;
         }
 
-        if (ctx.CurrentContext?.DirtyFields.Contains(fieldInfo) == true)
+        if (ctx.CurrentExtractionContext?.DirtyFields.Contains(fieldInfo) == true)
         {
             field.Clear();
         }
@@ -959,11 +959,11 @@ public static class ResourceMapper
 
     private static void AddDefinitionBasedCustomExtension(MappingContext ctx)
     {
-        if (ctx.CurrentContext?.Value is DataType dataType)
+        if (ctx.CurrentExtractionContext?.Value is DataType dataType)
         {
             dataType.AddExtension(ctx.QuestionnaireItem.Definition, ctx.QuestionnaireResponseItem.Answer.First().Value);
         }
-        else if (ctx.CurrentContext?.Value is DomainResource domainResource)
+        else if (ctx.CurrentExtractionContext?.Value is DomainResource domainResource)
         {
             domainResource.AddExtension(
                 ctx.QuestionnaireItem.Definition,
@@ -1031,48 +1031,59 @@ public static class ResourceMapper
 
         if (populationContextExpression is not null)
         {
-            var tempContext = false;
-            if (!ctx.NamedExpressions.TryGetValue(populationContextExpression.Name, out var context))
+            var tempContext = true;
+            if (!ctx.CurrentContext.TryGetValue(populationContextExpression.Name, out var context))
             {
-                var result = FhirPathMapping.EvaluateExpr(populationContextExpression.Expression_, ctx);
+                EvaluationResult? result;
+
+                try
+                {
+                    result = FhirPathMapping.EvaluateExpr(populationContextExpression.Expression_, ctx);
+                }
+                catch
+                {
+                    result = null;
+                }
                 if (result is null)
                 {
                     Console.WriteLine(
-                        "Warning: could not resolve expression {0} for {1}",
+                        "Warning: could not resolve expression {0} for {1}, with name {2}",
                         populationContextExpression.Expression_,
-                        ctx.QuestionnaireItem.LinkId
+                        ctx.QuestionnaireItem.LinkId,
+                        populationContextExpression.Name
                     );
                     return null;
                 }
 
                 context = new(result.Result, populationContextExpression.Name);
-                ctx.NamedExpressions.Add(populationContextExpression.Name, context);
-                tempContext = true;
+            }
+            else
+            {
+                tempContext = false;
+                ctx.RemoveContext(populationContextExpression.Name);
             }
 
-            var contextValues = context.Value;
-            var responseItems = contextValues
+            var responseItems = context.Value
                 .Select(value =>
                 {
                     var questionnaireResponseItem = new QuestionnaireResponse.ItemComponent
                     {
                         LinkId = ctx.QuestionnaireItem.LinkId
                     };
+                    ctx.AddContext(populationContextExpression.Name, new(value, populationContextExpression.Name));
                     ctx.SetQuestionnaireResponseItem(questionnaireResponseItem);
-
-                    context.Value = new[] { value };
 
                     CreateQuestionnaireResponseItems(ctx.QuestionnaireItem.Item, questionnaireResponseItem.Item, ctx);
                     ctx.PopQuestionnaireResponseItem();
+                    ctx.RemoveContext(populationContextExpression.Name);
 
                     return questionnaireResponseItem;
                 })
                 .ToArray();
-            context.Value = contextValues;
 
-            if (tempContext)
+            if (!tempContext)
             {
-                ctx.NamedExpressions.Remove(populationContextExpression.Name);
+                ctx.AddContext(populationContextExpression.Name, context);
             }
 
             return responseItems;
@@ -1160,6 +1171,5 @@ public static class ResourceMapper
         }
 
         return null;
-        // CreateQuestionnaireResponseItems(ctx.QuestionnaireItem.Item.ToArray(), ctx);
     }
 }
