@@ -978,7 +978,7 @@ public static class ResourceMapper
 
             if (ctx.QuestionnaireItem.Type == Questionnaire.QuestionnaireItemType.Group)
             {
-                GenerateQuestionnaireResponseItem(ctx);
+                CreateQuestionnaireResponseItems(ctx.QuestionnaireItem.Item, questionnaireResponseItem.Item, ctx);
             }
 
             ctx.PopQuestionnaireResponseItem();
