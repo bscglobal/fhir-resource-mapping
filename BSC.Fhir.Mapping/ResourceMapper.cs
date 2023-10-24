@@ -959,12 +959,9 @@ public static class ResourceMapper
     private static QuestionnaireResponse.ItemComponent[] GenerateQuestionnaireResponseItem(MappingContext ctx)
     {
         QuestionnaireResponse.ItemComponent[]? responseItems = null;
-        if (
-            ctx.QuestionnaireItem.Type == Questionnaire.QuestionnaireItemType.Group
-            && (ctx.QuestionnaireItem.Repeats ?? false)
-        )
+        if (ctx.QuestionnaireItem.Type == Questionnaire.QuestionnaireItemType.Group)
         {
-            responseItems = CreateRepeatingGroupQuestionnaireResponseItem(ctx);
+            responseItems = CreateGroupQuestionnaireResponseItem(ctx);
         }
         else
         {
@@ -974,24 +971,13 @@ public static class ResourceMapper
                 Answer = CreateQuestionnaireResponseItemAnswers(ctx)
             };
 
-            ctx.SetQuestionnaireResponseItem(questionnaireResponseItem);
-
-            if (ctx.QuestionnaireItem.Type == Questionnaire.QuestionnaireItemType.Group)
-            {
-                CreateQuestionnaireResponseItems(ctx.QuestionnaireItem.Item, questionnaireResponseItem.Item, ctx);
-            }
-
-            ctx.PopQuestionnaireResponseItem();
-
             responseItems = new[] { questionnaireResponseItem };
         }
 
         return responseItems ?? Array.Empty<QuestionnaireResponse.ItemComponent>();
     }
 
-    private static QuestionnaireResponse.ItemComponent[]? CreateRepeatingGroupQuestionnaireResponseItem(
-        MappingContext ctx
-    )
+    private static QuestionnaireResponse.ItemComponent[]? CreateGroupQuestionnaireResponseItem(MappingContext ctx)
     {
         var populationContextExpression = ctx.QuestionnaireItem.PopulationContext();
 
@@ -1044,10 +1030,7 @@ public static class ResourceMapper
             return responseItems;
         }
 
-        Console.WriteLine(
-            "Warning: could not find population context for repeating group {0}",
-            ctx.QuestionnaireItem.LinkId
-        );
+        Console.WriteLine("Warning: could not find population context for group {0}", ctx.QuestionnaireItem.LinkId);
         return null;
     }
 
