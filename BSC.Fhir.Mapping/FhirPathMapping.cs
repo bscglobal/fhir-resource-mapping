@@ -1,9 +1,13 @@
 using System.Text.Json;
+using BSC.Fhir.Mapping.Core.Expressions;
+using BSC.Fhir.Mapping.Expressions;
 using Hl7.Fhir.ElementModel;
 using Hl7.Fhir.FhirPath;
 using Hl7.Fhir.Model;
 
 namespace BSC.Fhir.Mapping;
+
+using BaseList = IReadOnlyCollection<Base>;
 
 public record EvaluationResult(Base SourceResource, Base[] Result, string? Name);
 
@@ -21,9 +25,9 @@ public static class FhirPathMapping
         }
     }
 
-    public static EvaluationResult? EvaluateExpr(string expr, MappingContext ctx, string? expressionName = null)
+    public static EvaluationResult? EvaluateExpr(string expr, Scope<BaseList> scope, string? expressionName = null)
     {
-        var evaluationCtx = GetEvaluationContext(expr, ctx);
+        var evaluationCtx = GetEvaluationContext(expr, scope);
         if (evaluationCtx?.Resource is null)
         {
             return null;
@@ -57,9 +61,9 @@ public static class FhirPathMapping
         }
     }
 
-    public static Type? EvaluateTypeFromExpr(string expr, MappingContext ctx)
+    public static Type? EvaluateTypeFromExpr(string expr, Scope<BaseList> scope)
     {
-        var evaluationCtx = GetEvaluationContext(expr, ctx);
+        var evaluationCtx = GetEvaluationContext(expr, scope);
 
         if (evaluationCtx.Resource is not null)
         {
@@ -95,7 +99,7 @@ public static class FhirPathMapping
         throw new NotImplementedException();
     }
 
-    private static EvaluationContext GetEvaluationContext(string expr, MappingContext ctx)
+    private static EvaluationContext GetEvaluationContext(string expr, Scope<BaseList> scope)
     {
         EvaluationContext evaluationCtx;
         var expressionParts = expr.Split('.');
@@ -104,16 +108,16 @@ public static class FhirPathMapping
         {
             evaluationCtx = start switch
             {
-                "%resource" => ResourceEvaluationSource(expr, ctx),
-                "%questionnaire" => QuestionnaireEvaluationSource(expressionParts, ctx),
-                "%context" => ContextEvaluationSource(expressionParts, ctx),
-                "%qitem" => QItemEvaluationSource(expressionParts, ctx),
-                _ => VariableEvaluationSource(expressionParts, ctx)
+                "%resource" => ResourceEvaluationSource(expr, scope),
+                "%questionnaire" => QuestionnaireEvaluationSource(expressionParts, scope),
+                "%context" => ContextEvaluationSource(expressionParts, scope),
+                "%qitem" => QItemEvaluationSource(expressionParts, scope),
+                _ => VariableEvaluationSource(expressionParts, scope)
             };
         }
-        else if (ctx.CurrentExtractionContext is not null)
+        else if (scope.ExtractionContext() is IQuestionnaireContext<BaseList> context)
         {
-            evaluationCtx = new(expr, ctx.CurrentExtractionContext.Value);
+            evaluationCtx = new(expr, context.Value?.FirstOrDefault());
         }
         else
         {
@@ -123,60 +127,53 @@ public static class FhirPathMapping
         return evaluationCtx;
     }
 
-    private static EvaluationContext ResourceEvaluationSource(string expr, MappingContext ctx)
+    private static EvaluationContext ResourceEvaluationSource(string expr, Scope<BaseList> scope)
     {
-        return new(expr, ctx.QuestionnaireResponse);
+        return new(expr, scope.ResponseItem);
     }
 
-    private static EvaluationContext QuestionnaireEvaluationSource(string[] exprParts, MappingContext ctx)
+    private static EvaluationContext QuestionnaireEvaluationSource(string[] exprParts, Scope<BaseList> scope)
     {
         exprParts[0] = "%resource";
         var execExpr = string.Join('.', exprParts);
 
-        return new(execExpr, ctx.Questionnaire);
+        return new(execExpr, scope.Questionnaire);
     }
 
-    private static EvaluationContext ContextEvaluationSource(string[] exprParts, MappingContext ctx)
+    private static EvaluationContext ContextEvaluationSource(string[] exprParts, Scope<BaseList> scope)
     {
         exprParts[0] = "%resource";
         var execExpr = string.Join('.', exprParts);
 
-        Base? source = ctx.QuestionnaireResponseItem as Base ?? ctx.QuestionnaireResponse;
+        Base? source = scope.ResponseItem as Base ?? scope.ResponseItem;
 
         return new(execExpr, source);
     }
 
-    private static EvaluationContext QItemEvaluationSource(string[] exprParts, MappingContext ctx)
+    private static EvaluationContext QItemEvaluationSource(string[] exprParts, Scope<BaseList> scope)
     {
         exprParts[0] = "%resource";
         var execExpr = string.Join('.', exprParts);
 
-        Base source = ctx.QuestionnaireItem switch
+        Base source = scope.Item switch
         {
             null
                 => throw new InvalidOperationException(
                     "Can not access QuestionnaireItem from expression not on QuestionnaireItem"
                 ),
-            _ => ctx.QuestionnaireItem
+            _ => scope.Item
         };
 
         return new(execExpr, source);
     }
 
-    private static EvaluationContext VariableEvaluationSource(string[] exprParts, MappingContext ctx)
+    private static EvaluationContext VariableEvaluationSource(string[] exprParts, Scope<BaseList> scope)
     {
         EvaluationContext evaluationCtx;
         var variableName = exprParts[0][1..];
-        if (!ctx.CurrentContext.TryGetValue(variableName, out var variable))
+        if (scope.GetResolvedContext(variableName) is ResolvedContext<BaseList> context)
         {
-            exprParts[0] = "%resource";
-            var execExpr = string.Join('.', exprParts);
-
-            evaluationCtx = new(execExpr);
-        }
-        else
-        {
-            if (variable.Value.Length == 0 || variable.Value.Length > 1)
+            if (context.Value.Count == 0 || context.Value.Count > 1)
             {
                 throw new InvalidOperationException(
                     $"Cannot use variable with any number of items other than 1. variableName: {variableName}"
@@ -185,7 +182,14 @@ public static class FhirPathMapping
 
             exprParts[0] = "%resource";
             var execExpr = string.Join('.', exprParts);
-            evaluationCtx = new(execExpr, variable.Value.First());
+            evaluationCtx = new(execExpr, context.Value.First());
+        }
+        else
+        {
+            exprParts[0] = "%resource";
+            var execExpr = string.Join('.', exprParts);
+
+            evaluationCtx = new(execExpr);
         }
 
         return evaluationCtx;

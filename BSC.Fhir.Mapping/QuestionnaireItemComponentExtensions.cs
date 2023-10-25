@@ -45,7 +45,8 @@ public static class QuestionnaireItemComponentExtensions
                 continue;
             }
 
-            var result = FhirPathMapping.EvaluateExpr(expression.Expression_, ctx, expression.Name);
+            // var result = FhirPathMapping.EvaluateExpr(expression.Expression_, ctx, expression.Name);
+            EvaluationResult? result = null;
             if (result is not null)
             {
                 results.Add(result);

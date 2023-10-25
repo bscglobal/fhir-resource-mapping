@@ -1,6 +1,6 @@
-namespace BSC.Fhir.Mapping.Expressions;
+namespace BSC.Fhir.Mapping.Core.Expressions;
 
-public enum QuestionnaireQueryType
+public enum QuestionnaireContextType
 {
     PopulationContext,
     ExtractionContext,
