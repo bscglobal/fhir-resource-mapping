@@ -1,6 +1,8 @@
+using BSC.Fhir.Mapping.Core;
+
 namespace BSC.Fhir.Mapping.Expressions;
 
-public class NumericIdProvider
+public class NumericIdProvider : INumericIdProvider
 {
     private int _currentId = 0;
 

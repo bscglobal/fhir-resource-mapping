@@ -34,6 +34,7 @@ public class QuestionnaireExpression : IQuestionnaireExpression<B>
         Id = id;
         Expression = expression.Expression_;
         ExpressionLanguage = expression.Language;
+        Name = expression.Name;
         Type = type;
         QuestionnaireItem = questionnaireItem;
         QuestionnaireResponseItem = questionnaireResponseItem;
