@@ -290,8 +290,8 @@ public static class ResourceMapper
             return null;
         }
 
-        var result = FhirPathMapping.EvaluateExpr(idExpression.Expression_, ctx);
-
+        // var result = FhirPathMapping.EvaluateExpr(idExpression.Expression_, ctx);
+        EvaluationResult? result = null;
         if (result is null || result.Result.Length == 0)
         {
             Console.WriteLine(
@@ -1038,7 +1038,8 @@ public static class ResourceMapper
 
                 try
                 {
-                    result = FhirPathMapping.EvaluateExpr(populationContextExpression.Expression_, ctx);
+                    // result = FhirPathMapping.EvaluateExpr(populationContextExpression.Expression_, ctx);
+                    result = null;
                 }
                 catch
                 {
@@ -1112,7 +1113,8 @@ public static class ResourceMapper
 
         if (initialExpression is not null)
         {
-            var evalResult = FhirPathMapping.EvaluateExpr(initialExpression.Expression_, ctx);
+            // var evalResult = FhirPathMapping.EvaluateExpr(initialExpression.Expression_, ctx);
+            EvaluationResult? evalResult = null;
 
             if (evalResult is null)
             {

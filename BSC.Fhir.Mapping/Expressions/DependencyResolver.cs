@@ -1,174 +1,64 @@
 using System.Text.RegularExpressions;
+using BSC.Fhir.Mapping.Core;
+using BSC.Fhir.Mapping.Core.Expressions;
 using Hl7.Fhir.Model;
+using Task = System.Threading.Tasks.Task;
 
 namespace BSC.Fhir.Mapping.Expressions;
 
+using BaseList = IReadOnlyCollection<Base>;
+
 public class DependencyResolver
 {
-    private class ResolverState
-    {
-        private readonly Stack<Questionnaire.ItemComponent> _items = new();
-        private readonly Stack<QuestionnaireResponse.ItemComponent> _responseItems = new();
-
-        public string LinkId { get; private set; } = "root";
-
-        public Questionnaire.ItemComponent? CurrentItem => _items.TryPeek(out var item) ? item : null;
-        public QuestionnaireResponse.ItemComponent? CurrentResponseItem =>
-            _responseItems.TryPeek(out var responseItem) ? responseItem : null;
-
-        public void PushQuestionnaireItem(Questionnaire.ItemComponent item)
-        {
-            _items.Push(item);
-        }
-
-        public void PopQuestionnaireItem()
-        {
-            _items.Pop();
-        }
-
-        public void PushQuestionnaireResponseItem(QuestionnaireResponse.ItemComponent responseItem)
-        {
-            _responseItems.Push(responseItem);
-        }
-
-        public void PopQuestionnaireResponseItem()
-        {
-            _responseItems.Pop();
-        }
-    }
-
     private readonly NumericIdProvider _idProvider = new();
-    private readonly ResolverState _state = new();
-    private readonly List<QuestionnaireQuery> _queries = new();
+    private readonly ResolverState _state;
     private readonly Questionnaire _questionnaire;
     private readonly QuestionnaireResponse? _questionnaireResponse;
+    private readonly IResourceLoader _resourceLoader;
 
-    public static void Resolve(Questionnaire questionnaire, QuestionnaireResponse? questionnaireResponse = null)
-    {
-        var resolver = new DependencyResolver(questionnaire, questionnaireResponse);
-        resolver.ParseQuestionnaire();
-    }
-
-    private DependencyResolver(Questionnaire questionnaire, QuestionnaireResponse? questionnaireResponse = null)
+    private DependencyResolver(
+        Questionnaire questionnaire,
+        QuestionnaireResponse? questionnaireResponse,
+        IReadOnlyCollection<LaunchContext> launchContext,
+        IResourceLoader resourceLoader
+    )
     {
         _questionnaire = questionnaire;
         _questionnaireResponse = questionnaireResponse;
+        _state = new(questionnaire, questionnaireResponse);
+        _resourceLoader = resourceLoader;
     }
 
-    private bool ParseQuestionnaire()
+    private void AddLaunchContextToScope(IReadOnlyCollection<LaunchContext> launchContext)
     {
-        _queries.Clear();
+        _state.CurrentScope.Context.AddRange(launchContext);
+    }
+
+    private Scope<IReadOnlyCollection<Base>>? ParseQuestionnaire()
+    {
         var rootExtensions = _questionnaire.AllExtensions();
 
         ParseExtensions(rootExtensions.ToArray());
         ParseQuestionnaireItems(_questionnaire.Item);
-        var graphResult = CreateDependencyGraph();
+        var graphResult = CreateDependencyGraph(_state.CurrentScope);
         if (graphResult is not null)
         {
             // _logger.LogError(
             //     $"Circular dependency detected for {graphResult.Expression.Expression_} in {graphResult.LinkId}"
             // );
-            return false;
+            return null;
         }
 
-        return true;
-    }
-
-    /// <summary>
-    /// Go through all found queries and calculate what each query depends on.
-    /// </summary>
-    private QuestionnaireQuery? CreateDependencyGraph()
-    {
-        for (var i = 0; i < _queries.Count; i++)
-        {
-            var query = _queries[i];
-            var expression = query.Expression;
-
-            QuestionnaireQuery? result = null;
-            if (expression.Language == Constants.FHIR_QUERY_MIME)
-            {
-                result = CalculateFhirQueryDependencies(query);
-            }
-            else if (expression.Language == Constants.FHIRPATH_MIME)
-            {
-                result = CalculateFhirPathDependencies(query);
-            }
-
-            if (result is not null)
-            {
-                return result;
-            }
-        }
-
-        return null;
-    }
-
-    private QuestionnaireQuery? CalculateFhirQueryDependencies(QuestionnaireQuery query)
-    {
-        var expression = query.Expression.Expression_;
-        var embeddedFhirpathRegex = @"\{\{(.*)\}\}";
-        var matches = Regex.Matches(expression, embeddedFhirpathRegex);
-
-        foreach (Match match in matches)
-        {
-            var fhirpathExpression = match.Groups.Values.FirstOrDefault()?.Value;
-            if (string.IsNullOrEmpty(fhirpathExpression))
-            {
-                // _logger.LogWarning($"Invalid embedded query {match.Value}");
-                continue;
-            }
-
-            fhirpathExpression = Regex.Replace(fhirpathExpression, "[{}]", "");
-
-            var expr = new Expression { Language = Constants.FHIRPATH_MIME, Expression_ = fhirpathExpression };
-            var embeddedQuery = CreateQuery(expr, QuestionnaireQueryType.Embedded, query);
-            _queries.Add(embeddedQuery);
-
-            if (!query.AddDependency(embeddedQuery))
-            {
-                return query;
-            }
-        }
-
-        return null;
-    }
-
-    private QuestionnaireQuery? CalculateFhirPathDependencies(QuestionnaireQuery query)
-    {
-        var fhirpathRegex = @"([^.]+(\((.+\..+)+\)))?([^.]+)?";
-        var expression = query.Expression.Expression_;
-
-        var parts = Regex.Matches(expression, fhirpathRegex).Select(match => match.Value);
-        var variables = parts.Where(part => part.StartsWith('%'));
-
-        foreach (var variable in variables)
-        {
-            if (Constants.POPULATION_DEPENDANT_CONTEXT.Contains(variable))
-            {
-                query.MakePopulationDependant();
-                continue;
-            }
-
-            var varName = variable[1..];
-            var dep = _queries.FirstOrDefault(query => query.Expression.Name == varName);
-
-            if (dep is not null)
-            {
-                if (!query.AddDependency(dep))
-                {
-                    return query;
-                }
-            }
-        }
-
-        return null;
+        return _state.CurrentScope;
     }
 
     private void ParseQuestionnaireItems(IReadOnlyCollection<Questionnaire.ItemComponent> items)
     {
         foreach (var item in items)
         {
+            _state.PushScope(item);
             ParseQuestionnaireItem(item);
+            _state.PopScope();
         }
     }
 
@@ -188,11 +78,11 @@ public class DependencyResolver
 
     private void ParseExtensions(IReadOnlyCollection<Extension> extensions, string? currentLinkId = null)
     {
-        var queries = extensions.Select(extension => ParseExtension(extension)).OfType<QuestionnaireQuery>();
-        _queries.AddRange(queries);
+        var queries = extensions.Select(extension => ParseExtension(extension)).OfType<QuestionnaireExpression>();
+        _state.CurrentScope.Context.AddRange(queries);
     }
 
-    private QuestionnaireQuery? ParseExtension(Extension extension)
+    private QuestionnaireExpression? ParseExtension(Extension extension)
     {
         return extension.Url switch
         {
@@ -200,28 +90,28 @@ public class DependencyResolver
                 => ParseExpressionExtension(
                     extension,
                     new[] { Constants.FHIRPATH_MIME, Constants.FHIR_QUERY_MIME },
-                    QuestionnaireQueryType.PopulationContext
+                    QuestionnaireContextType.PopulationContext
                 ),
             Constants.EXTRACTION_CONTEXT
                 => ParseExpressionExtension(
                     extension,
                     new[] { Constants.FHIRPATH_MIME, Constants.FHIR_QUERY_MIME },
-                    QuestionnaireQueryType.ExtractionContext
+                    QuestionnaireContextType.ExtractionContext
                 ),
             Constants.INITIAL_EXPRESSION
                 => ParseExpressionExtension(
                     extension,
                     new[] { Constants.FHIRPATH_MIME },
-                    QuestionnaireQueryType.InitialExpression
+                    QuestionnaireContextType.InitialExpression
                 ),
             _ => null
         };
     }
 
-    private QuestionnaireQuery? ParseExpressionExtension(
+    private QuestionnaireExpression? ParseExpressionExtension(
         Extension extension,
         string[] supportedLanguages,
-        QuestionnaireQueryType extensionType
+        QuestionnaireContextType extensionType
     )
     {
         var errorMessage = (string message) =>
@@ -246,16 +136,240 @@ public class DependencyResolver
             return null;
         }
 
-        var query = CreateQuery(expression, extensionType);
+        var query = CreateExpression(expression, extensionType);
         expression.AddExtension("ExpressionId", new Id { Value = query.Id.ToString() });
 
         return query;
     }
 
-    private QuestionnaireQuery CreateQuery(
+    private QuestionnaireExpression? CreateDependencyGraph(Scope<BaseList> scope)
+    {
+        for (var i = 0; i < scope.Context.Count; i++)
+        {
+            var context = scope.Context[i];
+            if (context is not QuestionnaireExpression query)
+            {
+                continue;
+            }
+
+            QuestionnaireExpression? result = null;
+            if (query.ExpressionLanguage == Constants.FHIR_QUERY_MIME)
+            {
+                result = CalculateFhirQueryDependencies(scope, query);
+            }
+            else if (query.ExpressionLanguage == Constants.FHIRPATH_MIME)
+            {
+                result = CalculateFhirPathDependencies(scope, query);
+            }
+
+            if (result is not null)
+            {
+                return result;
+            }
+        }
+
+        return null;
+    }
+
+    private QuestionnaireExpression? CalculateFhirQueryDependencies(
+        Scope<BaseList> scope,
+        QuestionnaireExpression query
+    )
+    {
+        var expression = query.Expression;
+        var embeddedFhirpathRegex = @"\{\{(.*)\}\}";
+        var matches = Regex.Matches(expression, embeddedFhirpathRegex);
+
+        foreach (Match match in matches)
+        {
+            var fhirpathExpression = match.Groups.Values.FirstOrDefault()?.Value;
+            if (string.IsNullOrEmpty(fhirpathExpression))
+            {
+                // _logger.LogWarning($"Invalid embedded query {match.Value}");
+                continue;
+            }
+
+            fhirpathExpression = Regex.Replace(fhirpathExpression, "[{}]", "");
+
+            var expr = new Expression { Language = Constants.FHIRPATH_MIME, Expression_ = fhirpathExpression };
+            var embeddedQuery = CreateExpression(expr, QuestionnaireContextType.Embedded, query);
+            scope.Context.Add(embeddedQuery);
+
+            if (!query.AddDependency(embeddedQuery))
+            {
+                return query;
+            }
+        }
+
+        return null;
+    }
+
+    private QuestionnaireExpression? CalculateFhirPathDependencies(Scope<BaseList> scope, QuestionnaireExpression query)
+    {
+        var fhirpathRegex = @"([^.]+(\((.+\..+)+\)))?([^.]+)?";
+        var expression = query.Expression;
+
+        var parts = Regex.Matches(expression, fhirpathRegex).Select(match => match.Value);
+        var variables = parts.Where(part => part.StartsWith('%'));
+
+        foreach (var variable in variables)
+        {
+            if (Constants.POPULATION_DEPENDANT_CONTEXT.Contains(variable))
+            {
+                query.MakeResponseDependant();
+                continue;
+            }
+
+            var varName = variable[1..];
+            var dep = scope.GetContext(varName);
+
+            if (dep is not null)
+            {
+                if (!query.AddDependency(dep))
+                {
+                    return query;
+                }
+            }
+            else
+            {
+                Console.WriteLine(
+                    "Error: Could not find dependency {0} in expression {1} for LinkId {2}",
+                    varName,
+                    expression,
+                    query.QuestionnaireItem?.LinkId ?? "root"
+                );
+            }
+        }
+
+        return null;
+    }
+
+    private async Task ResolveDependenciesAsync(Scope<BaseList> scope, CancellationToken cancellationToken = default)
+    {
+        var oldLength = 0;
+        while (
+            scope.Context
+                .Where(
+                    context =>
+                        context is IQuestionnaireExpression<BaseList> expr
+                        && !expr.Resolved()
+                        && expr.DependenciesResolved()
+                )
+                .ToArray()
+                is IQuestionnaireExpression<BaseList>[] unresolved
+            && unresolved.Length > 0
+        )
+        {
+            if (unresolved.Length == oldLength)
+            {
+                Console.WriteLine("Error: could not resolve all dependencies");
+                return;
+            }
+
+            oldLength = unresolved.Length;
+
+            ResolveFhirPathExpression(scope, unresolved);
+            await ResolveFhirQueriesAsync(scope, unresolved, cancellationToken);
+        }
+    }
+
+    private void ResolveFhirPathExpression(
+        Scope<BaseList> scope,
+        IReadOnlyCollection<IQuestionnaireExpression<BaseList>> unresolvedExpressions
+    )
+    {
+        var fhirpathQueries = unresolvedExpressions
+            .Where(query => query.ExpressionLanguage == Constants.FHIRPATH_MIME && query.DependenciesResolved())
+            .ToArray();
+
+        foreach (var query in fhirpathQueries)
+        {
+            var fhirpathResult = FhirPathMapping.EvaluateExpr(query.Expression, scope)?.Result;
+
+            if (fhirpathResult is null || fhirpathResult.Length > 0)
+            {
+                // _logger.LogWarning($"Found no results for {query.Expression.Expression_}");
+                continue;
+            }
+
+            query.SetValue(fhirpathResult);
+            var fhirqueryDependants = query.Dependants
+                .Where(dep => dep.ExpressionLanguage == Constants.FHIR_QUERY_MIME)
+                .ToArray();
+
+            if (fhirpathQueries.Length > 0 && fhirpathResult.Length > 1)
+            {
+                // _logger.LogWarning("Embedded {Query} has more than one result", query.Expression.Expression_);
+            }
+
+            var escapedQuery = Regex.Escape(query.Expression);
+            foreach (var dep in fhirqueryDependants)
+            {
+                dep.ReplaceExpression(
+                    Regex.Replace(
+                        dep.Expression,
+                        "\\{\\{" + escapedQuery + "\\}\\}",
+                        fhirpathResult.First().ToString() ?? ""
+                    )
+                );
+            }
+        }
+    }
+
+    private async Task ResolveFhirQueriesAsync(
+        Scope<BaseList> scope,
+        IReadOnlyCollection<IQuestionnaireExpression<BaseList>> unresolvedExpressions,
+        CancellationToken cancellationToken = default
+    )
+    {
+        var fhirQueries = unresolvedExpressions
+            .Where(
+                expr =>
+                    !expr.Resolved()
+                    && expr.ExpressionLanguage == Constants.FHIR_QUERY_MIME
+                    && expr.DependenciesResolved()
+            )
+            .ToArray();
+
+        var urls = fhirQueries.Select(query => query.Expression).Distinct().ToArray();
+        // _logger.LogDebug($"Executing {urls.Length} Fhir Queries");
+        // _logger.LogDebug(JsonSerializer.Serialize(urls, new JsonSerializerOptions() { WriteIndented = true }));
+
+        var resourceResult = await _resourceLoader.GetResourcesAsync(urls, cancellationToken);
+
+        // _logger.LogDebug($"Result length: {fhirQueryResult.Entry.Count}");
+
+        foreach (var query in fhirQueries)
+        {
+            // var queryResult = fhirQueryResult.Entry
+            //     .Select(entry => entry.Resource)
+            //     .OfType<Bundle>()
+            //     .Where(
+            //         bundle =>
+            //             bundle.Link.Any(
+            //                 link => link.Relation == "self" && link.Url.EndsWith(query.Expression)
+            //             )
+            //     )
+            //     .FirstOrDefault()
+            //     ?.Entry.Select(entry => entry.Resource)
+            //     .ToArray();
+            if (resourceResult.TryGetValue(query.Expression, out var queryResult))
+            {
+                // _logger.LogDebug("Found result for query {Expression}", query.Expression.Expression_);
+
+                query.SetValue(queryResult);
+            }
+            else
+            {
+                // _logger.LogDebug("Did not find result for query {Expression}", query.Expression.Expression_);
+            }
+        }
+    }
+
+    private QuestionnaireExpression CreateExpression(
         Expression expr,
-        QuestionnaireQueryType queryType,
-        QuestionnaireQuery? from = null
+        QuestionnaireContextType queryType,
+        QuestionnaireExpression? from = null
     ) =>
         new(
             _idProvider.GetId(),
