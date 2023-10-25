@@ -87,7 +87,7 @@ public class Scope<T>
         return context is not null ? new(context) : null;
     }
 
-    private IQuestionnaireContext<T>? GetContext(Func<IQuestionnaireContext<T>, bool> predicate, Scope<T> scope)
+    private static IQuestionnaireContext<T>? GetContext(Func<IQuestionnaireContext<T>, bool> predicate, Scope<T> scope)
     {
         var expression = scope.Context.FirstOrDefault(predicate);
 
@@ -96,9 +96,9 @@ public class Scope<T>
             return expression;
         }
 
-        if (Parent is not null)
+        if (scope.Parent is not null)
         {
-            return GetContext(predicate, Parent);
+            return GetContext(predicate, scope.Parent);
         }
 
         return null;

@@ -16,7 +16,7 @@ public class DependencyResolver
     private readonly QuestionnaireResponse? _questionnaireResponse;
     private readonly IResourceLoader _resourceLoader;
 
-    private DependencyResolver(
+    public DependencyResolver(
         Questionnaire questionnaire,
         QuestionnaireResponse? questionnaireResponse,
         IReadOnlyCollection<LaunchContext> launchContext,
@@ -27,6 +27,8 @@ public class DependencyResolver
         _questionnaireResponse = questionnaireResponse;
         _state = new(questionnaire, questionnaireResponse);
         _resourceLoader = resourceLoader;
+
+        AddLaunchContextToScope(launchContext);
     }
 
     private void AddLaunchContextToScope(IReadOnlyCollection<LaunchContext> launchContext)
@@ -34,12 +36,25 @@ public class DependencyResolver
         _state.CurrentScope.Context.AddRange(launchContext);
     }
 
-    private Scope<IReadOnlyCollection<Base>>? ParseQuestionnaire()
+    public async Task<Scope<IReadOnlyCollection<Base>>?> ParseQuestionnaireAsync(
+        CancellationToken cancellationToken = default
+    )
     {
         var rootExtensions = _questionnaire.AllExtensions();
 
         ParseExtensions(rootExtensions.ToArray());
         ParseQuestionnaireItems(_questionnaire.Item);
+
+        if (_state.CurrentScope.Parent is not null)
+        {
+            Console.WriteLine("Error: not in global scope");
+            return null;
+        }
+        else
+        {
+            Console.WriteLine("Debug: in global scope");
+        }
+
         var graphResult = CreateDependencyGraph(_state.CurrentScope);
         if (graphResult is not null)
         {
@@ -48,6 +63,8 @@ public class DependencyResolver
             // );
             return null;
         }
+
+        await ResolveDependenciesAsync(_state.CurrentScope, cancellationToken);
 
         return _state.CurrentScope;
     }
@@ -115,7 +132,7 @@ public class DependencyResolver
     )
     {
         var errorMessage = (string message) =>
-            $"{message} for {extensionType} in Questionnaire.Item {_state.LinkId}. Skipping resolution for this extension...";
+            $"{message} for {extensionType} in Questionnaire.Item {_state.CurrentItem?.LinkId ?? "root"}. Skipping resolution for this extension...";
 
         if (extension.Value is not Expression expression)
         {
@@ -165,6 +182,14 @@ public class DependencyResolver
             if (result is not null)
             {
                 return result;
+            }
+        }
+
+        foreach (var child in scope.Children)
+        {
+            if (CreateDependencyGraph(child) is QuestionnaireExpression expr)
+            {
+                return expr;
             }
         }
 
@@ -270,6 +295,11 @@ public class DependencyResolver
 
             ResolveFhirPathExpression(scope, unresolved);
             await ResolveFhirQueriesAsync(scope, unresolved, cancellationToken);
+        }
+
+        foreach (var child in scope.Children)
+        {
+            await ResolveDependenciesAsync(child, cancellationToken);
         }
     }
 

@@ -8,8 +8,6 @@ public class ResolverState
 
     private readonly HashSet<QuestionnaireExpression> _allExpressions = new();
 
-    public string LinkId { get; private set; } = "root";
-
     public Questionnaire.ItemComponent? CurrentItem => _currentScope?.Item;
     public QuestionnaireResponse.ItemComponent? CurrentResponseItem => _currentScope?.ResponseItem;
     public Scope<IReadOnlyCollection<Base>> CurrentScope => _currentScope;
