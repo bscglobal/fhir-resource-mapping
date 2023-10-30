@@ -170,23 +170,20 @@ public static class MappingExtenstions
                 ?.Value as Expression;
     }
 
-    public static Coding EnumCodeToCoding(Base baseObj)
+    public static Coding EnumCodeToCoding<T>(Code<T> baseObj)
+        where T : struct, Enum
     {
-        var typeName = baseObj.GetType().GenericTypeArguments.First();
-
-        var t = typeName;
-        if (t is null)
-        {
-            throw new InvalidOperationException($"Could not find type {typeName}");
-        }
+        var enumType = typeof(T);
 
         var code = baseObj.ToString();
 
-        var field = t.GetFields().FirstOrDefault(f => f.GetCustomAttribute<EnumLiteralAttribute>()?.Literal == code);
+        var field = enumType
+            .GetFields()
+            .FirstOrDefault(f => f.GetCustomAttribute<EnumLiteralAttribute>()?.Literal == code);
 
         if (field is null)
         {
-            throw new InvalidOperationException($"Could not find field for code {code} on type {typeName}");
+            throw new InvalidOperationException($"Could not find field for code {code} on type {enumType}");
         }
 
         var system = field.GetCustomAttribute<EnumLiteralAttribute>()?.System;
@@ -194,7 +191,7 @@ public static class MappingExtenstions
         if (system is null || display is null)
         {
             throw new InvalidOperationException(
-                $"Could not find system or display value for code {code} on type {typeName}"
+                $"Could not find system or display value for code {code} on type {enumType}"
             );
         }
 
@@ -212,7 +209,7 @@ public static class MappingExtenstions
         {
             Questionnaire.QuestionnaireItemType.Choice
                 when baseObj.GetType() is Type t && t.IsGenericType && t.GetGenericTypeDefinition() == typeof(Code<>)
-                => EnumCodeToCoding(baseObj),
+                => EnumCodeToCoding((dynamic)baseObj),
             Questionnaire.QuestionnaireItemType.Text when baseObj is Id id => new FhirString(id.Value),
             Questionnaire.QuestionnaireItemType.Reference when baseObj is Id id && sourceType is not null
                 => new ResourceReference($"{ModelInfo.GetFhirTypeNameForType(sourceType)}/{id.Value}"),
