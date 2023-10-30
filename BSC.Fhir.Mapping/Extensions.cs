@@ -190,29 +190,15 @@ public static class MappingExtenstions
 
         var code = baseObj.ToString();
 
-        var field = t.GetFields()
-            .FirstOrDefault(
-                f =>
-                    f.CustomAttributes
-                        .FirstOrDefault(a => a.AttributeType.Name == "EnumLiteralAttribute")
-                        ?.ConstructorArguments.First()
-                        .Value?.ToString() == code
-            );
+        var field = t.GetFields().FirstOrDefault(f => f.GetCustomAttribute<EnumLiteralAttribute>()?.Literal == code);
 
         if (field is null)
         {
             throw new InvalidOperationException($"Could not find field for code {code} on type {typeName}");
         }
 
-        var system = field.CustomAttributes
-            .FirstOrDefault(a => a.AttributeType.Name == "EnumLiteralAttribute")
-            ?.ConstructorArguments?.LastOrDefault()
-            .Value?.ToString();
-        var display = field.CustomAttributes
-            .FirstOrDefault(a => a.AttributeType.Name == "DescriptionAttribute")
-            ?.ConstructorArguments?.FirstOrDefault()
-            .Value?.ToString();
-
+        var system = field.GetCustomAttribute<EnumLiteralAttribute>()?.System;
+        var display = field.GetCustomAttribute<DescriptionAttribute>()?.Description;
         if (system is null || display is null)
         {
             throw new InvalidOperationException(
@@ -233,7 +219,7 @@ public static class MappingExtenstions
         return questionnaireItemType switch
         {
             Questionnaire.QuestionnaireItemType.Choice
-                when baseObj.GetType().GetGenericTypeDefinition() == typeof(Code<>)
+                when baseObj.GetType() is Type t && t.IsGenericType && t.GetGenericTypeDefinition() == typeof(Code<>)
                 => EnumCodeToCoding(baseObj),
             Questionnaire.QuestionnaireItemType.Text when baseObj is Id id => new FhirString(id.Value),
             Questionnaire.QuestionnaireItemType.Reference when baseObj is Id id && sourceType is not null
