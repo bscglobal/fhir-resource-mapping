@@ -15,9 +15,13 @@ public static class MappingExtenstions
     private const string ITEM_POPULATION_CONTEXT_EXTENSION_URL =
         "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-itemPopulationContext";
 
-    public static DataType? ItemExtractionContextExtractionValue(this IEnumerable<Extension> extensions)
+    public static DataType? ItemExtractionContextExtractionValue(
+        this IEnumerable<Extension> extensions
+    )
     {
-        var extension = extensions.SingleOrDefault(e => e.Url == ITEM_EXTRACTION_CONTEXT_EXTENSION_URL);
+        var extension = extensions.SingleOrDefault(
+            e => e.Url == ITEM_EXTRACTION_CONTEXT_EXTENSION_URL
+        );
 
         return extension?.Value;
     }
@@ -27,7 +31,10 @@ public static class MappingExtenstions
         return questionnaire.GetContext("root", ctx);
     }
 
-    public static ContextResult? GetContext(this Questionnaire.ItemComponent item, MappingContext ctx)
+    public static ContextResult? GetContext(
+        this Questionnaire.ItemComponent item,
+        MappingContext ctx
+    )
     {
         // var extensionValue = item.Extension.ItemExtractionContextExtractionValue();
         //
@@ -49,7 +56,11 @@ public static class MappingExtenstions
         return item.GetContext(item.LinkId, ctx);
     }
 
-    private static ContextResult? GetContext(this IExtendable item, string linkId, MappingContext ctx)
+    private static ContextResult? GetContext(
+        this IExtendable item,
+        string linkId,
+        MappingContext ctx
+    )
     {
         var extensionValue = item.Extension.ItemExtractionContextExtractionValue();
 
@@ -183,7 +194,9 @@ public static class MappingExtenstions
 
         if (field is null)
         {
-            throw new InvalidOperationException($"Could not find field for code {code} on type {enumType}");
+            throw new InvalidOperationException(
+                $"Could not find field for code {code} on type {enumType}"
+            );
         }
 
         var system = field.GetCustomAttribute<EnumLiteralAttribute>()?.System;
@@ -208,13 +221,22 @@ public static class MappingExtenstions
         return questionnaireItemType switch
         {
             Questionnaire.QuestionnaireItemType.Choice
-                when baseObj.GetType() is Type t && t.IsGenericType && t.GetGenericTypeDefinition() == typeof(Code<>)
+                when baseObj.GetType() is Type t
+                    && t.IsGenericType
+                    && t.GetGenericTypeDefinition() == typeof(Code<>)
                 => EnumCodeToCoding((dynamic)baseObj),
-            Questionnaire.QuestionnaireItemType.Text when baseObj is Id id => new FhirString(id.Value),
-            Questionnaire.QuestionnaireItemType.Reference when baseObj is Id id && sourceType is not null
-                => new ResourceReference($"{ModelInfo.GetFhirTypeNameForType(sourceType)}/{id.Value}"),
-            Questionnaire.QuestionnaireItemType.Reference when baseObj is FhirString str && sourceType is not null
-                => new ResourceReference($"{ModelInfo.GetFhirTypeNameForType(sourceType)}/{str.Value}"),
+            Questionnaire.QuestionnaireItemType.Text when baseObj is Id id
+                => new FhirString(id.Value),
+            Questionnaire.QuestionnaireItemType.Reference
+                when baseObj is Id id && sourceType is not null
+                => new ResourceReference(
+                    $"{ModelInfo.GetFhirTypeNameForType(sourceType)}/{id.Value}"
+                ),
+            Questionnaire.QuestionnaireItemType.Reference
+                when baseObj is FhirString str && sourceType is not null
+                => new ResourceReference(
+                    $"{ModelInfo.GetFhirTypeNameForType(sourceType)}/{str.Value}"
+                ),
             Questionnaire.QuestionnaireItemType.Reference when sourceType is null
                 => throw new InvalidOperationException("Could not create ResourceReference"),
             _ when baseObj is CodeableConcept codeableConcept => codeableConcept.Coding.First(),
@@ -236,14 +258,18 @@ public static class MappingExtenstions
         // }
     }
 
-    public static IReadOnlyCollection<Expression> GetPopulationContextExpressions(this Questionnaire questionnaire)
+    public static IReadOnlyCollection<Expression> GetPopulationContextExpressions(
+        this Questionnaire questionnaire
+    )
     {
         var expression =
             questionnaire.Extension
                 .FirstOrDefault(extension => extension.Url == ITEM_POPULATION_CONTEXT_EXTENSION_URL)
                 ?.Value as Expression;
 
-        var nestedExpessions = questionnaire.Item.SelectMany(item => item.GetPopulationContextExpressions()).ToArray();
+        var nestedExpessions = questionnaire.Item
+            .SelectMany(item => item.GetPopulationContextExpressions())
+            .ToArray();
 
         if (expression is null)
         {
