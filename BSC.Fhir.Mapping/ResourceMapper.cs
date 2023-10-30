@@ -91,7 +91,28 @@ public static class ResourceMapper
             if (responseItems.Length == 0)
             {
                 Console.WriteLine("Debug: could not find responseItem for LinkId {0}", questionnaireItem.LinkId);
-                continue;
+                if (questionnaireItem.Initial is not null && questionnaireItem.Initial.Count() > 0)
+                {
+                    Console.WriteLine("Debug: using initial value for LinkId {0}", questionnaireItem.LinkId);
+                    responseItems = new[]
+                    {
+                        new QuestionnaireResponse.ItemComponent
+                        {
+                            Answer = new List<QuestionnaireResponse.AnswerComponent>
+                            {
+                                new QuestionnaireResponse.AnswerComponent()
+                                {
+                                    //TODO: we will need a different approach for repeating items
+                                    Value = questionnaireItem.Initial.FirstOrDefault()?.Value
+                                }
+                            }
+                        }
+                    };
+                }
+                else
+                {
+                    continue;
+                }
             }
 
             if (!(questionnaireItem.Repeats ?? false) && responseItems.Length > 1)
