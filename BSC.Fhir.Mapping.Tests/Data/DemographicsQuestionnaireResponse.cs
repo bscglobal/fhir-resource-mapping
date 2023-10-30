@@ -19,6 +19,17 @@ public partial class Demographics
                 },
                 new()
                 {
+                    LinkId = "patient.gender",
+                    Answer =
+                    {
+                        new QuestionnaireResponse.AnswerComponent
+                        {
+                            Value = new Coding("http://hl7.org/fhir/administrative-gender", "male", "Male")
+                        }
+                    }
+                },
+                new()
+                {
                     LinkId = "patient.name",
                     Definition = "Patient.name",
                     Item =

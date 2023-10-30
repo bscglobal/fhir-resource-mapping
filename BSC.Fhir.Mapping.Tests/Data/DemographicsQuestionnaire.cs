@@ -125,6 +125,22 @@ public partial class Demographics
                   "type": "date",
                   "required": true
                 },
+{
+                  "extension": [
+                    {
+                      "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-initialExpression",
+                      "valueExpression": {
+                        "language": "text/fhirpath",
+                        "expression": "%patient.gender"
+                      }
+                    }
+                  ],
+                  "linkId": "patient.gender",
+                  "definition": "Patient.gender",
+                  "text": "gender",
+                  "type": "choice",
+                  "required": true
+                },
                 {
                   "extension": [
                     {
