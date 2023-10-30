@@ -126,6 +126,14 @@ public partial class Demographics
                   "required": true
                 },
 {
+
+                  "linkId": "patient.active",
+                  "definition": "Patient.active",
+                  "text": "active?",
+                  "type": "boolean",
+                  "required": true
+                },
+{
                   "extension": [
                     {
                       "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-initialExpression",
@@ -340,6 +348,15 @@ public partial class Demographics
 """;
 
         var result = parser.Parse<Questionnaire>(json);
+
+        var i = result.Item.FirstOrDefault(u => u.LinkId == "patient.active");
+        if (i != null)
+        {
+            i.Initial = new List<Questionnaire.InitialComponent>
+            {
+                new Questionnaire.InitialComponent() { Value = new FhirBoolean(true) }
+            };
+        }
 
         return result;
     }
