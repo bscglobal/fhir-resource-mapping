@@ -170,6 +170,59 @@ public static class MappingExtenstions
                 ?.Value as Expression;
     }
 
+    public static Coding EnumCodeToCoding(Base baseObj)
+    {
+        string? typeName = baseObj.GetType().GenericTypeArguments.First().FullName;
+        if (typeName is null)
+        {
+            throw new InvalidOperationException("Could not get type name");
+        }
+        ;
+        Type? t = AppDomain.CurrentDomain
+            .GetAssemblies()
+            .FirstOrDefault(asm => asm.GetName().Name == "Hl7.Fhir.R4.Core")
+            ?.GetType(typeName);
+
+        if (t is null)
+        {
+            throw new InvalidOperationException($"Could not find type {typeName}");
+        }
+
+        var code = baseObj.ToString();
+
+        var field = t.GetFields()
+            .FirstOrDefault(
+                f =>
+                    f.CustomAttributes
+                        .FirstOrDefault(a => a.AttributeType.Name == "EnumLiteralAttribute")
+                        ?.ConstructorArguments.First()
+                        .Value?.ToString() == code
+            );
+
+        if (field is null)
+        {
+            throw new InvalidOperationException($"Could not find field for code {code} on type {typeName}");
+        }
+
+        var system = field.CustomAttributes
+            .FirstOrDefault(a => a.AttributeType.Name == "EnumLiteralAttribute")
+            ?.ConstructorArguments?.LastOrDefault()
+            .Value?.ToString();
+        var display = field.CustomAttributes
+            .FirstOrDefault(a => a.AttributeType.Name == "DescriptionAttribute")
+            ?.ConstructorArguments?.FirstOrDefault()
+            .Value?.ToString();
+
+        if (system is null || display is null)
+        {
+            throw new InvalidOperationException(
+                $"Could not find system or display value for code {code} on type {typeName}"
+            );
+        }
+
+        return new Coding(system, code, display);
+    }
+
     public static DataType? AsExpectedType(
         this Base baseObj,
         Questionnaire.QuestionnaireItemType questionnaireItemType,
@@ -179,6 +232,8 @@ public static class MappingExtenstions
         // TODO(jaco): we should look at doing further parsing of values that turn into codings
         return questionnaireItemType switch
         {
+            Questionnaire.QuestionnaireItemType.Choice when baseObj.GetType().Name == "Code`1"
+                => EnumCodeToCoding(baseObj),
             Questionnaire.QuestionnaireItemType.Text when baseObj is Id id => new FhirString(id.Value),
             Questionnaire.QuestionnaireItemType.Reference when baseObj is Id id && sourceType is not null
                 => new ResourceReference($"{ModelInfo.GetFhirTypeNameForType(sourceType)}/{id.Value}"),
