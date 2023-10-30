@@ -232,7 +232,8 @@ public static class MappingExtenstions
         // TODO(jaco): we should look at doing further parsing of values that turn into codings
         return questionnaireItemType switch
         {
-            Questionnaire.QuestionnaireItemType.Choice when baseObj.GetType().Name == "Code`1"
+            Questionnaire.QuestionnaireItemType.Choice
+                when baseObj.GetType().GetGenericTypeDefinition() == typeof(Code<>)
                 => EnumCodeToCoding(baseObj),
             Questionnaire.QuestionnaireItemType.Text when baseObj is Id id => new FhirString(id.Value),
             Questionnaire.QuestionnaireItemType.Reference when baseObj is Id id && sourceType is not null
