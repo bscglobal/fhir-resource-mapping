@@ -172,17 +172,9 @@ public static class MappingExtenstions
 
     public static Coding EnumCodeToCoding(Base baseObj)
     {
-        string? typeName = baseObj.GetType().GenericTypeArguments.First().FullName;
-        if (typeName is null)
-        {
-            throw new InvalidOperationException("Could not get type name");
-        }
-        ;
-        Type? t = AppDomain.CurrentDomain
-            .GetAssemblies()
-            .FirstOrDefault(asm => asm.GetName().Name == "Hl7.Fhir.R4.Core")
-            ?.GetType(typeName);
+        var typeName = baseObj.GetType().GenericTypeArguments.First();
 
+        var t = typeName;
         if (t is null)
         {
             throw new InvalidOperationException($"Could not find type {typeName}");
