@@ -833,8 +833,15 @@ public static class ResourceMapper
         {
             return;
         }
-        // FIXME: this probably isn't going to work
-        field.SetValue(baseResource, Enum.Parse(fieldType, stringValue));
+        stringValue = stringValue[0..1].ToUpper() + stringValue[1..];
+
+        var enumValue = Enum.Parse(fieldType, stringValue);
+
+        // Create a Code instance with the determined enum type
+        Type codeType = typeof(Code<>).MakeGenericType(fieldType);
+        var codeValue = Activator.CreateInstance(codeType, (dynamic)enumValue);
+
+        field.SetValue(baseResource, codeValue);
     }
 
     private static DataType WrapAnswerInFieldType(DataType answer, Type fieldType, string? system = null)
