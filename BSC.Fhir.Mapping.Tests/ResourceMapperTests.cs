@@ -39,6 +39,7 @@ public class ResourceMapperTests
         {
             Id = patientId,
             BirthDate = "2006-04-05",
+            Gender = AdministrativeGender.Male,
             Name =
             {
                 new() { Family = familyName, Given = new[] { "Jane", "Rebecca" } },
@@ -80,6 +81,7 @@ public class ResourceMapperTests
         {
             Id = Guid.NewGuid().ToString(),
             BirthDate = "2006-04-05",
+            Gender = AdministrativeGender.Male,
             Name =
             {
                 new() { Family = familyName, Given = new[] { "Jane", "Rebecca" } },
@@ -161,7 +163,13 @@ public class ResourceMapperTests
             .SingleOrDefault(item => item.LinkId == "patient.birthDate")
             ?.Answer.FirstOrDefault()
             ?.Value.ToString();
+
         Assert.Equal(patient.BirthDate, actualPatientBirthDateAnswer);
+
+        var actualPatientGenderAnswer = response.Item
+            .SingleOrDefault(item => item.LinkId == "patient.gender")
+            ?.Answer.FirstOrDefault()
+            ?.Value;
 
         // TODO: fix tests for names (repeating groups)
 
