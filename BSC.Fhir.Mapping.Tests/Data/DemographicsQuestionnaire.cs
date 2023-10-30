@@ -126,6 +126,14 @@ public partial class Demographics
                   "required": true
                 },
 {
+
+                  "linkId": "patient.active",
+                  "definition": "Patient.active",
+                  "text": "active?",
+                  "type": "boolean",
+                  "required": true
+                },
+{
                   "extension": [
                     {
                       "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-initialExpression",
