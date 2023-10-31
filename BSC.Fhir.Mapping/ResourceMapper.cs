@@ -10,6 +10,7 @@ using System.Reflection;
 using System.Text.Json;
 using BSC.Fhir.Mapping.Core;
 using Hl7.Fhir.Model;
+using Hl7.Fhir.Validation;
 using Task = System.Threading.Tasks.Task;
 
 namespace BSC.Fhir.Mapping;
@@ -408,6 +409,23 @@ public static class ResourceMapper
         else
         {
             var type = fieldInfo.NonParameterizedType();
+
+            if (fieldInfo.NonParameterizedType() == typeof(Hl7.Fhir.Model.DataType))
+            {
+                var allowedTypes = fieldInfo.GetCustomAttribute<AllowedTypesAttribute>()?.Types;
+                if (allowedTypes is not null)
+                {
+                    var specifiedType = ctx.QuestionnaireItem.GetExtension("FhirType").Value.ToString();
+                    type = allowedTypes.FirstOrDefault(type => type.Name == specifiedType);
+                }
+                else
+                {
+                    throw new InvalidOperationException(
+                        $"Error: no AllowedTypesAttribute defined for {fieldInfo.Name}"
+                    );
+                }
+            }
+
             var value = Activator.CreateInstance(type) as Base;
             if (value is null)
             {
