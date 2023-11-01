@@ -9,7 +9,7 @@ public interface IQuestionnaireContext<T>
     T? Value { get; }
     QuestionnaireContextType Type { get; }
     IEnumerable<IQuestionnaireExpression<T>> Dependants { get; }
-    Scope<T> Scope { get; }
+    Scope Scope { get; }
 
     bool Resolved();
     void AddDependant(IQuestionnaireExpression<T> dependant);

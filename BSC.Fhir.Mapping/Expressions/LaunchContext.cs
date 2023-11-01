@@ -14,12 +14,12 @@ public class LaunchContext : IQuestionnaireContext<BaseList>
     public string Name { get; }
     public BaseList Value { get; }
     public int Id { get; }
-    public Scope<BaseList> Scope { get; }
+    public Scope Scope { get; }
     public QuestionnaireContextType Type => QuestionnaireContextType.LaunchContext;
 
     public IEnumerable<IQuestionnaireExpression<BaseList>> Dependants => _dependants.AsEnumerable();
 
-    public LaunchContext(int id, string name, Resource value, Scope<BaseList> scope)
+    public LaunchContext(int id, string name, Resource value, Scope scope)
     {
         Id = id;
         Name = name;

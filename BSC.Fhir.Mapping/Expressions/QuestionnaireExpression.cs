@@ -21,7 +21,7 @@ public class QuestionnaireExpression<T> : IQuestionnaireExpression<T>
     public Questionnaire.ItemComponent? QuestionnaireItem { get; }
     public QuestionnaireResponse.ItemComponent? QuestionnaireResponseItem { get; }
     public T? Value { get; protected set; }
-    public Scope<T> Scope { get; }
+    public Scope Scope { get; }
     public IQuestionnaireExpression<T>? ClonedFrom { get; protected init; }
 
     public IEnumerable<IQuestionnaireExpression<T>> Dependants => _dependants.AsEnumerable();
@@ -32,7 +32,7 @@ public class QuestionnaireExpression<T> : IQuestionnaireExpression<T>
         string? name,
         string expr,
         string exprLanguage,
-        Scope<T> scope,
+        Scope scope,
         QuestionnaireContextType type,
         Questionnaire.ItemComponent? questionnaireItem,
         QuestionnaireResponse.ItemComponent? questionnaireResponseItem
