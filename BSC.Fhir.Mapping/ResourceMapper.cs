@@ -418,6 +418,12 @@ public static class ResourceMapper
                 {
                     var specifiedType = ctx.QuestionnaireItem.GetExtension("FhirType").Value.ToString();
                     type = allowedTypes.FirstOrDefault(type => type.Name == specifiedType);
+                    if (type is null)
+                    {
+                        throw new InvalidOperationException(
+                            $"Error: type sepcified in extension is {specifiedType}, which does not match any AllowedTypesAttribute defined for {fieldInfo.Name}"
+                        );
+                    }
                 }
                 else
                 {

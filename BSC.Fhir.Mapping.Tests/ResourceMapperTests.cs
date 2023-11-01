@@ -73,6 +73,38 @@ public class ResourceMapperTests
     }
 
     [Fact]
+    public async Task Extract_GivesCorrectBundleForSR()
+    {
+        Console.WriteLine();
+        Console.WriteLine("=================");
+        Console.WriteLine("Extract");
+        Console.WriteLine("=================");
+        Console.WriteLine();
+
+        var patientId = Guid.NewGuid().ToString();
+        var srID = Guid.NewGuid().ToString();
+        var demoQuestionnaire = Data.ServiceRequest.CreateQuestionnaire();
+        var demoQuestionnaireResponse = Data.ServiceRequest.CreateQuestionnaireResponse(patientId, srID);
+
+        var servreq = new Hl7.Fhir.Model.ServiceRequest()
+        {
+            Id = srID,
+            Subject = new ResourceReference($"Patient/{patientId}"),
+            Occurrence = new Period() { Start = "2021-01-01T00:00:00Z" }
+        };
+
+        var context = new MappingContext(demoQuestionnaire, demoQuestionnaireResponse);
+        context.NamedExpressions.Add("extraction_root", new(servreq, "extraction_root"));
+        context.NamedExpressions.Add("user", new(new Practitioner { Id = Guid.NewGuid().ToString() }, "user"));
+
+        var bundle = await ResourceMapper.Extract(demoQuestionnaire, demoQuestionnaireResponse, context);
+
+        Console.WriteLine(bundle.ToJson(new FhirJsonSerializationSettings { Pretty = true }));
+
+        Assert.True(true);
+    }
+
+    [Fact]
     public void Populate_GivesCorrectQuestionnaireResponseForDemo()
     {
         var familyName = "Smith";
