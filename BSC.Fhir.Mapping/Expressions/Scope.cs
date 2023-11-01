@@ -1,4 +1,3 @@
-using System.Text.Json;
 using BSC.Fhir.Mapping.Core;
 using BSC.Fhir.Mapping.Core.Expressions;
 using Hl7.Fhir.Model;
@@ -21,6 +20,8 @@ public class Scope : IClonable<Scope>
     public Scope? ClonedFrom { get; private init; }
 
     private readonly INumericIdProvider _idProvider;
+    private ExtractionContext? _extractionContext;
+    private bool _extractionContextSearched = false;
 
     public Scope(Scope parent, INumericIdProvider idProvider)
     {
@@ -141,10 +142,23 @@ public class Scope : IClonable<Scope>
         return GetContext(expr => expr.Type == QuestionnaireContextType.ExtractionContext, this);
     }
 
-    public Resource? ExtractionContextValue()
+    public ExtractionContext? ExtractionContextValue()
     {
-        return GetContext(expr => expr.Type == QuestionnaireContextType.ExtractionContext, this)
-                ?.Value?.FirstOrDefault() as Resource;
+        if (_extractionContextSearched)
+        {
+            return _extractionContext;
+        }
+
+        var context = ExtractionContext();
+
+        _extractionContextSearched = true;
+
+        if (context?.Resolved() == true)
+        {
+            _extractionContext = new ExtractionContext(context.Value!.First());
+        }
+
+        return _extractionContext;
     }
 
     public IQuestionnaireContext<BaseList>? GetContext(int id)
