@@ -217,7 +217,7 @@ public class DependencyResolver
             {
                 result = CalculateFhirQueryDependencies(scope, query);
             }
-            else if (query is FhirPathExpression<BaseList> fhirpathExpr)
+            else if (query is FhirPathExpression fhirpathExpr)
             {
                 result = CalculateFhirPathDependencies(scope, fhirpathExpr);
             }
@@ -275,10 +275,7 @@ public class DependencyResolver
         return null;
     }
 
-    private QuestionnaireExpression<BaseList>? CalculateFhirPathDependencies(
-        Scope scope,
-        FhirPathExpression<BaseList> query
-    )
+    private QuestionnaireExpression<BaseList>? CalculateFhirPathDependencies(Scope scope, FhirPathExpression query)
     {
         var fhirpathRegex = @"([^.]+(\((.+\..+)+\)))?([^.]+)?";
         var expression = query.Expression;
@@ -316,7 +313,7 @@ public class DependencyResolver
         {
             var qItemExpr = Regex.Replace(expression, "%resource", "%questionnaire");
             qItemExpr = Regex.Replace(qItemExpr, "%context", "%qitem");
-            var qitemExpr = (FhirPathExpression<BaseList>)query.Clone(new { Id = _idProvider.GetId(), Scope = scope });
+            var qitemExpr = (FhirPathExpression)query.Clone(new { Id = _idProvider.GetId(), Scope = scope });
             var result = FhirPathMapping.EvaluateExpr(qitemExpr);
 
             if (result is null || result.Result.FirstOrDefault() is not Questionnaire.ItemComponent qItem)
@@ -402,7 +399,7 @@ public class DependencyResolver
                 break;
             }
             var resolvableFhirpaths = expressions
-                .OfType<FhirPathExpression<BaseList>>()
+                .OfType<FhirPathExpression>()
                 .Where(expr => !expr.Resolved() && expr.DependenciesResolved())
                 .ToArray();
 
@@ -526,7 +523,7 @@ public class DependencyResolver
         return true;
     }
 
-    private bool ResolveFhirPathExpression(IReadOnlyCollection<FhirPathExpression<BaseList>> unresolvedExpressions)
+    private bool ResolveFhirPathExpression(IReadOnlyCollection<FhirPathExpression> unresolvedExpressions)
     {
         var fhirpathQueries = unresolvedExpressions
             .Where(query => query.ExpressionLanguage == Constants.FHIRPATH_MIME && query.DependenciesResolved())
@@ -541,13 +538,15 @@ public class DependencyResolver
                 query.Name ?? "anonymous",
                 query.Type.ToString()
             );
-            var fhirpathResult = FhirPathMapping.EvaluateExpr(query)?.Result;
-            if (fhirpathResult is null)
+            var evalResult = FhirPathMapping.EvaluateExpr(query);
+            if (evalResult is null)
             {
                 Console.WriteLine("Warning: Something went  wrong during evaluation for {0}", query.Expression);
                 query.SetValue(null);
                 continue;
             }
+
+            var fhirpathResult = evalResult.Result;
 
             if (fhirpathResult.Length == 0)
             {
@@ -556,7 +555,7 @@ public class DependencyResolver
                 continue;
             }
 
-            query.SetValue(fhirpathResult);
+            query.SetValue(fhirpathResult, evalResult.SourceResource);
             if (query.Type == QuestionnaireContextType.Embedded)
             {
                 if (fhirpathResult.Length > 1)
@@ -586,7 +585,7 @@ public class DependencyResolver
             }
             else if (fhirpathResult.Length > 1)
             {
-                ExplodeExpression(fhirpathResult, new[] { query }, query.Scope);
+                ExplodeExpression(fhirpathResult, new[] { query }, query.Scope, evalResult.SourceResource);
                 return true;
             }
         }
@@ -597,7 +596,8 @@ public class DependencyResolver
     private void ExplodeExpression(
         IReadOnlyCollection<Base> results,
         IReadOnlyCollection<IQuestionnaireExpression<BaseList>> originalExprs,
-        Scope scope
+        Scope scope,
+        Base? sourceResource = null
     )
     {
         var newScopes = results
@@ -616,7 +616,15 @@ public class DependencyResolver
                     .Where(ctx => originalExprs.Contains(ctx.ClonedFrom));
                 foreach (var expr in newExprs)
                 {
-                    expr.SetValue(new[] { result });
+                    var value = new[] { result };
+                    if (expr is FhirPathExpression fhirpathExpr && sourceResource is not null)
+                    {
+                        fhirpathExpr.SetValue(value, sourceResource);
+                    }
+                    else
+                    {
+                        expr.SetValue(value);
+                    }
                 }
 
                 var allNewExprs = newScope.AllContextInSubtree();
@@ -740,7 +748,7 @@ public class DependencyResolver
         return false;
     }
 
-    private FhirPathExpression<BaseList> CreateFhirPathExpression(
+    private FhirPathExpression CreateFhirPathExpression(
         string? name,
         string expr,
         QuestionnaireContextType queryType,
