@@ -1,83 +1,74 @@
+using BSC.Fhir.Mapping.Core;
 using BSC.Fhir.Mapping.Core.Expressions;
 using Hl7.Fhir.Model;
 
 namespace BSC.Fhir.Mapping.Expressions;
 
-using B = IReadOnlyCollection<Base>;
-
-public class QuestionnaireExpression : IQuestionnaireExpression<B>
+public class QuestionnaireExpression<T> : IQuestionnaireExpression<T>
 {
-    private readonly HashSet<IQuestionnaireContext<B>> _dependencies = new(QuestionnaireContextComparer<B>.Default);
-    private readonly HashSet<IQuestionnaireExpression<B>> _dependants = new(QuestionnaireContextComparer<B>.Default);
+    protected bool _resolutionAttempted = false;
+    protected HashSet<IQuestionnaireContext<T>> _dependencies { get; init; } =
+        new(QuestionnaireContextComparer<T>.Default);
+    protected HashSet<IQuestionnaireExpression<T>> _dependants { get; init; } =
+        new(QuestionnaireContextComparer<T>.Default);
 
     public int Id { get; }
     public string? Name { get; }
-    public string Expression { get; private set; }
+    public string Expression { get; protected set; }
     public string ExpressionLanguage { get; }
     public bool ResponseDependant { get; private set; } = false;
     public QuestionnaireContextType Type { get; }
     public Questionnaire.ItemComponent? QuestionnaireItem { get; }
     public QuestionnaireResponse.ItemComponent? QuestionnaireResponseItem { get; }
-    public B? Value { get; private set; }
+    public T? Value { get; protected set; }
+    public Scope<T> Scope { get; }
+    public IQuestionnaireExpression<T>? ClonedFrom { get; protected init; }
 
-    public IEnumerable<IQuestionnaireExpression<B>> Dependants => _dependants.AsEnumerable();
-    public IEnumerable<IQuestionnaireContext<B>> Dependencies => _dependencies.AsEnumerable();
+    public IEnumerable<IQuestionnaireExpression<T>> Dependants => _dependants.AsEnumerable();
+    public IEnumerable<IQuestionnaireContext<T>> Dependencies => _dependencies.AsEnumerable();
 
     public QuestionnaireExpression(
         int id,
-        Expression expression,
+        string? name,
+        string expr,
+        string exprLanguage,
+        Scope<T> scope,
         QuestionnaireContextType type,
         Questionnaire.ItemComponent? questionnaireItem,
         QuestionnaireResponse.ItemComponent? questionnaireResponseItem
     )
     {
         Id = id;
-        Expression = expression.Expression_;
-        ExpressionLanguage = expression.Language;
-        Name = expression.Name;
-        Type = type;
+        Expression = expr;
+        ExpressionLanguage = exprLanguage;
+        Name = name;
         QuestionnaireItem = questionnaireItem;
         QuestionnaireResponseItem = questionnaireResponseItem;
+        Scope = scope;
+        Type = type;
     }
 
-    public bool AddDependency(IQuestionnaireContext<B> dependency)
+    public void AddDependency(IQuestionnaireContext<T> dependency)
     {
-        if (dependency.Id == Id)
-        {
-            return false;
-        }
-
         _dependencies.Add(dependency);
-
-        foreach (var dependant in _dependants)
-        {
-            if (!dependant.AddDependency(dependency))
-            {
-                return false;
-            }
-        }
-
-        return true;
+        dependency.AddDependant(this);
     }
 
-    public bool AddDependant(IQuestionnaireExpression<B> dependant)
+    public void AddDependant(IQuestionnaireExpression<T> dependant)
     {
-        if (dependant.Id == Id)
-        {
-            return false;
-        }
-
         _dependants.Add(dependant);
+    }
 
-        foreach (var dependency in _dependencies)
-        {
-            if (!dependency.AddDependant(dependant))
-            {
-                return false;
-            }
-        }
+    public void RemoveDependency(IQuestionnaireContext<T> dependency)
+    {
+        _dependencies.Remove(dependency);
 
-        return true;
+        dependency.RemoveDependant(this);
+    }
+
+    public void RemoveDependant(IQuestionnaireExpression<T> dependant)
+    {
+        _dependants.Remove(dependant);
     }
 
     public void MakeResponseDependant()
@@ -90,14 +81,15 @@ public class QuestionnaireExpression : IQuestionnaireExpression<B>
         }
     }
 
-    public void SetValue(B value)
+    public void SetValue(T? value)
     {
+        _resolutionAttempted = true;
         Value = value;
     }
 
     public bool Resolved()
     {
-        return Value is not null;
+        return Value is not null || _resolutionAttempted;
     }
 
     public bool DependenciesResolved()
@@ -108,5 +100,36 @@ public class QuestionnaireExpression : IQuestionnaireExpression<B>
     public void ReplaceExpression(string expression)
     {
         Expression = expression;
+    }
+
+    public virtual IQuestionnaireExpression<T> Clone(dynamic? replacementFields = null)
+    {
+        if (replacementFields is null)
+        {
+            throw new ArgumentNullException(nameof(replacementFields));
+        }
+
+        return new QuestionnaireExpression<T>(
+            replacementFields.Id,
+            Name,
+            Expression,
+            ExpressionLanguage,
+            replacementFields.Scope,
+            Type,
+            QuestionnaireItem,
+            QuestionnaireResponseItem
+        )
+        {
+            Value = Value,
+            _dependencies = new HashSet<IQuestionnaireContext<T>>(
+                _dependencies,
+                QuestionnaireContextComparer<T>.Default
+            ),
+            _dependants = new HashSet<IQuestionnaireExpression<T>>(
+                _dependants,
+                QuestionnaireContextComparer<T>.Default
+            ),
+            ClonedFrom = this
+        };
     }
 }

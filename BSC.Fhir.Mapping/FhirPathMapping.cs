@@ -4,6 +4,7 @@ using BSC.Fhir.Mapping.Expressions;
 using Hl7.Fhir.ElementModel;
 using Hl7.Fhir.FhirPath;
 using Hl7.Fhir.Model;
+using Hl7.Fhir.Serialization;
 
 namespace BSC.Fhir.Mapping;
 
@@ -25,9 +26,9 @@ public static class FhirPathMapping
         }
     }
 
-    public static EvaluationResult? EvaluateExpr(string expr, Scope<BaseList> scope, string? expressionName = null)
+    public static EvaluationResult? EvaluateExpr(FhirPathExpression<BaseList> expr, string? expressionName = null)
     {
-        var evaluationCtx = GetEvaluationContext(expr, scope);
+        var evaluationCtx = GetEvaluationContext(expr);
         if (evaluationCtx?.Resource is null)
         {
             return null;
@@ -61,11 +62,11 @@ public static class FhirPathMapping
         }
     }
 
-    public static Type? EvaluateTypeFromExpr(string expr, Scope<BaseList> scope)
+    public static Type? EvaluateTypeFromExpr(FhirPathExpression<BaseList> expr)
     {
-        var evaluationCtx = GetEvaluationContext(expr, scope);
+        var evaluationCtx = GetEvaluationContext(expr);
 
-        if (evaluationCtx.Resource is not null)
+        if (evaluationCtx?.Resource is not null)
         {
             var evalResult = FhirPathExtensions.Select(
                 evaluationCtx.Resource,
@@ -96,32 +97,32 @@ public static class FhirPathMapping
             }
         }
 
-        throw new NotImplementedException();
+        return null;
     }
 
-    private static EvaluationContext GetEvaluationContext(string expr, Scope<BaseList> scope)
+    private static EvaluationContext? GetEvaluationContext(FhirPathExpression<BaseList> expr)
     {
-        EvaluationContext evaluationCtx;
-        var expressionParts = expr.Split('.');
+        EvaluationContext? evaluationCtx = null;
+        var expressionParts = expr.Expression.Split('.');
         var start = expressionParts[0];
         if (start.StartsWith("%"))
         {
             evaluationCtx = start switch
             {
-                "%resource" => ResourceEvaluationSource(expr, scope),
-                "%questionnaire" => QuestionnaireEvaluationSource(expressionParts, scope),
-                "%context" => ContextEvaluationSource(expressionParts, scope),
-                "%qitem" => QItemEvaluationSource(expressionParts, scope),
-                _ => VariableEvaluationSource(expressionParts, scope)
+                "%resource" => ResourceEvaluationSource(expr.Expression, expr.Scope),
+                "%questionnaire" => QuestionnaireEvaluationSource(expressionParts, expr.Scope),
+                "%context" => ContextEvaluationSource(expressionParts, expr.Scope),
+                "%qitem" => QItemEvaluationSource(expressionParts, expr.Scope),
+                _ => VariableEvaluationSource(expressionParts, expr)
             };
         }
-        else if (scope.ExtractionContext() is IQuestionnaireContext<BaseList> context)
+        else if (expr.Scope.ExtractionContext() is IQuestionnaireContext<BaseList> context)
         {
-            evaluationCtx = new(expr, context.Value?.FirstOrDefault());
+            evaluationCtx = new(expr.Expression, context.Value?.FirstOrDefault());
         }
         else
         {
-            throw new InvalidOperationException($"Could not find evaluation context for expression {expr}");
+            Console.WriteLine("Error: Could not find evaluation context for expression {0}", expr);
         }
 
         return evaluationCtx;
@@ -167,29 +168,26 @@ public static class FhirPathMapping
         return new(execExpr, source);
     }
 
-    private static EvaluationContext VariableEvaluationSource(string[] exprParts, Scope<BaseList> scope)
+    private static EvaluationContext? VariableEvaluationSource(
+        string[] exprParts,
+        FhirPathExpression<BaseList> expression
+    )
     {
-        EvaluationContext evaluationCtx;
+        EvaluationContext? evaluationCtx = null;
         var variableName = exprParts[0][1..];
-        if (scope.GetResolvedContext(variableName) is ResolvedContext<BaseList> context)
+        if (
+            expression.Dependencies.FirstOrDefault(dep => dep.Resolved() && dep.Name == variableName)
+                is IQuestionnaireContext<BaseList> context
+            && context.Value is not null
+        )
         {
-            if (context.Value.Count == 0 || context.Value.Count > 1)
-            {
-                throw new InvalidOperationException(
-                    $"Cannot use variable with any number of items other than 1. variableName: {variableName}"
-                );
-            }
-
             exprParts[0] = "%resource";
             var execExpr = string.Join('.', exprParts);
             evaluationCtx = new(execExpr, context.Value.First());
         }
         else
         {
-            exprParts[0] = "%resource";
-            var execExpr = string.Join('.', exprParts);
-
-            evaluationCtx = new(execExpr);
+            Console.WriteLine("Error: Cannot find context in scope for variable {0}", variableName);
         }
 
         return evaluationCtx;

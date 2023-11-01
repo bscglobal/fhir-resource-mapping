@@ -24,17 +24,60 @@ public class DependencyResolverTests
     {
         var idProvider = new NumericIdProvider();
         var questionnaire = Demographics.CreateQuestionnaire();
-        var patient = new Patient();
-        var resourceLoader = ResourceLoaderMock(new() { { "Patient", new[] { patient } } });
-        var launchContext = DemoLaunchContext(idProvider);
+        var patientId = Guid.NewGuid().ToString();
+        var relativeIds = new[] { Guid.NewGuid().ToString(), Guid.NewGuid().ToString() };
+        var demoQuestionnaire = Demographics.CreateQuestionnaire();
+        var demoQuestionnaireResponse = Demographics.CreateQuestionnaireResponse(patientId, relativeIds);
+        var familyName = "Smith";
+        var patient = new Patient
+        {
+            Id = patientId,
+            BirthDate = "2006-04-05",
+            Name =
+            {
+                new() { Family = familyName, Given = new[] { "Jane", "Rebecca" } },
+                new() { Family = familyName, Given = new[] { "Elisabeth", "Charlotte" } }
+            }
+        };
+        var relatives = relativeIds.Select(
+            id =>
+                new RelatedPerson
+                {
+                    Id = id,
+                    Patient = new ResourceReference($"Patient/{patientId}"),
+                    BirthDate = "1964-06-01",
+                    Name =
+                    {
+                        new() { Family = "Paul", Given = new[] { "Annabel" } }
+                    }
+                }
+        );
+        var resourceLoader = ResourceLoaderMock(
+            new()
+            {
+                { $"Patient?_id={patientId}", new[] { patient } },
+                { $"RelatedPerson?patient={patientId}", relatives.ToArray() }
+            }
+        );
 
-        var resolver = new DependencyResolver(questionnaire, null, launchContext, resourceLoader.Object);
+        var launchContext = new Dictionary<string, Resource>
+        {
+            { "patient", patient },
+            {
+                "user",
+                new Practitioner { Id = Guid.NewGuid().ToString() }
+            },
+        };
+
+        var resolver = new DependencyResolver(
+            idProvider,
+            questionnaire,
+            null,
+            launchContext,
+            resourceLoader.Object,
+            ResolvingContext.Extraction | ResolvingContext.Population
+        );
         await resolver.ParseQuestionnaireAsync();
-    }
-
-    private IReadOnlyCollection<LaunchContext> DemoLaunchContext(INumericIdProvider idProvider)
-    {
-        return new[] { new LaunchContext(idProvider, "patient", new Patient { Id = Guid.NewGuid().ToString() }) };
     }
 
     private Mock<IResourceLoader> ResourceLoaderMock(Dictionary<string, IReadOnlyCollection<Resource>> results)

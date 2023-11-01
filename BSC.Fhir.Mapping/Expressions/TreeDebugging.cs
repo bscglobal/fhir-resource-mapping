@@ -1,3 +1,4 @@
+using System.Text.Json;
 using BSC.Fhir.Mapping.Core.Expressions;
 using Hl7.Fhir.Model;
 
@@ -5,20 +6,22 @@ namespace BSC.Fhir.Mapping.Expressions;
 
 internal static class TreeDebugging
 {
-    public static void PrintTree(Scope<IReadOnlyCollection<Base>> scope)
+    public static void PrintTree<T>(Scope<T> scope, bool printDeps = false)
     {
         Console.WriteLine();
-        PrintTree(scope, "    ", "", false, false);
+        PrintTree(scope, "    ", printDeps: printDeps);
         Console.WriteLine();
         Console.WriteLine();
     }
 
-    private static void PrintTree(
-        Scope<IReadOnlyCollection<Base>> scope,
+    private static void PrintTree<T>(
+        Scope<T> scope,
         string prefix = "",
         string linkIdPrefix = "",
         bool addIndent = false,
-        bool addBar = false
+        bool addBar = false,
+        Scope<T>? originalScope = null,
+        bool printDeps = false
     )
     {
         if (addIndent)
@@ -28,6 +31,12 @@ internal static class TreeDebugging
         Console.WriteLine(prefix + linkIdPrefix + (scope.Item?.LinkId ?? "root"));
 
         prefix = prefix + (addBar ? "│" : " ") + (addIndent ? "     " : "");
+        if (scope == originalScope)
+        {
+            Console.WriteLine(prefix + "│");
+            Console.WriteLine(prefix + "Circular tree detected!");
+            return;
+        }
 
         var hasChildren = scope.Children.Count > 0;
         if (scope.Context.Count > 0)
@@ -46,7 +55,8 @@ internal static class TreeDebugging
                 prefix + (hasChildren ? "│     " : "      "),
                 lastContext ? "└─ " : "├─ ",
                 true,
-                !lastContext
+                !lastContext,
+                printDeps
             );
         }
 
@@ -61,16 +71,17 @@ internal static class TreeDebugging
             var child = scope.Children[i];
 
             var lastChild = i == scope.Children.Count - 1;
-            PrintTree(child, prefix + "      ", lastChild ? "└─ " : "├─ ", true, !lastChild);
+            PrintTree(child, prefix + "      ", lastChild ? "└─ " : "├─ ", true, !lastChild, originalScope ?? scope);
         }
     }
 
-    private static void PrintContext(
-        IQuestionnaireContext<IReadOnlyCollection<Base>> context,
+    public static void PrintContext<T>(
+        IQuestionnaireContext<T> context,
         string prefix = "",
         string titlePrefix = "",
         bool addIndent = false,
-        bool addBar = false
+        bool addBar = false,
+        bool printDeps = false
     )
     {
         if (addIndent)
@@ -82,6 +93,13 @@ internal static class TreeDebugging
         );
         prefix = prefix + (addBar ? "│" : " ") + (addIndent ? "     " : "");
 
+        Console.WriteLine(prefix + "│");
+        Console.WriteLine(prefix + "├─ Resolved");
+        Console.WriteLine(prefix + "│     │");
+        Console.WriteLine(
+            prefix + "│     └─ " + (context.Value is not null ? JsonSerializer.Serialize(context.Value) : "Nope")
+        );
+
         var expression = context as IQuestionnaireExpression<IReadOnlyCollection<Base>>;
         var deps = expression?.Dependencies.ToArray();
         var hasDeps = deps?.Length > 0;
@@ -89,10 +107,14 @@ internal static class TreeDebugging
         if (expression is not null)
         {
             Console.WriteLine(prefix + "│");
+            Console.WriteLine(prefix + "├─ Dependencies Resolved");
+            Console.WriteLine(prefix + "│     │");
+            Console.WriteLine(prefix + "│     └─ " + expression.DependenciesResolved());
+            Console.WriteLine(prefix + "│");
             Console.WriteLine(prefix + (hasDeps ? "├─ " : "└─ ") + expression.Expression);
         }
 
-        if (hasDeps)
+        if (hasDeps && printDeps)
         {
             var depsPrefix = prefix + "      ";
             Console.WriteLine(prefix + "│");
