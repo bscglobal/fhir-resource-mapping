@@ -26,7 +26,7 @@ public static class FhirPathMapping
         }
     }
 
-    public static EvaluationResult? EvaluateExpr(FhirPathExpression<BaseList> expr, string? expressionName = null)
+    public static EvaluationResult? EvaluateExpr(FhirPathExpression expr, string? expressionName = null)
     {
         var evaluationCtx = GetEvaluationContext(expr);
         if (evaluationCtx?.Resource is null)
@@ -62,7 +62,7 @@ public static class FhirPathMapping
         }
     }
 
-    public static Type? EvaluateTypeFromExpr(FhirPathExpression<BaseList> expr)
+    public static Type? EvaluateTypeFromExpr(FhirPathExpression expr)
     {
         var evaluationCtx = GetEvaluationContext(expr);
 
@@ -100,7 +100,7 @@ public static class FhirPathMapping
         return null;
     }
 
-    private static EvaluationContext? GetEvaluationContext(FhirPathExpression<BaseList> expr)
+    private static EvaluationContext? GetEvaluationContext(FhirPathExpression expr)
     {
         EvaluationContext? evaluationCtx = null;
         var expressionParts = expr.Expression.Split('.');
@@ -168,10 +168,7 @@ public static class FhirPathMapping
         return new(execExpr, source);
     }
 
-    private static EvaluationContext? VariableEvaluationSource(
-        string[] exprParts,
-        FhirPathExpression<BaseList> expression
-    )
+    private static EvaluationContext? VariableEvaluationSource(string[] exprParts, FhirPathExpression expression)
     {
         EvaluationContext? evaluationCtx = null;
         var variableName = exprParts[0][1..];

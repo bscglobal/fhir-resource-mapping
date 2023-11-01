@@ -3,8 +3,12 @@ using Hl7.Fhir.Model;
 
 namespace BSC.Fhir.Mapping.Expressions;
 
-public class FhirPathExpression<T> : QuestionnaireExpression<T>
+using BaseList = IReadOnlyCollection<Base>;
+
+public class FhirPathExpression : QuestionnaireExpression<BaseList>
 {
+    public Base? SourceResource { get; private set; }
+
     public FhirPathExpression(
         int id,
         string? name,
@@ -16,14 +20,14 @@ public class FhirPathExpression<T> : QuestionnaireExpression<T>
     )
         : base(id, name, expr, Constants.FHIRPATH_MIME, scope, type, questionnaireItem, questionnaireResponseItem) { }
 
-    public override IQuestionnaireExpression<T> Clone(dynamic? replacementFields = null)
+    public override IQuestionnaireExpression<BaseList> Clone(dynamic? replacementFields = null)
     {
         if (replacementFields is null)
         {
             throw new ArgumentNullException(nameof(replacementFields));
         }
 
-        return new FhirPathExpression<T>(
+        return new FhirPathExpression(
             replacementFields.Id,
             Name,
             Expression,
@@ -34,15 +38,21 @@ public class FhirPathExpression<T> : QuestionnaireExpression<T>
         )
         {
             Value = Value,
-            _dependencies = new HashSet<IQuestionnaireContext<T>>(
+            _dependencies = new HashSet<IQuestionnaireContext<BaseList>>(
                 _dependencies,
-                QuestionnaireContextComparer<T>.Default
+                QuestionnaireContextComparer<BaseList>.Default
             ),
-            _dependants = new HashSet<IQuestionnaireExpression<T>>(
+            _dependants = new HashSet<IQuestionnaireExpression<BaseList>>(
                 _dependants,
-                QuestionnaireContextComparer<T>.Default
+                QuestionnaireContextComparer<BaseList>.Default
             ),
             ClonedFrom = this
         };
+    }
+
+    public void SetValue(BaseList value, Base source)
+    {
+        SetValue(value);
+        SourceResource = source;
     }
 }
