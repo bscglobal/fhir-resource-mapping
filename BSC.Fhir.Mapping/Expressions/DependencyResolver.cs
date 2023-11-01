@@ -1,11 +1,8 @@
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using BSC.Fhir.Mapping.Core;
 using BSC.Fhir.Mapping.Core.Expressions;
 using Hl7.Fhir.Model;
-using Hl7.Fhir.Serialization;
-using Task = System.Threading.Tasks.Task;
 
 namespace BSC.Fhir.Mapping.Expressions;
 
@@ -13,7 +10,7 @@ using BaseList = IReadOnlyCollection<Base>;
 
 public class DependencyResolver
 {
-    private readonly NumericIdProvider _idProvider;
+    private readonly INumericIdProvider _idProvider;
     private readonly ScopeTree _scopeTree;
     private readonly Questionnaire _questionnaire;
     private readonly QuestionnaireResponse? _questionnaireResponse;
@@ -22,10 +19,10 @@ public class DependencyResolver
     private readonly Dictionary<string, IReadOnlyCollection<Resource>> _queryResults = new();
 
     public DependencyResolver(
-        NumericIdProvider idProvider,
+        INumericIdProvider idProvider,
         Questionnaire questionnaire,
         QuestionnaireResponse? questionnaireResponse,
-        Dictionary<string, Resource> launchContext,
+        IDictionary<string, Resource> launchContext,
         IResourceLoader resourceLoader,
         ResolvingContext resolvingContext
     )
@@ -40,7 +37,7 @@ public class DependencyResolver
         AddLaunchContextToScope(launchContext);
     }
 
-    private void AddLaunchContextToScope(Dictionary<string, Resource> launchContext)
+    private void AddLaunchContextToScope(IDictionary<string, Resource> launchContext)
     {
         var scopedLaunchContext = launchContext.Select(
             kv => new LaunchContext(_idProvider.GetId(), kv.Key, kv.Value, _scopeTree.CurrentScope)
@@ -49,7 +46,7 @@ public class DependencyResolver
         _scopeTree.CurrentScope.Context.AddRange(scopedLaunchContext);
     }
 
-    public async Task<Scope<BaseList>?> ParseQuestionnaireAsync(CancellationToken cancellationToken = default)
+    public async Task<Scope?> ParseQuestionnaireAsync(CancellationToken cancellationToken = default)
     {
         var rootExtensions = _questionnaire.AllExtensions();
 
@@ -205,7 +202,7 @@ public class DependencyResolver
         return query;
     }
 
-    private QuestionnaireExpression<BaseList>? CreateDependencyGraph(Scope<BaseList> scope)
+    private QuestionnaireExpression<BaseList>? CreateDependencyGraph(Scope scope)
     {
         for (var i = 0; i < scope.Context.Count; i++)
         {
@@ -243,7 +240,7 @@ public class DependencyResolver
     }
 
     private QuestionnaireExpression<BaseList>? CalculateFhirQueryDependencies(
-        Scope<BaseList> scope,
+        Scope scope,
         QuestionnaireExpression<BaseList> query
     )
     {
@@ -279,7 +276,7 @@ public class DependencyResolver
     }
 
     private QuestionnaireExpression<BaseList>? CalculateFhirPathDependencies(
-        Scope<BaseList> scope,
+        Scope scope,
         FhirPathExpression<BaseList> query
     )
     {
@@ -343,7 +340,7 @@ public class DependencyResolver
         return null;
     }
 
-    private IQuestionnaireExpression<BaseList>? IsCircularGraph(Scope<BaseList> scope)
+    private IQuestionnaireExpression<BaseList>? IsCircularGraph(Scope scope)
     {
         var checkedExprs = new HashSet<IQuestionnaireContext<BaseList>>();
 
@@ -391,15 +388,6 @@ public class DependencyResolver
     {
         TreeDebugging.PrintTree(_scopeTree.CurrentScope);
 
-        // Console.WriteLine(
-        //     string.Join(
-        //         " -> ",
-        //         expressions.Select(expr => expr.Id + $" ({(expr.Name is null ? "anonymous" : expr.Name)})")
-        //     )
-        // );
-
-
-        var runs = 0;
         var oldLength = 0;
         while (true)
         {
@@ -476,7 +464,7 @@ public class DependencyResolver
         return true;
     }
 
-    private HashSet<IQuestionnaireExpression<BaseList>>? TopologicalSort(Scope<BaseList> scope)
+    private HashSet<IQuestionnaireExpression<BaseList>>? TopologicalSort(Scope scope)
     {
         var expressions = scope.AllContextInSubtree().OfType<IQuestionnaireExpression<BaseList>>();
 
@@ -609,7 +597,7 @@ public class DependencyResolver
     private void ExplodeExpression(
         IReadOnlyCollection<Base> results,
         IReadOnlyCollection<IQuestionnaireExpression<BaseList>> originalExprs,
-        Scope<BaseList> scope
+        Scope scope
     )
     {
         var newScopes = results
@@ -756,7 +744,7 @@ public class DependencyResolver
         string? name,
         string expr,
         QuestionnaireContextType queryType,
-        Scope<BaseList> scope,
+        Scope scope,
         IQuestionnaireExpression<BaseList>? from = null
     ) =>
         new(
@@ -773,6 +761,6 @@ public class DependencyResolver
         string? name,
         string expr,
         QuestionnaireContextType queryType,
-        Scope<BaseList> scope
+        Scope scope
     ) => new(_idProvider.GetId(), name, expr, scope, queryType, _scopeTree.CurrentItem, _scopeTree.CurrentResponseItem);
 }

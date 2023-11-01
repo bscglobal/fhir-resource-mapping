@@ -3,16 +3,14 @@ using Hl7.Fhir.Model;
 
 namespace BSC.Fhir.Mapping.Expressions;
 
-using BaseList = IReadOnlyCollection<Base>;
-
 public class ScopeTree
 {
-    private Scope<BaseList> _currentScope;
+    private Scope _currentScope;
     private readonly INumericIdProvider _idProvider;
 
     public Questionnaire.ItemComponent? CurrentItem => _currentScope?.Item;
     public QuestionnaireResponse.ItemComponent? CurrentResponseItem => _currentScope?.ResponseItem;
-    public Scope<BaseList> CurrentScope => _currentScope;
+    public Scope CurrentScope => _currentScope;
 
     public ScopeTree(
         Questionnaire questionnaire,
@@ -45,7 +43,7 @@ public class ScopeTree
         return true;
     }
 
-    public static Scope<BaseList>? GetScope(string linkId, Scope<BaseList> scope)
+    public static Scope? GetScope(string linkId, Scope scope)
     {
         if (scope.Item?.LinkId == linkId)
         {
@@ -54,7 +52,7 @@ public class ScopeTree
 
         foreach (var child in scope.Children)
         {
-            if (GetScope(linkId, child) is Scope<BaseList> found)
+            if (GetScope(linkId, child) is Scope found)
             {
                 return found;
             }

@@ -9,7 +9,7 @@ public class FhirPathExpression<T> : QuestionnaireExpression<T>
         int id,
         string? name,
         string expr,
-        Scope<T> scope,
+        Scope scope,
         QuestionnaireContextType type,
         Questionnaire.ItemComponent? questionnaireItem,
         QuestionnaireResponse.ItemComponent? questionnaireResponseItem

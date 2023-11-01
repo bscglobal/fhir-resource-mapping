@@ -6,7 +6,7 @@ namespace BSC.Fhir.Mapping.Expressions;
 
 internal static class TreeDebugging
 {
-    public static void PrintTree<T>(Scope<T> scope, bool printDeps = false)
+    public static void PrintTree(Scope scope, bool printDeps = false)
     {
         Console.WriteLine();
         PrintTree(scope, "    ", printDeps: printDeps);
@@ -14,13 +14,13 @@ internal static class TreeDebugging
         Console.WriteLine();
     }
 
-    private static void PrintTree<T>(
-        Scope<T> scope,
+    private static void PrintTree(
+        Scope scope,
         string prefix = "",
         string linkIdPrefix = "",
         bool addIndent = false,
         bool addBar = false,
-        Scope<T>? originalScope = null,
+        Scope? originalScope = null,
         bool printDeps = false
     )
     {

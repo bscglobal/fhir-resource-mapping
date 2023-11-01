@@ -5,22 +5,24 @@ using Hl7.Fhir.Model;
 
 namespace BSC.Fhir.Mapping.Expressions;
 
-public class Scope<T> : IClonable<Scope<T>>
+using BaseList = IReadOnlyCollection<Base>;
+
+public class Scope : IClonable<Scope>
 {
     public int Level { get; }
     public Questionnaire Questionnaire { get; private init; }
     public QuestionnaireResponse? QuestionnaireResponse { get; set; }
     public Questionnaire.ItemComponent? Item { get; private init; }
     public QuestionnaireResponse.ItemComponent? ResponseItem { get; private init; }
-    public List<IQuestionnaireContext<T>> Context { get; private init; } = new();
-    public Scope<T>? Parent { get; private init; }
-    public List<Scope<T>> Children { get; private init; } = new();
+    public List<IQuestionnaireContext<BaseList>> Context { get; private init; } = new();
+    public Scope? Parent { get; private init; }
+    public List<Scope> Children { get; private init; } = new();
 
-    public Scope<T>? ClonedFrom { get; private init; }
+    public Scope? ClonedFrom { get; private init; }
 
     private readonly INumericIdProvider _idProvider;
 
-    public Scope(Scope<T> parent, INumericIdProvider idProvider)
+    public Scope(Scope parent, INumericIdProvider idProvider)
     {
         parent.Children.Add(this);
         Parent = parent;
@@ -41,7 +43,7 @@ public class Scope<T> : IClonable<Scope<T>>
         _idProvider = idProvider;
     }
 
-    public Scope(Questionnaire.ItemComponent item, Scope<T> parentScope, INumericIdProvider idProvider)
+    public Scope(Questionnaire.ItemComponent item, Scope parentScope, INumericIdProvider idProvider)
         : this(parentScope, idProvider)
     {
         Item = item;
@@ -56,7 +58,7 @@ public class Scope<T> : IClonable<Scope<T>>
     public Scope(
         Questionnaire.ItemComponent item,
         QuestionnaireResponse.ItemComponent responseItem,
-        Scope<T> parentScope,
+        Scope parentScope,
         INumericIdProvider idProvider
     )
         : this(item, parentScope, idProvider)
@@ -78,9 +80,9 @@ public class Scope<T> : IClonable<Scope<T>>
         _idProvider = idProvider;
     }
 
-    public IReadOnlyCollection<IQuestionnaireContext<T>> AllContextInSubtree()
+    public IReadOnlyCollection<IQuestionnaireContext<BaseList>> AllContextInSubtree()
     {
-        var list = new HashSet<IQuestionnaireContext<T>>(QuestionnaireContextComparer<T>.Default);
+        var list = new HashSet<IQuestionnaireContext<BaseList>>(QuestionnaireContextComparer<BaseList>.Default);
 
         AddContextDependenciesToList(Context, list);
 
@@ -93,23 +95,26 @@ public class Scope<T> : IClonable<Scope<T>>
     }
 
     private static void AddContextDependenciesToList(
-        IEnumerable<IQuestionnaireContext<T>> contexts,
-        HashSet<IQuestionnaireContext<T>> allContext
+        IEnumerable<IQuestionnaireContext<BaseList>> contexts,
+        HashSet<IQuestionnaireContext<BaseList>> allContext
     )
     {
         foreach (var ctx in contexts)
         {
             allContext.Add(ctx);
-            if (ctx is IQuestionnaireExpression<T> expr)
+            if (ctx is IQuestionnaireExpression<BaseList> expr)
             {
-                AddContextDependenciesToList(expr.Dependencies.OfType<IQuestionnaireExpression<T>>(), allContext);
+                AddContextDependenciesToList(
+                    expr.Dependencies.OfType<IQuestionnaireExpression<BaseList>>(),
+                    allContext
+                );
             }
         }
     }
 
-    public Scope<T> Clone(dynamic? replacementFields = null)
+    public Scope Clone(dynamic? replacementFields = null)
     {
-        var newScope = new Scope<T>(_idProvider, Questionnaire, QuestionnaireResponse)
+        var newScope = new Scope(_idProvider, Questionnaire, QuestionnaireResponse)
         {
             Item = Item,
             QuestionnaireResponse = QuestionnaireResponse,
@@ -123,36 +128,42 @@ public class Scope<T> : IClonable<Scope<T>>
         return newScope;
     }
 
-    private void CopyContextToScope(Scope<T> scope)
+    private void CopyContextToScope(Scope scope)
     {
         var clonedContext = Context
-            .OfType<IClonable<IQuestionnaireExpression<T>>>()
+            .OfType<IClonable<IQuestionnaireExpression<BaseList>>>()
             .Select(ctx => ctx.Clone(new { Id = _idProvider.GetId(), Scope = scope }));
         scope.Context.AddRange(clonedContext);
     }
 
-    public IQuestionnaireContext<T>? ExtractionContext()
+    public IQuestionnaireContext<BaseList>? ExtractionContext()
     {
         return GetContext(expr => expr.Type == QuestionnaireContextType.ExtractionContext, this);
     }
 
-    public IQuestionnaireContext<T>? GetContext(int id)
+    public Resource? ExtractionContextValue()
+    {
+        return GetContext(expr => expr.Type == QuestionnaireContextType.ExtractionContext, this)
+                ?.Value?.FirstOrDefault() as Resource;
+    }
+
+    public IQuestionnaireContext<BaseList>? GetContext(int id)
     {
         return GetContext(expr => expr.Id == id, this);
     }
 
-    public ResolvedContext<T>? GetResolvedContext(int id)
+    public ResolvedContext<BaseList>? GetResolvedContext(int id)
     {
         var context = GetContext(expr => expr.Resolved() && expr.Id == id, this);
         return context is not null ? new(context) : null;
     }
 
-    public IQuestionnaireContext<T>? GetContext(string name)
+    public IQuestionnaireContext<BaseList>? GetContext(string name)
     {
         return GetContext(expr => expr.Name == name, this);
     }
 
-    public ResolvedContext<T>? GetResolvedContext(string name)
+    public ResolvedContext<BaseList>? GetResolvedContext(string name)
     {
         var context = GetContext(expr => expr.Resolved() && expr.Name == name, this);
 
@@ -165,7 +176,10 @@ public class Scope<T> : IClonable<Scope<T>>
         return context is not null ? new(context) : null;
     }
 
-    private static IQuestionnaireContext<T>? GetContext(Func<IQuestionnaireContext<T>, bool> predicate, Scope<T> scope)
+    private static IQuestionnaireContext<BaseList>? GetContext(
+        Func<IQuestionnaireContext<BaseList>, bool> predicate,
+        Scope scope
+    )
     {
         var expression = scope.Context.FirstOrDefault(predicate);
 

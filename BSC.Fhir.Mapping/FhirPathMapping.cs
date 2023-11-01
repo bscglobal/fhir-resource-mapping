@@ -128,12 +128,12 @@ public static class FhirPathMapping
         return evaluationCtx;
     }
 
-    private static EvaluationContext ResourceEvaluationSource(string expr, Scope<BaseList> scope)
+    private static EvaluationContext ResourceEvaluationSource(string expr, Scope scope)
     {
         return new(expr, scope.ResponseItem);
     }
 
-    private static EvaluationContext QuestionnaireEvaluationSource(string[] exprParts, Scope<BaseList> scope)
+    private static EvaluationContext QuestionnaireEvaluationSource(string[] exprParts, Scope scope)
     {
         exprParts[0] = "%resource";
         var execExpr = string.Join('.', exprParts);
@@ -141,7 +141,7 @@ public static class FhirPathMapping
         return new(execExpr, scope.Questionnaire);
     }
 
-    private static EvaluationContext ContextEvaluationSource(string[] exprParts, Scope<BaseList> scope)
+    private static EvaluationContext ContextEvaluationSource(string[] exprParts, Scope scope)
     {
         exprParts[0] = "%resource";
         var execExpr = string.Join('.', exprParts);
@@ -151,7 +151,7 @@ public static class FhirPathMapping
         return new(execExpr, source);
     }
 
-    private static EvaluationContext QItemEvaluationSource(string[] exprParts, Scope<BaseList> scope)
+    private static EvaluationContext QItemEvaluationSource(string[] exprParts, Scope scope)
     {
         exprParts[0] = "%resource";
         var execExpr = string.Join('.', exprParts);
