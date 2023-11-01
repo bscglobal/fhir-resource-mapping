@@ -410,7 +410,8 @@ public static class ResourceMapper
         {
             var type = fieldInfo.NonParameterizedType();
 
-            if (fieldInfo.NonParameterizedType() == typeof(Hl7.Fhir.Model.DataType))
+            if (type == typeof(Hl7.Fhir.Model.DataType))
+
             {
                 var allowedTypes = fieldInfo.GetCustomAttribute<AllowedTypesAttribute>()?.Types;
                 if (allowedTypes is not null)
