@@ -1,30 +1,37 @@
+using BSC.Fhir.Mapping.Core;
 using Hl7.Fhir.Model;
 
 namespace BSC.Fhir.Mapping.Expressions;
 
-public class ResolverState
-{
-    private Scope<IReadOnlyCollection<Base>> _currentScope;
+using BaseList = IReadOnlyCollection<Base>;
 
-    private readonly HashSet<QuestionnaireExpression> _allExpressions = new();
+public class ScopeTree
+{
+    private Scope<BaseList> _currentScope;
+    private readonly INumericIdProvider _idProvider;
 
     public Questionnaire.ItemComponent? CurrentItem => _currentScope?.Item;
     public QuestionnaireResponse.ItemComponent? CurrentResponseItem => _currentScope?.ResponseItem;
-    public Scope<IReadOnlyCollection<Base>> CurrentScope => _currentScope;
+    public Scope<BaseList> CurrentScope => _currentScope;
 
-    public ResolverState(Questionnaire questionnaire, QuestionnaireResponse? questionnaireResponse)
+    public ScopeTree(
+        Questionnaire questionnaire,
+        QuestionnaireResponse? questionnaireResponse,
+        INumericIdProvider idProvider
+    )
     {
-        _currentScope = new(questionnaire, questionnaireResponse);
+        _idProvider = idProvider;
+        _currentScope = new(idProvider, questionnaire, questionnaireResponse);
     }
 
     public void PushScope(Questionnaire.ItemComponent item)
     {
-        _currentScope = new(item, _currentScope);
+        _currentScope = new(item, _currentScope, _idProvider);
     }
 
     public void PushScope(Questionnaire.ItemComponent item, QuestionnaireResponse.ItemComponent responseItem)
     {
-        _currentScope = new(item, responseItem, _currentScope);
+        _currentScope = new(item, responseItem, _currentScope, _idProvider);
     }
 
     public bool PopScope()
@@ -38,9 +45,21 @@ public class ResolverState
         return true;
     }
 
-    public void AddExpressionToScope(QuestionnaireExpression expression)
+    public static Scope<BaseList>? GetScope(string linkId, Scope<BaseList> scope)
     {
-        _currentScope.Context.Add(expression);
-        _allExpressions.Add(expression);
+        if (scope.Item?.LinkId == linkId)
+        {
+            return scope;
+        }
+
+        foreach (var child in scope.Children)
+        {
+            if (GetScope(linkId, child) is Scope<BaseList> found)
+            {
+                return found;
+            }
+        }
+
+        return null;
     }
 }

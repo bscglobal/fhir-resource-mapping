@@ -12,17 +12,19 @@ public class LaunchContext : IQuestionnaireContext<BaseList>
         new(QuestionnaireContextComparer<BaseList>.Default);
 
     public string Name { get; }
-    public IReadOnlyCollection<Base> Value { get; }
+    public BaseList Value { get; }
     public int Id { get; }
+    public Scope<BaseList> Scope { get; }
     public QuestionnaireContextType Type => QuestionnaireContextType.LaunchContext;
 
     public IEnumerable<IQuestionnaireExpression<BaseList>> Dependants => _dependants.AsEnumerable();
 
-    public LaunchContext(INumericIdProvider idProvider, string name, Resource value)
+    public LaunchContext(int id, string name, Resource value, Scope<BaseList> scope)
     {
-        Id = idProvider.GetId();
+        Id = id;
         Name = name;
         Value = new[] { value };
+        Scope = scope;
     }
 
     public bool Resolved()
@@ -30,10 +32,13 @@ public class LaunchContext : IQuestionnaireContext<BaseList>
         return true;
     }
 
-    public bool AddDependant(IQuestionnaireExpression<BaseList> dependant)
+    public void AddDependant(IQuestionnaireExpression<BaseList> dependant)
     {
         _dependants.Add(dependant);
+    }
 
-        return true;
+    public void RemoveDependant(IQuestionnaireExpression<BaseList> dependant)
+    {
+        _dependants.Remove(dependant);
     }
 }
