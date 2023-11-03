@@ -411,12 +411,13 @@ public static class ResourceMapper
             var type = fieldInfo.NonParameterizedType();
 
             if (type == typeof(Hl7.Fhir.Model.DataType))
-
             {
                 var allowedTypes = fieldInfo.GetCustomAttribute<AllowedTypesAttribute>()?.Types;
                 if (allowedTypes is not null)
                 {
-                    var specifiedType = ctx.QuestionnaireItem.GetExtension("FhirType").Value.ToString();
+                    var specifiedType = ctx.QuestionnaireItem
+                        .GetExtension("FhirType")
+                        .Value.ToString();
                     type = allowedTypes.FirstOrDefault(type => type.Name == specifiedType);
                     if (type is null)
                     {
@@ -744,8 +745,12 @@ public static class ResourceMapper
         var type = fieldInfo.NonParameterizedType();
 
         SliceDefinition? slice = null;
-
-        while (elementEnumerator.MoveNext() && elementEnumerator.Current.Path.StartsWith(baseType))
+        elementEnumerator.MoveNext();
+        while (
+            elementEnumerator.Current is not null
+            && elementEnumerator.Current.Path.StartsWith(baseType)
+            && slice is null
+        )
         {
             var currentSliceName = elementEnumerator.Current.SliceName;
 
@@ -766,8 +771,13 @@ public static class ResourceMapper
             )
             {
                 var current = elementEnumerator.Current;
-                var fixedFieldName = FieldNameByDefinition(current.Path);
+                var fixedFieldName = FieldNameByDefinition(current.Path, true);
                 var propInfo = type.GetProperty(fixedFieldName);
+                if (propInfo is null)
+                {
+                    fixedFieldName = FieldNameByDefinition(current.Path, false);
+                    propInfo = type.GetProperty(fixedFieldName);
+                }
                 if (propInfo is not null)
                 {
                     if (current.Fixed is not null)
@@ -800,7 +810,7 @@ public static class ResourceMapper
 
         foreach (var fixedVal in slice.Fixed)
         {
-            fixedVal.PropertyInfo.SetValue(value, fixedVal.Value);
+            SetFieldElementValue(value, fixedVal.PropertyInfo, fixedVal.Value);
         }
 
         if (fieldInfo.IsNonStringEnumerable())
@@ -881,7 +891,14 @@ public static class ResourceMapper
         DataType answerValue
     )
     {
+        if (field.PropertyType.Name == "String" && answerValue is FhirString)
+        {
+            field.SetValue(baseResource, answerValue.ToString());
+        }
+        else
+        {
         field.SetValue(baseResource, answerValue);
+    }
     }
 
     private static void AddAnswerToListField(
