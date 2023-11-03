@@ -70,9 +70,7 @@ public static class ResourceMapper
         return new Bundle
         {
             Type = Bundle.BundleType.Transaction,
-            Entry = extractedResources
-                .Select(resource => new Bundle.EntryComponent { Resource = resource })
-                .ToList()
+            Entry = extractedResources.Select(resource => new Bundle.EntryComponent { Resource = resource }).ToList()
         };
     }
 
@@ -93,10 +91,7 @@ public static class ResourceMapper
 
             if (responseItems.Length == 0)
             {
-                Console.WriteLine(
-                    "Debug: could not find responseItem for LinkId {0}",
-                    questionnaireItem.LinkId
-                );
+                Console.WriteLine("Debug: could not find responseItem for LinkId {0}", questionnaireItem.LinkId);
 
                 continue;
             }
@@ -114,8 +109,7 @@ public static class ResourceMapper
             if (
                 questionnaireItem.Type == Questionnaire.QuestionnaireItemType.Group
                 && (questionnaireItem.Repeats ?? false)
-                && extractionContext.QuestionnaireItem.Extension.ItemExtractionContextExtractionValue()
-                    is not null
+                && extractionContext.QuestionnaireItem.Extension.ItemExtractionContextExtractionValue() is not null
             )
             {
                 await ExtractResourcesByDefinition(
@@ -139,12 +133,7 @@ public static class ResourceMapper
                 foreach (var responseItem in responseItems)
                 {
                     extractionContext.SetQuestionnaireResponseItem(responseItem);
-                    await ExtractByDefinition(
-                        extractionContext,
-                        extractionResult,
-                        profileLoader,
-                        cancellationToken
-                    );
+                    await ExtractByDefinition(extractionContext, extractionResult, profileLoader, cancellationToken);
                     extractionContext.PopQuestionnaireResponseItem();
                 }
             }
@@ -163,12 +152,7 @@ public static class ResourceMapper
         {
             if (ctx.QuestionnaireItem.Extension.ItemExtractionContextExtractionValue() is not null)
             {
-                await ExtractResourceByDefinition(
-                    ctx,
-                    extractionResult,
-                    profileLoader,
-                    cancellationToken
-                );
+                await ExtractResourceByDefinition(ctx, extractionResult, profileLoader, cancellationToken);
             }
             else if (ctx.QuestionnaireItem.Definition is not null)
             {
@@ -178,12 +162,7 @@ public static class ResourceMapper
                         $"No extraction context defined for {ctx.QuestionnaireItem.Definition}"
                     );
                 }
-                await ExtractComplexTypeValueByDefinition(
-                    ctx,
-                    extractionResult,
-                    profileLoader,
-                    cancellationToken
-                );
+                await ExtractComplexTypeValueByDefinition(ctx, extractionResult, profileLoader, cancellationToken);
             }
             else
             {
@@ -225,14 +204,11 @@ public static class ResourceMapper
     )
     {
         var contextResult = ctx.QuestionnaireItem.GetContext(ctx);
-        var context =
-            contextResult?.Resources.FirstOrDefault() ?? contextResult?.CreateNewResource();
+        var context = contextResult?.Resources.FirstOrDefault() ?? contextResult?.CreateNewResource();
 
         if (context is null)
         {
-            throw new InvalidOperationException(
-                "Unable to create a resource from questionnaire item"
-            );
+            throw new InvalidOperationException("Unable to create a resource from questionnaire item");
         }
 
         ctx.SetCurrentExtractionContext(context);
@@ -261,9 +237,7 @@ public static class ResourceMapper
 
         if (contextResult is null)
         {
-            throw new InvalidOperationException(
-                "Unable to create a resource from questionnaire item"
-            );
+            throw new InvalidOperationException("Unable to create a resource from questionnaire item");
         }
 
         var contexts = new List<Resource>();
@@ -272,9 +246,7 @@ public static class ResourceMapper
         {
             ctx.SetQuestionnaireResponseItem(responseItem);
 
-            var contextResource =
-                GetContextResource(contextResult.Resources, ctx)
-                ?? contextResult.CreateNewResource();
+            var contextResource = GetContextResource(contextResult.Resources, ctx) ?? contextResult.CreateNewResource();
 
             if (contextResource is null)
             {
@@ -305,10 +277,7 @@ public static class ResourceMapper
         extractionResult.AddRange(contexts);
     }
 
-    private static Resource? GetContextResource(
-        IReadOnlyCollection<Resource> resources,
-        MappingContext ctx
-    )
+    private static Resource? GetContextResource(IReadOnlyCollection<Resource> resources, MappingContext ctx)
     {
         var keyExtension = ctx.QuestionnaireItem.GetExtension("extractionContextId");
 
@@ -398,13 +367,7 @@ public static class ResourceMapper
         var definition = ctx.QuestionnaireItem.Definition;
         if (fieldInfo is null)
         {
-            await UseSliceFromProfile(
-                fieldName,
-                ctx,
-                extractionResult,
-                profileLoader,
-                cancellationToken
-            );
+            await UseSliceFromProfile(fieldName, ctx, extractionResult, profileLoader, cancellationToken);
         }
         else
         {
@@ -415,9 +378,7 @@ public static class ResourceMapper
                 var allowedTypes = fieldInfo.GetCustomAttribute<AllowedTypesAttribute>()?.Types;
                 if (allowedTypes is not null)
                 {
-                    var specifiedType = ctx.QuestionnaireItem
-                        .GetExtension("FhirType")
-                        .Value.ToString();
+                    var specifiedType = ctx.QuestionnaireItem.GetExtension("FhirType").Value.ToString();
                     type = allowedTypes.FirstOrDefault(type => type.Name == specifiedType);
                     if (type is null)
                     {
@@ -496,15 +457,9 @@ public static class ResourceMapper
             return;
         }
 
-        if (
-            ctx.QuestionnaireResponseItem.Answer.Count == 0
-            && calculatedValue?.Result.Length is 0 or null
-        )
+        if (ctx.QuestionnaireResponseItem.Answer.Count == 0 && calculatedValue?.Result.Length is 0 or null)
         {
-            Console.WriteLine(
-                "Warning: no answer or calculated value for {0}",
-                ctx.QuestionnaireResponseItem.LinkId
-            );
+            Console.WriteLine("Warning: no answer or calculated value for {0}", ctx.QuestionnaireResponseItem.LinkId);
             return;
         }
 
@@ -547,9 +502,7 @@ public static class ResourceMapper
                     if (field.PropertyType.NonParameterizedType() == typeof(ResourceReference))
                     {
                         var sourceType = calculatedValue.SourceResource.GetType();
-                        answers = calculatedValues.Select(
-                            value => CreateResourceReference(value, sourceType)
-                        );
+                        answers = calculatedValues.Select(value => CreateResourceReference(value, sourceType));
                     }
                     else
                     {
@@ -643,9 +596,7 @@ public static class ResourceMapper
         }
 
         var definition = ctx.QuestionnaireItem.Definition;
-        var extensionForType = definition[
-            (profileContext.PoundIndex + 1)..definition.LastIndexOf('.')
-        ];
+        var extensionForType = definition[(profileContext.PoundIndex + 1)..definition.LastIndexOf('.')];
 
         if (IsExtensionSupportedByProfile(profileContext.Profile, extensionForType, fieldName))
         {
@@ -719,9 +670,7 @@ public static class ResourceMapper
         elementEnumerator.MoveNext();
 
         // TODO: Check if this works
-        while (
-            elementEnumerator.Current.Slicing is null || elementEnumerator.Current.Path != baseType
-        )
+        while (elementEnumerator.Current.Slicing is null || elementEnumerator.Current.Path != baseType)
         {
             elementEnumerator.MoveNext();
         }
@@ -734,11 +683,7 @@ public static class ResourceMapper
 
         if (fieldInfo is null)
         {
-            Console.WriteLine(
-                "Could not find property {0} on {1}",
-                fieldName,
-                contextType.ToString()
-            );
+            Console.WriteLine("Could not find property {0} on {1}", fieldName, contextType.ToString());
             return;
         }
 
@@ -765,10 +710,7 @@ public static class ResourceMapper
                 slice = new SliceDefinition(elementEnumerator.Current.SliceName);
             }
 
-            while (
-                elementEnumerator.MoveNext()
-                && string.IsNullOrEmpty(elementEnumerator.Current.SliceName)
-            )
+            while (elementEnumerator.MoveNext() && string.IsNullOrEmpty(elementEnumerator.Current.SliceName))
             {
                 var current = elementEnumerator.Current;
                 var fixedFieldName = FieldNameByDefinition(current.Path, true);
@@ -786,9 +728,7 @@ public static class ResourceMapper
                     }
                     else if (current.Pattern is not null)
                     {
-                        slice?.Pattern.Add(
-                            new SliceDefinition.SliceFilter(propInfo, current.Pattern)
-                        );
+                        slice?.Pattern.Add(new SliceDefinition.SliceFilter(propInfo, current.Pattern));
                     }
                 }
             }
@@ -871,9 +811,7 @@ public static class ResourceMapper
     )
     {
         var fieldType = field.PropertyType;
-        var answersOfFieldType = answers
-            .Select(ans => WrapAnswerInFieldType(ans, fieldType))
-            .ToArray();
+        var answersOfFieldType = answers.Select(ans => WrapAnswerInFieldType(ans, fieldType)).ToArray();
 
         if (field.IsParameterized() && fieldType.IsNonStringEnumerable())
         {
@@ -885,11 +823,7 @@ public static class ResourceMapper
         }
     }
 
-    private static void SetFieldElementValue(
-        Base baseResource,
-        PropertyInfo field,
-        DataType answerValue
-    )
+    private static void SetFieldElementValue(Base baseResource, PropertyInfo field, DataType answerValue)
     {
         if (field.PropertyType.Name == "String" && answerValue is FhirString)
         {
@@ -897,8 +831,8 @@ public static class ResourceMapper
         }
         else
         {
-        field.SetValue(baseResource, answerValue);
-    }
+            field.SetValue(baseResource, answerValue);
+        }
     }
 
     private static void AddAnswerToListField(
@@ -951,11 +885,7 @@ public static class ResourceMapper
         field.SetValue(baseResource, codeValue);
     }
 
-    private static DataType WrapAnswerInFieldType(
-        DataType answer,
-        Type fieldType,
-        string? system = null
-    )
+    private static DataType WrapAnswerInFieldType(DataType answer, Type fieldType, string? system = null)
     {
         var type = fieldType.NonParameterizedType();
         if (type == typeof(CodeableConcept) && answer is Coding coding)
@@ -1015,17 +945,10 @@ public static class ResourceMapper
     {
         return profile.Snapshot.Element
             .Where(element => element.Path == $"{extensionForType}.extension")
-            .Any(
-                element =>
-                    element.ElementId[(element.ElementId.LastIndexOf(':') + 1)..] == fieldName
-            );
+            .Any(element => element.ElementId[(element.ElementId.LastIndexOf(':') + 1)..] == fieldName);
     }
 
-    private static bool IsSliceSupportedByProfile(
-        StructureDefinition profile,
-        string typeToCheck,
-        string sliceName
-    )
+    private static bool IsSliceSupportedByProfile(StructureDefinition profile, string typeToCheck, string sliceName)
     {
         var val = profile.Snapshot.Element
             .Where(element => element.Path == typeToCheck)
@@ -1038,10 +961,7 @@ public static class ResourceMapper
     {
         if (ctx.CurrentContext?.Value is DataType dataType)
         {
-            dataType.AddExtension(
-                ctx.QuestionnaireItem.Definition,
-                ctx.QuestionnaireResponseItem.Answer.First().Value
-            );
+            dataType.AddExtension(ctx.QuestionnaireItem.Definition, ctx.QuestionnaireResponseItem.Answer.First().Value);
         }
         else if (ctx.CurrentContext?.Value is DomainResource domainResource)
         {
@@ -1084,9 +1004,7 @@ public static class ResourceMapper
         responseItems.AddRange(responses);
     }
 
-    private static QuestionnaireResponse.ItemComponent[] GenerateQuestionnaireResponseItem(
-        MappingContext ctx
-    )
+    private static QuestionnaireResponse.ItemComponent[] GenerateQuestionnaireResponseItem(MappingContext ctx)
     {
         QuestionnaireResponse.ItemComponent[]? responseItems = null;
         if (ctx.QuestionnaireItem.Type == Questionnaire.QuestionnaireItemType.Group)
@@ -1107,23 +1025,16 @@ public static class ResourceMapper
         return responseItems ?? Array.Empty<QuestionnaireResponse.ItemComponent>();
     }
 
-    private static QuestionnaireResponse.ItemComponent[]? CreateGroupQuestionnaireResponseItem(
-        MappingContext ctx
-    )
+    private static QuestionnaireResponse.ItemComponent[]? CreateGroupQuestionnaireResponseItem(MappingContext ctx)
     {
         var populationContextExpression = ctx.QuestionnaireItem.PopulationContext();
 
         if (populationContextExpression is not null)
         {
             var tempContext = false;
-            if (
-                !ctx.NamedExpressions.TryGetValue(populationContextExpression.Name, out var context)
-            )
+            if (!ctx.NamedExpressions.TryGetValue(populationContextExpression.Name, out var context))
             {
-                var result = FhirPathMapping.EvaluateExpr(
-                    populationContextExpression.Expression_,
-                    ctx
-                );
+                var result = FhirPathMapping.EvaluateExpr(populationContextExpression.Expression_, ctx);
                 if (result is null)
                 {
                     Console.WriteLine(
@@ -1151,11 +1062,7 @@ public static class ResourceMapper
 
                     context.Value = new[] { value };
 
-                    CreateQuestionnaireResponseItems(
-                        ctx.QuestionnaireItem.Item,
-                        questionnaireResponseItem.Item,
-                        ctx
-                    );
+                    CreateQuestionnaireResponseItems(ctx.QuestionnaireItem.Item, questionnaireResponseItem.Item, ctx);
                     ctx.PopQuestionnaireResponseItem();
 
                     return questionnaireResponseItem;
@@ -1171,10 +1078,7 @@ public static class ResourceMapper
             return responseItems;
         }
 
-        Console.WriteLine(
-            "Warning: could not find population context for group {0}",
-            ctx.QuestionnaireItem.LinkId
-        );
+        Console.WriteLine("Warning: could not find population context for group {0}", ctx.QuestionnaireItem.LinkId);
         return null;
     }
 
@@ -1213,11 +1117,8 @@ public static class ResourceMapper
                                 new QuestionnaireResponse.AnswerComponent()
                                 {
                                     Value = result.AsExpectedType(
-                                        ctx.QuestionnaireItem.Type
-                                            ?? Questionnaire.QuestionnaireItemType.Text,
-                                        evalResult.SourceResource is Resource resource
-                                            ? resource.GetType()
-                                            : null
+                                        ctx.QuestionnaireItem.Type ?? Questionnaire.QuestionnaireItemType.Text,
+                                        evalResult.SourceResource is Resource resource ? resource.GetType() : null
                                     )
                                 }
                         )
@@ -1242,11 +1143,8 @@ public static class ResourceMapper
                                 new()
                                 {
                                     Value = x.AsExpectedType(
-                                        ctx.QuestionnaireItem.Type
-                                            ?? Questionnaire.QuestionnaireItemType.Text,
-                                        evalResult.SourceResource is Resource resource
-                                            ? resource.GetType()
-                                            : null
+                                        ctx.QuestionnaireItem.Type ?? Questionnaire.QuestionnaireItemType.Text,
+                                        evalResult.SourceResource is Resource resource ? resource.GetType() : null
                                     )
                                 }
                             }
@@ -1257,9 +1155,7 @@ public static class ResourceMapper
         else if (ctx.QuestionnaireItem.Initial.Count > 0)
         {
             return ctx.QuestionnaireItem.Initial
-                .Select(
-                    initial => new QuestionnaireResponse.AnswerComponent() { Value = initial.Value }
-                )
+                .Select(initial => new QuestionnaireResponse.AnswerComponent() { Value = initial.Value })
                 .ToList();
         }
 
