@@ -8,5 +8,6 @@ public enum QuestionnaireContextType
     InitialExpression,
     CalculatedExpression,
     VariableExpression,
+    ExtractionContextId,
     Embedded
 }

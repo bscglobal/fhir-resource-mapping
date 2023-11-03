@@ -71,6 +71,13 @@ public class QuestionnaireExpression<T> : IQuestionnaireExpression<T>
         _dependants.Remove(dependant);
     }
 
+    public bool HasDependency(Func<IQuestionnaireContext<T>, bool> predicate)
+    {
+        return Dependencies.Any(
+            dep => predicate(dep) || (dep is IQuestionnaireExpression<T> expr && expr.HasDependency(predicate))
+        );
+    }
+
     public void MakeResponseDependant()
     {
         ResponseDependant = true;
@@ -81,7 +88,7 @@ public class QuestionnaireExpression<T> : IQuestionnaireExpression<T>
         }
     }
 
-    public void SetValue(T? value)
+    public virtual void SetValue(T? value)
     {
         _resolutionAttempted = true;
         Value = value;

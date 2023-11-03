@@ -4,6 +4,7 @@ using BSC.Fhir.Mapping.Expressions;
 using BSC.Fhir.Mapping.Tests.Data;
 using FluentAssertions;
 using Hl7.Fhir.Model;
+using Hl7.Fhir.Serialization;
 using Moq;
 using Xunit.Abstractions;
 using Task = System.Threading.Tasks.Task;
@@ -69,15 +70,18 @@ public class DependencyResolverTests
             },
         };
 
+        var questionnaireResponse = new QuestionnaireResponse();
         var resolver = new DependencyResolver(
             idProvider,
             questionnaire,
-            null,
+            questionnaireResponse,
             launchContext,
             resourceLoader.Object,
-            ResolvingContext.Extraction | ResolvingContext.Population
+            ResolvingContext.Population
         );
         await resolver.ParseQuestionnaireAsync();
+
+        // Console.WriteLine(questionnaireResponse.ToJson(new() { Pretty = true }));
     }
 
     private Mock<IResourceLoader> ResourceLoaderMock(Dictionary<string, IReadOnlyCollection<Resource>> results)
