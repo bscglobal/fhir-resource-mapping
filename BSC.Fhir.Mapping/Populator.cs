@@ -1,142 +1,99 @@
+using BSC.Fhir.Mapping.Core;
+using BSC.Fhir.Mapping.Expressions;
+using BSC.Fhir.Mapping.Logging;
 using Hl7.Fhir.Model;
+using Hl7.Fhir.Serialization;
+using Microsoft.Extensions.Logging;
 
 namespace BSC.Fhir.Mapping;
 
 public class Populator
 {
-    public static QuestionnaireResponse Populate(Questionnaire questionnaire, MappingContext ctx)
+    private readonly INumericIdProvider _idProvider;
+    private readonly IResourceLoader _resourceLoader;
+    private readonly ILogger<Populator> _logger;
+
+    public Populator(INumericIdProvider idProvider, IResourceLoader resourceLoader)
     {
+        _idProvider = idProvider;
+        _resourceLoader = resourceLoader;
+        _logger = FhirMappingLogging.GetLogger<Populator>();
+    }
+
+    public async Task<QuestionnaireResponse> Populate(
+        Questionnaire questionnaire,
+        IDictionary<string, Resource> launchContext
+    )
+    {
+        _logger.LogDebug("Populating QuestionnaireResponse from Questionnaire ({Name})", questionnaire.Title);
         var response = new QuestionnaireResponse();
-        ctx.QuestionnaireResponse = response;
 
-        CreateQuestionnaireResponseItems(questionnaire.Item, response.Item, ctx);
+        var resolver = new DependencyResolver(
+            _idProvider,
+            questionnaire,
+            response,
+            launchContext,
+            _resourceLoader,
+            ResolvingContext.Population
+        );
+        var rootScope = await resolver.ParseQuestionnaireAsync();
 
-        return response;
-    }
-
-    private static void CreateQuestionnaireResponseItems(
-        IReadOnlyCollection<Questionnaire.ItemComponent> questionnaireItems,
-        List<QuestionnaireResponse.ItemComponent> responseItems,
-        MappingContext ctx,
-        bool debug = false
-    )
-    {
-        var responses = questionnaireItems.SelectMany(item =>
+        if (rootScope is null)
         {
-            if (debug)
-            {
-                Console.WriteLine("Debug: CreatingQuestionnaireResponseItems for {0}", item.LinkId);
-            }
-            ctx.SetQuestionnaireItem(item);
-            var responseItem = GenerateQuestionnaireResponseItem(ctx);
-            ctx.PopQuestionnaireItem();
-            return responseItem;
-        });
-
-        responseItems.AddRange(responses);
-    }
-
-    private static QuestionnaireResponse.ItemComponent[] GenerateQuestionnaireResponseItem(MappingContext ctx)
-    {
-        QuestionnaireResponse.ItemComponent[]? responseItems = null;
-        if (ctx.QuestionnaireItem.Type == Questionnaire.QuestionnaireItemType.Group)
-        {
-            responseItems = CreateGroupQuestionnaireResponseItem(ctx);
-        }
-        else
-        {
-            var questionnaireResponseItem = new QuestionnaireResponse.ItemComponent
-            {
-                LinkId = ctx.QuestionnaireItem.LinkId,
-                Answer = CreateQuestionnaireResponseItemAnswers(ctx)
-            };
-
-            responseItems = new[] { questionnaireResponseItem };
+            throw new InvalidOperationException("Could not populate QuestionnaireResponse");
         }
 
-        return responseItems ?? Array.Empty<QuestionnaireResponse.ItemComponent>();
+        CreateQuestionnaireResponseItems(rootScope.Children);
+
+        return ConstructResponse(rootScope);
     }
 
-    private static QuestionnaireResponse.ItemComponent[]? CreateGroupQuestionnaireResponseItem(MappingContext ctx)
+    private void CreateQuestionnaireResponseItems(IReadOnlyCollection<Scope> scopes)
     {
-        var populationContextExpression = ctx.QuestionnaireItem.PopulationContext();
-
-        if (populationContextExpression is not null)
+        foreach (var scope in scopes)
         {
-            var tempContext = true;
-            if (!ctx.CurrentContext.TryGetValue(populationContextExpression.Name, out var context))
-            {
-                EvaluationResult? result;
+            _logger.LogDebug("CreatingQuestionnaireResponseItems for {LinkId}", scope.Item?.LinkId ?? "root");
 
-                try
-                {
-                    // result = FhirPathMapping.EvaluateExpr(populationContextExpression.Expression_, ctx);
-                    result = null;
-                }
-                catch
-                {
-                    result = null;
-                }
-                if (result is null)
-                {
-                    Console.WriteLine(
-                        "Warning: could not resolve expression {0} for {1}, with name {2}",
-                        populationContextExpression.Expression_,
-                        ctx.QuestionnaireItem.LinkId,
-                        populationContextExpression.Name
-                    );
-                    return null;
-                }
+            GenerateQuestionnaireResponseItem(scope);
+        }
+    }
 
-                context = new(result.Result, populationContextExpression.Name);
-            }
-            else
-            {
-                tempContext = false;
-                ctx.RemoveContext(populationContextExpression.Name);
-            }
-
-            var responseItems = context.Value
-                .Select(value =>
-                {
-                    var questionnaireResponseItem = new QuestionnaireResponse.ItemComponent
-                    {
-                        LinkId = ctx.QuestionnaireItem.LinkId
-                    };
-                    ctx.AddContext(populationContextExpression.Name, new(value, populationContextExpression.Name));
-                    ctx.SetQuestionnaireResponseItem(questionnaireResponseItem);
-
-                    CreateQuestionnaireResponseItems(ctx.QuestionnaireItem.Item, questionnaireResponseItem.Item, ctx);
-                    ctx.PopQuestionnaireResponseItem();
-                    ctx.RemoveContext(populationContextExpression.Name);
-
-                    return questionnaireResponseItem;
-                })
-                .ToArray();
-
-            if (!tempContext)
-            {
-                ctx.AddContext(populationContextExpression.Name, context);
-            }
-
-            return responseItems;
+    private void GenerateQuestionnaireResponseItem(Scope scope)
+    {
+        if (scope.Item is null)
+        {
+            Console.WriteLine("Error: Scope QuestionnaireItem is null on level {0}", scope.Level);
+            return;
         }
 
-        Console.WriteLine("Warning: could not find population context for group {0}", ctx.QuestionnaireItem.LinkId);
-        return null;
+        if (scope.ResponseItem is null)
+        {
+            _logger.LogWarning("Scope does not have ResponseItem. LinkId: {LinkId}", scope.Item.LinkId);
+            return;
+        }
+
+        scope.ResponseItem.Answer = CreateQuestionnaireResponseItemAnswers(scope);
+
+        CreateQuestionnaireResponseItems(scope.Children);
     }
 
-    private static List<QuestionnaireResponse.AnswerComponent>? CreateQuestionnaireResponseItemAnswers(
-        MappingContext ctx
-    )
+    private List<QuestionnaireResponse.AnswerComponent>? CreateQuestionnaireResponseItemAnswers(Scope scope)
     {
-        if (ctx.QuestionnaireItem.Type == Questionnaire.QuestionnaireItemType.Group)
+        if (scope.Item is null)
+        {
+            Console.WriteLine("Error: Scope QuestionnaireItem is null on level {0}", scope.Level);
+            return null;
+        }
+
+        if (scope.Children.Count > 0)
         {
             return null;
         }
 
-        var initialExpression = ctx.QuestionnaireItem.InitialExpression();
-        if (!(ctx.QuestionnaireItem.Initial.Count == 0 || initialExpression is null))
+        var initialExpression =
+            scope.Context.FirstOrDefault(ctx => ctx.Type == Core.Expressions.QuestionnaireContextType.InitialExpression)
+            as FhirPathExpression;
+        if (!(scope.Item.Initial.Count == 0 || initialExpression is null))
         {
             throw new InvalidOperationException(
                 "QuestionnaireItem is not allowed to have both intial.value and initial expression. See rule at http://build.fhir.org/ig/HL7/sdc/expressions.html#initialExpression"
@@ -145,41 +102,44 @@ public class Populator
 
         if (initialExpression is not null)
         {
-            // var evalResult = FhirPathMapping.EvaluateExpr(initialExpression.Expression_, ctx);
-            EvaluationResult? evalResult = null;
-
-            if (evalResult is null)
+            if (initialExpression.Value is null)
             {
-                Console.WriteLine("Could not find a value for {0}", initialExpression.Expression_);
+                Console.WriteLine("Could not find a value for {0}", initialExpression.Expression);
             }
             else
             {
-                if (ctx.QuestionnaireItem.Repeats ?? false)
+                _logger.LogDebug(
+                    "Setting QuestionnaireResponse Answer from initial expression for LinkId {LinkId}",
+                    scope.Item.LinkId
+                );
+                if (scope.Item.Repeats ?? false)
                 {
-                    return evalResult.Result
+                    return initialExpression.Value
                         .Select(
                             result =>
                                 new QuestionnaireResponse.AnswerComponent()
                                 {
                                     Value = result.AsExpectedType(
-                                        ctx.QuestionnaireItem.Type ?? Questionnaire.QuestionnaireItemType.Text,
-                                        evalResult.SourceResource is Resource resource ? resource.GetType() : null
+                                        scope.Item.Type ?? Questionnaire.QuestionnaireItemType.Text,
+                                        initialExpression.SourceResource is Resource resource
+                                            ? resource.GetType()
+                                            : null
                                     )
                                 }
                         )
                         .ToList();
                 }
-                else if (evalResult.Result.Length > 1)
+                else if (initialExpression.Value.Count > 1)
                 {
                     Console.WriteLine(
                         "Warning: expression {0} resolved to more than one answer. LinkId: {1}",
-                        initialExpression.Expression_,
-                        ctx.QuestionnaireItem.LinkId
+                        initialExpression.Expression,
+                        scope.Item.LinkId
                     );
                 }
                 else
                 {
-                    return evalResult.Result.SingleOrDefault() switch
+                    return initialExpression.Value.SingleOrDefault() switch
                     {
                         null => null,
                         var x
@@ -188,8 +148,10 @@ public class Populator
                                 new()
                                 {
                                     Value = x.AsExpectedType(
-                                        ctx.QuestionnaireItem.Type ?? Questionnaire.QuestionnaireItemType.Text,
-                                        evalResult.SourceResource is Resource resource ? resource.GetType() : null
+                                        scope.Item.Type ?? Questionnaire.QuestionnaireItemType.Text,
+                                        initialExpression.SourceResource is Resource resource
+                                            ? resource.GetType()
+                                            : null
                                     )
                                 }
                             }
@@ -199,5 +161,41 @@ public class Populator
         }
 
         return null;
+    }
+
+    private QuestionnaireResponse ConstructResponse(Scope rootScope)
+    {
+        var response = rootScope.QuestionnaireResponse;
+
+        if (response is null)
+        {
+            throw new ArgumentException("rootScope.QuestionnaireResponse is null");
+        }
+
+        response.Item = ConstructResponseItems(rootScope.Children);
+
+        return response;
+    }
+
+    private List<QuestionnaireResponse.ItemComponent> ConstructResponseItems(IReadOnlyCollection<Scope> scopes)
+    {
+        var list = new List<QuestionnaireResponse.ItemComponent>(scopes.Count);
+
+        foreach (var scope in scopes)
+        {
+            var childItems = ConstructResponseItems(scope.Children);
+
+            if (scope.ResponseItem is not null)
+            {
+                list.Add(scope.ResponseItem);
+                scope.ResponseItem.Item.AddRange(childItems);
+            }
+            else
+            {
+                list.AddRange(childItems);
+            }
+        }
+
+        return list;
     }
 }

@@ -14,6 +14,7 @@ public interface IQuestionnaireExpression<T> : IQuestionnaireContext<T>, IClonab
     void RemoveDependency(IQuestionnaireContext<T> dependency);
     void MakeResponseDependant();
     bool DependenciesResolved();
+    bool HasDependency(Func<IQuestionnaireContext<T>, bool> predicate);
     void SetValue(T? value);
     void ReplaceExpression(string expression);
 }

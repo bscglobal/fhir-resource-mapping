@@ -1,3 +1,5 @@
+using BSC.Fhir.Mapping.Core.Expressions;
+
 namespace BSC.Fhir.Mapping.Expressions;
 
 public static class Constants
@@ -14,8 +16,19 @@ public static class Constants
     public const string CALCULATED_EXPRESSION =
         "http://hl7.org/fhir/uv/sdc/StructureDefinition-sdc-questionnaire-calculatedExpression.html";
     public const string HIDDEN = "http://hl7.org/fhir/StructureDefinition/questionnaire-hidden";
+    public const string EXTRACTION_CONTEXT_ID = "extractionId";
 
     public const string FHIR_QUERY_MIME = "application/x-fhir-query";
     public const string FHIRPATH_MIME = "text/fhirpath";
+    public static readonly QuestionnaireContextType[] POPULATION_ONLY_CONTEXTS = new[]
+    {
+        QuestionnaireContextType.PopulationContext,
+        QuestionnaireContextType.InitialExpression
+    };
+    public static readonly QuestionnaireContextType[] EXTRACTION_ONLY_CONTEXTS = new[]
+    {
+        QuestionnaireContextType.ExtractionContext,
+        QuestionnaireContextType.ExtractionContextId
+    };
     public static readonly string[] POPULATION_DEPENDANT_CONTEXT = new[] { "%resource", "%context" };
 }

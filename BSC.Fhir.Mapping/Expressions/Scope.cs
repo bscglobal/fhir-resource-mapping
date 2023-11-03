@@ -81,6 +81,23 @@ public class Scope : IClonable<Scope>
         _idProvider = idProvider;
     }
 
+    public IReadOnlyCollection<Scope> GetChildScope(Func<Scope, bool> predicate)
+    {
+        var scopes = new List<Scope>();
+
+        if (predicate(this))
+        {
+            scopes.Add(this);
+        }
+
+        foreach (var child in Children)
+        {
+            scopes.AddRange(child.GetChildScope(predicate));
+        }
+
+        return scopes;
+    }
+
     public IReadOnlyCollection<IQuestionnaireContext<BaseList>> AllContextInSubtree()
     {
         var list = new HashSet<IQuestionnaireContext<BaseList>>(QuestionnaireContextComparer<BaseList>.Default);
@@ -118,6 +135,11 @@ public class Scope : IClonable<Scope>
         var newScope = new Scope(_idProvider, Questionnaire, QuestionnaireResponse)
         {
             Item = Item,
+            ResponseItem = (
+                Item is not null
+                    ? new QuestionnaireResponse.ItemComponent { LinkId = Item.LinkId, Answer = ResponseItem?.Answer }
+                    : null
+            ),
             QuestionnaireResponse = QuestionnaireResponse,
             Parent = replacementFields?.Parent ?? Parent,
             ClonedFrom = this
