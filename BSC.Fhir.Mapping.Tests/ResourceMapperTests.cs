@@ -93,11 +93,25 @@ public class ResourceMapperTests
             Occurrence = new Period() { Start = "2021-01-01T00:00:00Z" }
         };
 
+        var profileLoaderMock = new Mock<IProfileLoader>();
+        profileLoaderMock
+            .Setup(x => x.LoadProfileAsync(It.IsAny<Canonical>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Data.ServiceRequest.CreateProfile());
+
         var context = new MappingContext(demoQuestionnaire, demoQuestionnaireResponse);
         context.NamedExpressions.Add("extraction_root", new(servreq, "extraction_root"));
         context.NamedExpressions.Add("user", new(new Practitioner { Id = Guid.NewGuid().ToString() }, "user"));
 
-        var bundle = await ResourceMapper.Extract(demoQuestionnaire, demoQuestionnaireResponse, context);
+        var bundle = await ResourceMapper.Extract(
+            demoQuestionnaire,
+            demoQuestionnaireResponse,
+            context,
+            profileLoaderMock.Object
+        );
+
+        var r = bundle.Entry.FirstOrDefault()?.Resource;
+
+        Assert.True((r as Hl7.Fhir.Model.ServiceRequest).Extension.Count == 2);
 
         Console.WriteLine(bundle.ToJson(new FhirJsonSerializationSettings { Pretty = true }));
 

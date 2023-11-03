@@ -5,6 +5,19 @@ namespace BSC.Fhir.Mapping.Tests.Data;
 
 public partial class ServiceRequest
 {
+    private const string ITEM_EXTRACTION_CONTEXT_EXTENSION_URL =
+        "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-itemExtractionContext";
+    private const string ITEM_INITIAL_EXPRESSION =
+        "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-initialExpression";
+    private const string QUESTIONNAIRE_HIDDEN_URL = "http://hl7.org/fhir/StructureDefinition/questionnaire-hidden";
+    private const string ITEM_POPULATION_CONTEXT =
+        "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-itemPopulationContext";
+    private const string QUESTIONNAIRE_ITEM_CALCULATED_EXPRESSION =
+        "http://hl7.org/fhir/uv/sdc/StructureDefinition-sdc-questionnaire-calculatedExpression.html";
+    private const string VARIABLE_EXTENSION_URL = "http://hl7.org/fhir/StructureDefinition/variable";
+    private const string LAUNCH_CONTEXT_EXTENSION_URL =
+        "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-launchContext";
+
     public static Questionnaire CreateQuestionnaire()
     {
         var parser = new FhirJsonParser();
@@ -161,7 +174,145 @@ public partial class ServiceRequest
 """;
 
         var result = parser.Parse<Questionnaire>(json);
+        /* new()
+         {
+             Definition = "Composition.section.entry",
+             LinkId = "noteSection.entry",
+             Type = Questionnaire.QuestionnaireItemType.Reference,
+             Extension =
+                             {
+                                 new() { Url = QUESTIONNAIRE_HIDDEN_URL, Value = new FhirBoolean(true) },
+                                 new()
+                                 {
+                                     Url = QUESTIONNAIRE_ITEM_CALCULATED_EXPRESSION,
+                                     Value = new Expression
+                                     {
+                                         Language = "text/fhirpath",
+                                         Expression_ =
+                                             "%resource.item.where(linkId='noteDocumentReference').first().item.where(linkId='note.id').first().answer.value"
+                                     }
+                                 }
+                             }
+         }*/
+        /*result.Item.Add(
+            new()
+            {
+                LinkId = "extension",
+                Definition = "Servicerequest.extension",
+                Type = Questionnaire.QuestionnaireItemType.Group,
+                Extension =
+                {
+                    new() { Url = QUESTIONNAIRE_HIDDEN_URL, Value = new FhirBoolean(true) },
+                    new()
+                    {
+                        Url = ITEM_EXTRACTION_CONTEXT_EXTENSION_URL,
+                        Value = new Expression
+                        {
+                            Language = "text/fhirpath",
+                            Expression_ = "%servicerequest.extension.where(url='CareUnitExtension').first()"
+                        }
+                    }
+                },
+                Item =
+                {
+                    new()
+                    {
+                        LinkId = "extension.value",
+                        Definition = "Servicerequest.extension.value",
+                        Type = Questionnaire.QuestionnaireItemType.String,
+                        Extension =
+                        {
+                            new()
+                            {
+                                Url = ITEM_EXTRACTION_CONTEXT_EXTENSION_URL,
+                                Value = new Expression
+                                {
+                                    Language = "text/fhirpath",
+                                    Expression_ = "%servicerequest.extension.where(url='CareUnitExtension').first()"
+                                }
+                            }
+                        }
+                    },
+                    new()
+                    {
+                        LinkId = "extension.url",
+                        Definition = "Servicerequest.extension.url",
+                        Type = Questionnaire.QuestionnaireItemType.String,
+                        Initial = { new() { Value = new FhirString("CareUnitExtension") } },
+                        /*Extension =
+                        {
+                            new() { Url = QUESTIONNAIRE_HIDDEN_URL, Value = new FhirBoolean(true) },
+                            new()
+                            {
+                                Url = QUESTIONNAIRE_ITEM_CALCULATED_EXPRESSION,
+                                Value = new Expression
+                                {
+                                    Language = "text/fhirpath",
+                                    Expression_ = "%servicerequest.extension.url"
+                                }
+                            }
+                        }/
+                    }
+                }
+            }
+        );*/
 
+        result.Item.Add(
+            new()
+            {
+                LinkId = "extensionTeam",
+                Type = Questionnaire.QuestionnaireItemType.Group,
+                Definition = "ServiceRequest#servicerequest.extension:team",
+                Item =
+                {
+                    new()
+                    {
+                        Definition = "ServiceRequest.extension.url",
+                        LinkId = "extensionTeam.url",
+                        Type = Questionnaire.QuestionnaireItemType.Text,
+                        Initial = { new() { Value = new FhirString("TeamExtension") } }
+                    },
+                    new()
+                    {
+                        Definition = "ServiceRequest.extension.value",
+                        LinkId = "extensionTeam.value",
+                        Type = Questionnaire.QuestionnaireItemType.String,
+                        Extension =
+                        {
+                            new() { Url = QUESTIONNAIRE_HIDDEN_URL, Value = new FhirBoolean(true) },
+                        }
+                    }
+                },
+            }
+        );
+        result.Item.Add(
+            new()
+            {
+                LinkId = "extension",
+                Type = Questionnaire.QuestionnaireItemType.Group,
+                Definition = "ServiceRequest#servicerequest.extension:careUnit",
+                Item =
+                {
+                    new()
+                    {
+                        Definition = "ServiceRequest.extension.url",
+                        LinkId = "extension.url",
+                        Type = Questionnaire.QuestionnaireItemType.Text,
+                        Initial = { new() { Value = new FhirString("CareUnitExtension") } }
+                    },
+                    new()
+                    {
+                        Definition = "ServiceRequest.extension.value",
+                        LinkId = "extension.value",
+                        Type = Questionnaire.QuestionnaireItemType.Reference,
+                        Extension =
+                        {
+                            new() { Url = QUESTIONNAIRE_HIDDEN_URL, Value = new FhirBoolean(true) },
+                        }
+                    }
+                },
+            }
+        );
         return result;
     }
 }
