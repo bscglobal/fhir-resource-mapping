@@ -6,7 +6,7 @@ using Microsoft.Extensions.Logging;
 
 namespace BSC.Fhir.Mapping;
 
-public class Populator
+public class Populator : IPopulator
 {
     private readonly INumericIdProvider _idProvider;
     private readonly IResourceLoader _resourceLoader;
