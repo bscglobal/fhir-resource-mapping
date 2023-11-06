@@ -147,58 +147,6 @@ public class Extractor
         extractionResult.Add(context);
     }
 
-    // private async Task ExtractResourcesByDefinition(
-    //     IReadOnlyCollection<QuestionnaireResponse.ItemComponent> responseItems,
-    //     MappingContext ctx,
-    //     List<Resource> extractionResult,
-    //     IProfileLoader profileLoader,
-    //     CancellationToken cancellationToken = default
-    // )
-    // {
-    //     var contextResult = ctx.QuestionnaireItem.GetContext(ctx);
-    //
-    //     if (contextResult is null)
-    //     {
-    //         throw new InvalidOperationException("Unable to create a resource from questionnaire item");
-    //     }
-    //
-    //     var contexts = new List<Resource>();
-    //
-    //     foreach (var responseItem in responseItems)
-    //     {
-    //         ctx.SetQuestionnaireResponseItem(responseItem);
-    //
-    //         var contextResource = GetContextResource(contextResult.Resources, ctx) ?? contextResult.CreateNewResource();
-    //
-    //         if (contextResource is null)
-    //         {
-    //             Console.WriteLine(
-    //                 "Warning: could not find resource for context in QuestionnaireItem {0}. Skipping this QuestionnaireResponseItem",
-    //                 ctx.QuestionnaireItem.LinkId
-    //             );
-    //             continue;
-    //         }
-    //
-    //         ctx.SetCurrentExtractionContext(contextResource);
-    //
-    //         await ExtractByDefinition(
-    //             ctx.QuestionnaireItem.Item,
-    //             responseItem.Item,
-    //             ctx,
-    //             extractionResult,
-    //             profileLoader,
-    //             cancellationToken
-    //         );
-    //
-    //         ctx.PopCurrentExtractionContext();
-    //         ctx.PopQuestionnaireResponseItem();
-    //
-    //         contexts.Add(contextResource);
-    //     }
-    //
-    //     extractionResult.AddRange(contexts);
-    // }
-
     private Resource? GetContextResource(IReadOnlyCollection<Resource> resources, MappingContext ctx)
     {
         var keyExtension = ctx.QuestionnaireItem.GetExtension("extractionContextId");
