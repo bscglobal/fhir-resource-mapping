@@ -11,7 +11,7 @@ using Task = System.Threading.Tasks.Task;
 
 namespace BSC.Fhir.Mapping;
 
-public class Extractor
+public class Extractor : IExtractor
 {
     private readonly INumericIdProvider _idProvider;
     private readonly IResourceLoader _resourceLoader;
