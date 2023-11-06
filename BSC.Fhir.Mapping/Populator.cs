@@ -2,7 +2,6 @@ using BSC.Fhir.Mapping.Core;
 using BSC.Fhir.Mapping.Expressions;
 using BSC.Fhir.Mapping.Logging;
 using Hl7.Fhir.Model;
-using Hl7.Fhir.Serialization;
 using Microsoft.Extensions.Logging;
 
 namespace BSC.Fhir.Mapping;
@@ -158,6 +157,12 @@ public class Populator
                     };
                 }
             }
+        }
+        else if (scope.Item.Initial.Count > 0)
+        {
+            return scope.Item.Initial
+                .Select(initial => new QuestionnaireResponse.AnswerComponent() { Value = initial.Value })
+                .ToList();
         }
 
         return null;
