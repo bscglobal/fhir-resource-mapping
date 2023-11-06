@@ -698,7 +698,14 @@ public class Extractor
 
     private void SetFieldElementValue(Base baseResource, PropertyInfo field, DataType answerValue)
     {
-        field.SetValue(baseResource, answerValue);
+        if (field.PropertyType.Name == "String" && answerValue is FhirString)
+        {
+            field.SetValue(baseResource, answerValue.ToString());
+        }
+        else
+        {
+            field.SetValue(baseResource, answerValue);
+        }
     }
 
     private void AddAnswerToListField(
