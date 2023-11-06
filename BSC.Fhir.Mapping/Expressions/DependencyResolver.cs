@@ -85,8 +85,6 @@ public class DependencyResolver
 
         await ResolveDependenciesAsync(cancellationToken);
 
-        TreeDebugging.PrintTree(_scopeTree.CurrentScope);
-
         return _scopeTree.CurrentScope;
     }
 
@@ -98,7 +96,7 @@ public class DependencyResolver
         var sortedItems = items.OrderBy(item => item.LinkId);
         var sortedResponseItems = responseItems.OrderBy(responseItem => responseItem.LinkId);
         var responseItemQueue = new Queue<QuestionnaireResponse.ItemComponent>(sortedResponseItems);
-        foreach (var item in items)
+        foreach (var item in sortedItems)
         {
             var responseItemCount = 0;
             while (responseItemQueue.TryPeek(out var responseItem) && responseItem.LinkId == item.LinkId)
@@ -203,19 +201,19 @@ public class DependencyResolver
         if (extension.Value is not Expression expression)
         {
             var type = ModelInfo.GetFhirTypeNameForType(extension.Value.GetType());
-            // _logger.LogWarning(errorMessage($"Unexpected type {type}. Expected Expression"));
+            _logger.LogWarning(errorMessage($"Unexpected type {type}. Expected Expression"));
             return null;
         }
 
         if (!supportedLanguages.Contains(expression.Language))
         {
-            // _logger.LogWarning(errorMessage($"Unsupported expression language {expression.Language}"));
+            _logger.LogWarning(errorMessage($"Unsupported expression language {expression.Language}"));
             return null;
         }
 
         if (string.IsNullOrEmpty(expression.Expression_))
         {
-            // _logger.LogWarning(errorMessage("Empty expression"));
+            _logger.LogWarning(errorMessage("Empty expression"));
             return null;
         }
 
@@ -424,8 +422,6 @@ public class DependencyResolver
 
     private async Task<bool> ResolveDependenciesAsync(CancellationToken cancellationToken = default)
     {
-        // TreeDebugging.PrintTree(_scopeTree.CurrentScope);
-
         var runs = 0;
         var oldLength = 0;
         while (runs++ < 5)
@@ -502,8 +498,6 @@ public class DependencyResolver
                 return false;
             }
         }
-
-        // TreeDebugging.PrintTree(_scopeTree.CurrentScope);
 
         return true;
     }
@@ -788,7 +782,6 @@ public class DependencyResolver
             scope.Parent?.Children.RemoveAt(index.Value);
             scope.Parent?.Children.InsertRange(index.Value, newScopes);
         }
-        // TreeDebugging.PrintTree(scope.Parent!);
     }
 
     private void ReplaceDependencies(
@@ -838,8 +831,6 @@ public class DependencyResolver
 
         var resourceResult = await _resourceLoader.GetResourcesAsync(urls, cancellationToken);
 
-        // _logger.LogDebug($"Result length: {fhirQueryResult.Entry.Count}");
-
         foreach (var result in _queryResults)
         {
             HandleFhirQueryResult(result, unresolvedExpressions);
@@ -850,7 +841,6 @@ public class DependencyResolver
 
             HandleFhirQueryResult(result, unresolvedExpressions);
         }
-        // TreeDebugging.PrintTree(_scopeTree.CurrentScope);
         return false;
     }
 

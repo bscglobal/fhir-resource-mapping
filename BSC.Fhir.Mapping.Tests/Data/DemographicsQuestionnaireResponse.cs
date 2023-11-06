@@ -18,17 +18,14 @@ public partial class Demographics
                 {
                     LinkId = "patient.id",
                     Definition = "Patient.id",
-                    Answer = { new QuestionnaireResponse.AnswerComponent { Value = new FhirString(patientId) } }
+                    Answer = { new() { Value = new FhirString(patientId) } }
                 },
                 new()
                 {
                     LinkId = "patient.gender",
                     Answer =
                     {
-                        new QuestionnaireResponse.AnswerComponent
-                        {
-                            Value = new Coding("http://hl7.org/fhir/administrative-gender", "male", "Male")
-                        }
+                        new() { Value = new Coding("http://hl7.org/fhir/administrative-gender", "male", "Male") }
                     }
                 },
                 new()
