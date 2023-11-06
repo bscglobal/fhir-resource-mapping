@@ -16,19 +16,19 @@ public class Extractor
     private readonly INumericIdProvider _idProvider;
     private readonly IResourceLoader _resourceLoader;
     private readonly IProfileLoader _profileLoader;
-    private readonly ILogger<Extractor> _logger;
+    private readonly ILogger _logger;
 
     public Extractor(
         IResourceLoader resourceLoader,
         IProfileLoader profileLoader,
         INumericIdProvider? idProvider = null,
-        ILogger<Extractor>? logger = null
+        ILogger? logger = null
     )
     {
         _idProvider = idProvider ?? new NumericIdProvider();
         _resourceLoader = resourceLoader;
         _profileLoader = new CachingProfileLoader(profileLoader);
-        _logger = logger ?? FhirMappingLogging.GetLogger<Extractor>();
+        _logger = logger ?? FhirMappingLogging.GetLogger();
     }
 
     public async Task<Bundle> ExtractAsync(
