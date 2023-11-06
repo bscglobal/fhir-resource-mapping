@@ -1,10 +1,9 @@
 using BSC.Fhir.Mapping.Core;
 using BSC.Fhir.Mapping.Expressions;
-using BSC.Fhir.Mapping.Logging;
 using BSC.Fhir.Mapping.Tests.Data;
 using BSC.Fhir.Mapping.Tests.Mocks;
 using Hl7.Fhir.Model;
-using Hl7.Fhir.Serialization;
+using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit.Abstractions;
 using Task = System.Threading.Tasks.Task;
@@ -18,7 +17,6 @@ public class PopulatorTests
     public PopulatorTests(ITestOutputHelper output)
     {
         _output = output;
-        FhirMappingLogging.LoggerFactory = new TestLoggerFactory(output);
     }
 
     [Fact]
@@ -101,7 +99,11 @@ public class PopulatorTests
                 }
             );
 
-        var populator = new Populator(new NumericIdProvider(), resourceLoaderMock.Object);
+        var populator = new Populator(
+            new NumericIdProvider(),
+            resourceLoaderMock.Object,
+            new TestLogger<Populator>(_output)
+        );
 
         var response = await populator.Populate(
             demoQuestionnaire,
