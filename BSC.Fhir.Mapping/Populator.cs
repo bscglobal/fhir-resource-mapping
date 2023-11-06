@@ -19,9 +19,10 @@ public class Populator
         _logger = logger ?? FhirMappingLogging.GetLogger<Populator>();
     }
 
-    public async Task<QuestionnaireResponse> Populate(
+    public async Task<QuestionnaireResponse> PopulateAsync(
         Questionnaire questionnaire,
-        IDictionary<string, Resource> launchContext
+        IDictionary<string, Resource> launchContext,
+        CancellationToken cancellationToken = default
     )
     {
         _logger.LogDebug("Populating QuestionnaireResponse from Questionnaire ({Name})", questionnaire.Title);
@@ -35,7 +36,7 @@ public class Populator
             _resourceLoader,
             ResolvingContext.Population
         );
-        var rootScope = await resolver.ParseQuestionnaireAsync();
+        var rootScope = await resolver.ParseQuestionnaireAsync(cancellationToken);
 
         if (rootScope is null)
         {

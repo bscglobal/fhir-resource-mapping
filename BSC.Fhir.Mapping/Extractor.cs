@@ -31,7 +31,7 @@ public class Extractor
         _logger = logger ?? FhirMappingLogging.GetLogger<Extractor>();
     }
 
-    public async Task<Bundle> Extract(
+    public async Task<Bundle> ExtractAsync(
         Questionnaire questionnaire,
         QuestionnaireResponse questionnaireResponse,
         IDictionary<string, Resource> launchContext,
