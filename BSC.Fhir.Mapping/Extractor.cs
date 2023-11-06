@@ -124,7 +124,7 @@ public class Extractor
         }
         else
         {
-            Console.WriteLine("Error: Could not extract questionnaire item with LinkId {0}", scope.Item.LinkId);
+            _logger.LogError("Could not extract questionnaire item with LinkId {0}", scope.Item.LinkId);
         }
     }
 
@@ -154,8 +154,8 @@ public class Extractor
 
         if (keyExtension?.Value is not Expression idExpression)
         {
-            Console.WriteLine(
-                "Warning: could not find key on extractionContext for QuestionnaireItem {0}",
+            _logger.LogWarning(
+                "could not find key on extractionContext for QuestionnaireItem {0}",
                 ctx.QuestionnaireItem.LinkId
             );
             return null;
@@ -165,8 +165,8 @@ public class Extractor
         EvaluationResult? result = null;
         if (result is null || result.Result.Length == 0)
         {
-            Console.WriteLine(
-                "Warning: could not resolve expression {0} on QuestionnaireItem {1}",
+            _logger.LogWarning(
+                "could not resolve expression {0} on QuestionnaireItem {1}",
                 idExpression.Expression_,
                 ctx.QuestionnaireItem.LinkId
             );
@@ -175,8 +175,8 @@ public class Extractor
 
         if (result.Result.Length > 1)
         {
-            Console.WriteLine(
-                "Warning: key expression {0} resolved to more than one value for {1}",
+            _logger.LogWarning(
+                "key expression {0} resolved to more than one value for {1}",
                 idExpression.Expression_,
                 ctx.QuestionnaireItem.LinkId
             );
@@ -185,7 +185,7 @@ public class Extractor
 
         if (result.Result.First() is not FhirString str)
         {
-            Console.WriteLine("Warning: key does not resolve to string");
+            _logger.LogWarning("key does not resolve to string");
             return null;
         }
 
@@ -193,16 +193,16 @@ public class Extractor
 
         if (resource is null)
         {
-            Console.WriteLine(
-                "Debug: could not find extractionContext resource with key {0} for QuestionnaireItem {1}",
+            _logger.LogDebug(
+                "could not find extractionContext resource with key {0} for QuestionnaireItem {1}",
                 str.Value,
                 ctx.QuestionnaireItem.LinkId
             );
         }
         else
         {
-            Console.WriteLine(
-                "Debug: context resource found for LinkId {0}. Key: {1}",
+            _logger.LogDebug(
+                "context resource found for LinkId {0}. Key: {1}",
                 ctx.QuestionnaireItem.LinkId,
                 str.Value
             );
@@ -235,8 +235,8 @@ public class Extractor
 
         if (scope.ResponseItem.Item.Count == 0)
         {
-            Console.WriteLine(
-                "Debug: QuestionnaireResponseItem {0} has no child items. Skipping extraction of complex type...",
+            _logger.LogDebug(
+                "QuestionnaireResponseItem {0} has no child items. Skipping extraction of complex type...",
                 scope.Item.LinkId
             );
             return;
@@ -299,7 +299,7 @@ public class Extractor
 
                 if (val is not null && !extractionContext.DirtyFields.Contains(fieldInfo))
                 {
-                    Console.WriteLine("Debug: clearing list for field {0}", fieldInfo.Name);
+                    _logger.LogDebug("clearing list for field {0}", fieldInfo.Name);
                     val.Clear();
                 }
 
@@ -427,7 +427,7 @@ public class Extractor
         CancellationToken cancellationToken = default
     )
     {
-        Console.WriteLine("Debug: Checking slice for fieldName {0}", fieldName);
+        _logger.LogDebug("Checking slice for fieldName {0}", fieldName);
 
         var definition = item.Definition;
         var profileContext = await GetProfile(extractionContext, scope, cancellationToken);
@@ -459,8 +459,8 @@ public class Extractor
             }
             else
             {
-                Console.WriteLine(
-                    "Warning: slice '{0}' for field {1} is not defined in StructureDefinition for {2}, so field is ignored",
+                _logger.LogWarning(
+                    "slice '{0}' for field {1} is not defined in StructureDefinition for {2}, so field is ignored",
                     sliceName,
                     fieldName,
                     ModelInfo.GetFhirTypeNameForType(extractionContext.Value.GetType())
@@ -480,7 +480,7 @@ public class Extractor
     {
         if (extractionContext is null)
         {
-            Console.WriteLine("Error: CurrentContext is null");
+            _logger.LogError("CurrentContext is null");
             return;
         }
 
@@ -500,8 +500,8 @@ public class Extractor
         }
         else
         {
-            Console.WriteLine(
-                "Warning: extension for field {0} is not defined in StructureDefinition for {1}, so field is ignored",
+            _logger.LogWarning(
+                "extension for field {0} is not defined in StructureDefinition for {1}, so field is ignored",
                 fieldName,
                 ModelInfo.GetFhirTypeNameForType(extractionContext.Value.GetType())
             );
@@ -516,7 +516,7 @@ public class Extractor
     {
         if (scope.Item is null)
         {
-            Console.WriteLine("Error: Scope.Item is null");
+            _logger.LogError("Scope.Item is null");
             return null;
         }
 
@@ -524,7 +524,7 @@ public class Extractor
         var poundIndex = definition.LastIndexOf('#');
         if (poundIndex < 0)
         {
-            Console.WriteLine("Error: no pound sign in definition: [{0}]", definition);
+            _logger.LogError("no pound sign in definition: [{0}]", definition);
             return null;
         }
 
@@ -533,7 +533,7 @@ public class Extractor
 
         if (profile is null)
         {
-            Console.WriteLine("Error: could not find profile for url: {0}", canonicalUrl);
+            _logger.LogError("could not find profile for url: {0}", canonicalUrl);
             return null;
         }
 
@@ -553,7 +553,7 @@ public class Extractor
     {
         if (item.Repeats == true)
         {
-            Console.WriteLine("Error: QuestionnaireItem with slice definition should not repeat");
+            _logger.LogError("QuestionnaireItem with slice definition should not repeat");
             return;
         }
 
@@ -585,7 +585,7 @@ public class Extractor
 
             if (string.IsNullOrEmpty(currentSliceName))
             {
-                Console.WriteLine("Error: expected ElementDefinition with sliceName set");
+                _logger.LogError("expected ElementDefinition with sliceName set");
                 return;
             }
 
@@ -614,7 +614,7 @@ public class Extractor
 
         if (slice is null)
         {
-            Console.WriteLine("Error: could not find matching slice in profile");
+            _logger.LogError("Could not find matching slice in profile");
             return;
         }
 
@@ -622,7 +622,7 @@ public class Extractor
 
         if (value is null)
         {
-            Console.WriteLine("Error: could not construct type [{0}]", type);
+            _logger.LogError("could not construct type [{0}]", type);
             return;
         }
 

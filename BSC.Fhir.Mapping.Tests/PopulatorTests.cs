@@ -108,14 +108,6 @@ public class PopulatorTests
             new Dictionary<string, Resource> { { "patient", patient } }
         );
 
-        // Console.WriteLine();
-        // Console.WriteLine("=================");
-        // Console.WriteLine("Populate");
-        // Console.WriteLine("=================");
-        // Console.WriteLine();
-        //
-        Console.WriteLine(response.ToJson(new() { Pretty = true }));
-
         var actualPatientIdAnswer = response.Item
             .SingleOrDefault(item => item.LinkId == "patient.id")
             ?.Answer.FirstOrDefault()

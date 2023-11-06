@@ -24,12 +24,6 @@ public class ExtractorTests
     [Fact]
     public async Task Extract_GivesCorrectBundleForDemo()
     {
-        Console.WriteLine();
-        Console.WriteLine("=================");
-        Console.WriteLine("Extract");
-        Console.WriteLine("=================");
-        Console.WriteLine();
-
         var patientId = Guid.NewGuid().ToString();
         var relativeIds = (Guid.NewGuid().ToString(), Guid.NewGuid().ToString(), Guid.NewGuid().ToString());
         var demoQuestionnaire = Demographics.CreateQuestionnaire();
