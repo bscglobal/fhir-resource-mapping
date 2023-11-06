@@ -133,9 +133,16 @@ public class ExtractorTests
         var createdPatient = bundle.Entry.Select(e => e.Resource).OfType<Patient>().FirstOrDefault();
 
         createdPatient.Should().NotBeNull();
-        createdPatient!.Id.Should().Be(patient.Id);
-        createdPatient!.BirthDate.Should().Be(patient.BirthDate);
-        createdPatient!.Name.Should().BeEquivalentTo(expectedPatientNames);
+
+        if (createdPatient is null)
+        {
+            return;
+        }
+
+        createdPatient.Id.Should().Be(patient.Id);
+        createdPatient.BirthDate.Should().Be(patient.BirthDate);
+        createdPatient.Name.Should().BeEquivalentTo(expectedPatientNames);
+        createdPatient.Gender.Should().Be(AdministrativeGender.Male);
 
         var relatedPersons = bundle.Entry.Select(e => e.Resource).OfType<RelatedPerson>().ToArray();
 
