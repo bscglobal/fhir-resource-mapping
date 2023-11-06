@@ -2,7 +2,9 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using BSC.Fhir.Mapping.Core;
 using BSC.Fhir.Mapping.Core.Expressions;
+using BSC.Fhir.Mapping.Logging;
 using Hl7.Fhir.Model;
+using Microsoft.Extensions.Logging;
 
 namespace BSC.Fhir.Mapping.Expressions;
 
@@ -18,6 +20,7 @@ public class DependencyResolver
     private readonly ResolvingContext _resolvingContext;
     private readonly QuestionnaireContextType[] _notAllowedContextTypes;
     private readonly Dictionary<string, IReadOnlyCollection<Resource>> _queryResults = new();
+    private readonly ILogger<DependencyResolver> _logger;
 
     public DependencyResolver(
         INumericIdProvider idProvider,
@@ -40,6 +43,7 @@ public class DependencyResolver
             ResolvingContext.Extraction => Constants.POPULATION_ONLY_CONTEXTS,
             _ => Array.Empty<QuestionnaireContextType>()
         };
+        _logger = FhirMappingLogging.GetLogger<DependencyResolver>();
 
         AddLaunchContextToScope(launchContext);
     }
@@ -55,6 +59,7 @@ public class DependencyResolver
 
     public async Task<Scope?> ParseQuestionnaireAsync(CancellationToken cancellationToken = default)
     {
+        _logger.LogDebug("Parsing Questionnaire in ResolutionContext {Context}", _resolvingContext.ToString());
         var rootExtensions = _questionnaire.AllExtensions();
 
         ParseExtensions(rootExtensions.ToArray());
@@ -62,7 +67,7 @@ public class DependencyResolver
 
         if (_scopeTree.CurrentScope.Parent is not null)
         {
-            Console.WriteLine("Error: not in global scope");
+            _logger.LogError("not in global scope");
             return null;
         }
 
@@ -74,13 +79,13 @@ public class DependencyResolver
 
         if (IsCircularGraph(_scopeTree.CurrentScope) is IQuestionnaireExpression<BaseList> faultyDep)
         {
-            Console.WriteLine("Error: detected circular dependency {0}", faultyDep.Expression);
+            _logger.LogError("detected circular dependency {0}", faultyDep.Expression);
             return null;
         }
 
-        // TreeDebugging.PrintTree(_scopeTree.CurrentScope);
-
         await ResolveDependenciesAsync(cancellationToken);
+
+        TreeDebugging.PrintTree(_scopeTree.CurrentScope);
 
         return _scopeTree.CurrentScope;
     }
@@ -124,7 +129,7 @@ public class DependencyResolver
     {
         if (string.IsNullOrEmpty(item.LinkId))
         {
-            Console.WriteLine("Warning: Questionnaire item does not have LinkId, skipping...");
+            _logger.LogWarning("Questionnaire item does not have LinkId, skipping...");
             return;
         }
 
@@ -289,13 +294,13 @@ public class DependencyResolver
             var fhirpathExpression = match.Groups.Values.FirstOrDefault()?.Value;
             if (string.IsNullOrEmpty(fhirpathExpression))
             {
-                Console.WriteLine("Warning - Invalid embedded query {0}", match.Value);
+                _logger.LogWarning("Invalid embedded query {0}", match.Value);
                 continue;
             }
 
             fhirpathExpression = Regex.Replace(fhirpathExpression, "[{}]", "");
 
-            Console.WriteLine("Debug: Creating embedded expression {0}", fhirpathExpression);
+            _logger.LogDebug("Creating embedded expression {0}", fhirpathExpression);
             var embeddedQuery = CreateFhirPathExpression(
                 null,
                 fhirpathExpression,
@@ -336,8 +341,8 @@ public class DependencyResolver
             }
             else
             {
-                Console.WriteLine(
-                    "Error: Could not find dependency {0} in expression {1} for LinkId {2}",
+                _logger.LogError(
+                    "Could not find dependency {0} in expression {1} for LinkId {2}",
                     varName,
                     expression,
                     query.QuestionnaireItem?.LinkId ?? "root"
@@ -354,7 +359,7 @@ public class DependencyResolver
 
             if (result is null || result.Result.FirstOrDefault() is not Questionnaire.ItemComponent qItem)
             {
-                Console.WriteLine("Warning: could not resolve expression {0}", qItemExpr);
+                _logger.LogWarning("could not resolve expression {0}", qItemExpr);
             }
             else
             {
@@ -421,8 +426,9 @@ public class DependencyResolver
     {
         // TreeDebugging.PrintTree(_scopeTree.CurrentScope);
 
+        var runs = 0;
         var oldLength = 0;
-        while (true)
+        while (runs++ < 5)
         {
             var expressions = _scopeTree.CurrentScope
                 .AllContextInSubtree()
@@ -452,8 +458,8 @@ public class DependencyResolver
             }
 
             var resolvedFhirPaths = resolvableFhirpaths.Where(expr => expr.Resolved()).ToArray();
-            Console.WriteLine(
-                "Debug: Resolved {0}/{1} FHIRPath expressions",
+            _logger.LogDebug(
+                "Resolved {0}/{1} FHIRPath expressions",
                 resolvedFhirPaths.Length,
                 resolvableFhirpaths.Length
             );
@@ -478,7 +484,7 @@ public class DependencyResolver
                 )
                 .ToArray();
 
-            Console.WriteLine("Debug: There are {0} resolvable FHIR queries", resolvableFhirQueries.Length);
+            _logger.LogDebug("There are {0} resolvable FHIR queries", resolvableFhirQueries.Length);
 
             if (
                 resolvableFhirQueries.Length > 0
@@ -492,7 +498,7 @@ public class DependencyResolver
 
             if (resolvedFhirPaths.Length + resolvableFhirQueries.Length == 0)
             {
-                Console.WriteLine("Error: could not resolve all dependencies");
+                _logger.LogError("could not resolve all dependencies");
                 return false;
             }
         }
@@ -530,7 +536,7 @@ public class DependencyResolver
         return result;
     }
 
-    private static bool VisitExpr(
+    private bool VisitExpr(
         IQuestionnaireExpression<BaseList> expr,
         HashSet<IQuestionnaireExpression<BaseList>> orderedExprs,
         HashSet<IQuestionnaireExpression<BaseList>> visitedExprs,
@@ -544,7 +550,7 @@ public class DependencyResolver
 
         if (visitedExprs.Contains(expr))
         {
-            Console.WriteLine("Error: circular reference detected for expression {0}", expr.Expression);
+            _logger.LogError("circular reference detected for expression {0}", expr.Expression);
             return false;
         }
 
@@ -569,12 +575,12 @@ public class DependencyResolver
         var fhirpathQueries = unresolvedExpressions
             .Where(query => query.ExpressionLanguage == Constants.FHIRPATH_MIME && query.DependenciesResolved())
             .ToArray();
-        Console.WriteLine("Debug: Resolving {0} fhirpath expressions", fhirpathQueries.Length);
+        _logger.LogDebug("Resolving {0} fhirpath expressions", fhirpathQueries.Length);
 
         foreach (var query in fhirpathQueries)
         {
-            Console.WriteLine(
-                "Debug: Evaluating FHIRPath expression '{0}' ({1}). Type: {2}",
+            _logger.LogDebug(
+                "Evaluating FHIRPath expression '{0}' ({1}). Type: {2}",
                 query.Expression,
                 query.Name ?? "anonymous",
                 query.Type.ToString()
@@ -582,7 +588,7 @@ public class DependencyResolver
             var evalResult = FhirPathMapping.EvaluateExpr(query);
             if (evalResult is null)
             {
-                Console.WriteLine("Warning: Something went  wrong during evaluation for {0}", query.Expression);
+                _logger.LogWarning("Something went  wrong during evaluation for {0}", query.Expression);
                 query.SetValue(null);
                 continue;
             }
@@ -591,7 +597,7 @@ public class DependencyResolver
 
             if (fhirpathResult.Length == 0)
             {
-                Console.WriteLine("Warning: Found no results for {0}", query.Expression);
+                _logger.LogWarning("Found no results for {0}", query.Expression);
                 query.SetValue(null);
                 continue;
             }
@@ -601,10 +607,10 @@ public class DependencyResolver
             {
                 if (fhirpathResult.Length > 1)
                 {
-                    Console.WriteLine("Warning: Embedded {0} has more than one result", query.Expression);
+                    _logger.LogWarning("Embedded {0} has more than one result", query.Expression);
                     continue;
                 }
-                Console.WriteLine("Debug - replacing embedded fhirpath query {0} with result", fhirpathResult.First());
+                _logger.LogDebug("Replacing embedded fhirpath query {0} with result", fhirpathResult.First());
                 query.SetValue(fhirpathResult);
 
                 var fhirqueryDependants = query.Dependants
@@ -614,7 +620,6 @@ public class DependencyResolver
                 var escapedQuery = Regex.Escape(query.Expression);
                 foreach (var dep in fhirqueryDependants)
                 {
-                    Console.WriteLine(fhirpathResult.First().ToString());
                     dep.ReplaceExpression(
                         Regex.Replace(
                             dep.Expression,
@@ -641,14 +646,17 @@ public class DependencyResolver
         Base? sourceResource = null
     )
     {
+        _logger.LogDebug("Exploding expression {Expression}", originalExprs.First().Expression);
+
         if (scope.Item is null)
         {
-            Console.WriteLine("Error: cannot explode expression on root");
+            _logger.LogError("Cannot explode expression on root");
             return;
         }
 
         if (scope.Context.Any(ctx => ctx.Type == QuestionnaireContextType.ExtractionContextId))
         {
+            _logger.LogDebug("Extraction Context Id");
             var resources = results.OfType<Resource>();
             var existingScopes = _scopeTree.CurrentScope.GetChildScope(
                 child => child.Item is not null && child.Item.LinkId == scope.Item.LinkId
@@ -663,10 +671,7 @@ public class DependencyResolver
 
                 if (extractionIdExpr is null)
                 {
-                    Console.WriteLine(
-                        "Warning: could not find key on extractionContext for QuestionnaireItem {0}",
-                        linkId
-                    );
+                    _logger.LogWarning("could not find key on extractionContext for QuestionnaireItem {0}", linkId);
                     continue;
                 }
 
@@ -676,51 +681,56 @@ public class DependencyResolver
 
                 if (extractionExpr is null)
                 {
-                    Console.WriteLine("Warning: could not find extractionContext for QuestionnaireItem {0}", linkId);
+                    _logger.LogWarning("could not find extractionContext for QuestionnaireItem {0}", linkId);
                     continue;
                 }
 
                 var result = FhirPathMapping.EvaluateExpr(extractionIdExpr);
+                Resource? resource = null;
                 if (result is null || result.Result.Length == 0)
                 {
-                    Console.WriteLine(
-                        "Warning: could not resolve expression {0} on QuestionnaireItem {1}",
+                    _logger.LogWarning(
+                        "Could not resolve expression {0} on QuestionnaireItem {1}",
                         extractionIdExpr.Expression,
                         linkId
                     );
-                    continue;
-                }
-
-                if (result.Result.Length > 1)
-                {
-                    Console.WriteLine(
-                        "Warning: key expression {0} resolved to more than one value for {1}",
-                        extractionIdExpr.Expression,
-                        linkId
-                    );
-                    continue;
-                }
-
-                if (result.Result.First() is not FhirString str)
-                {
-                    Console.WriteLine("Warning: key does not resolve to string");
-                    continue;
-                }
-
-                var resource = resources.FirstOrDefault(resource => resource.Id == str.Value);
-
-                if (resource is null)
-                {
-                    Console.WriteLine(
-                        "Debug: could not find extractionContext resource with key {0} for QuestionnaireItem {1}. Expected Type: {2}",
-                        str.Value,
-                        linkId
-                    );
-                    extractionExpr.SetValue(null);
                 }
                 else
                 {
-                    Console.WriteLine("Debug: context resource found for LinkId {0}. Key: {1}", linkId, str.Value);
+                    if (result.Result.Length > 1)
+                    {
+                        _logger.LogWarning(
+                            "Key expression {0} resolved to more than one value for {1}",
+                            extractionIdExpr.Expression,
+                            linkId
+                        );
+                        continue;
+                    }
+
+                    if (result.Result.First() is not FhirString str)
+                    {
+                        _logger.LogWarning("key does not resolve to string");
+                        continue;
+                    }
+
+                    resource = resources.FirstOrDefault(resource => resource.Id == str.Value);
+                }
+
+                if (resource is null)
+                {
+                    var fhirTypeName = extractionExpr.Expression.Split('?').FirstOrDefault();
+                    if (
+                        !string.IsNullOrEmpty(fhirTypeName)
+                        && ModelInfo.GetTypeForFhirType(fhirTypeName) is Type fhirType
+                    )
+                    {
+                        _logger.LogDebug("Creating new Resource {Name}", fhirTypeName);
+                        resource = Activator.CreateInstance(fhirType) as Resource;
+                    }
+                }
+
+                if (resource is not null)
+                {
                     extractionExpr.SetValue(new[] { resource });
                 }
             }
@@ -732,8 +742,8 @@ public class DependencyResolver
                 {
                     var newScope = scope.Clone();
 
-                    Console.WriteLine(
-                        "Debug: Exploding expression {0} for answer {1}",
+                    _logger.LogDebug(
+                        "Exploding expression {0} for answer {1}",
                         originalExprs.First().Expression,
                         result
                     );
@@ -769,8 +779,8 @@ public class DependencyResolver
 
             if (!index.HasValue)
             {
-                Console.WriteLine(
-                    "Error: Scope of exploding expression {0} does not have a parent",
+                _logger.LogError(
+                    "Scope of exploding expression {0} does not have a parent",
                     originalExprs.First().Expression
                 );
                 return;
@@ -809,8 +819,8 @@ public class DependencyResolver
         CancellationToken cancellationToken = default
     )
     {
-        Console.WriteLine(
-            "Debug: Resolving Fhir Queries - {0}",
+        _logger.LogDebug(
+            "Resolving Fhir Queries - {0}",
             JsonSerializer.Serialize(
                 unresolvedExpressions.Select(expr => expr.Expression),
                 new JsonSerializerOptions() { WriteIndented = true }
@@ -823,11 +833,8 @@ public class DependencyResolver
             .Where(url => !_queryResults.ContainsKey(url))
             .ToArray();
 
-        Console.WriteLine("Debug: Executing {0} Fhir Queries", urls.Length);
-        Console.WriteLine(
-            "Debug: {0}",
-            JsonSerializer.Serialize(urls, new JsonSerializerOptions() { WriteIndented = true })
-        );
+        _logger.LogDebug("Executing {0} Fhir Queries", urls.Length);
+        _logger.LogDebug("{0}", JsonSerializer.Serialize(urls, new JsonSerializerOptions() { WriteIndented = true }));
 
         var resourceResult = await _resourceLoader.GetResourcesAsync(urls, cancellationToken);
 
@@ -853,15 +860,15 @@ public class DependencyResolver
     )
     {
         var exprs = unresolvedExpressions.Where(expr => expr.Expression == result.Key).ToArray();
-        Console.WriteLine("Debug: Found result for query {0}. Expressions: {1}", result.Key, exprs.Length);
+        _logger.LogDebug("Found result for query {0}. Expressions: {1}", result.Key, exprs.Length);
 
         if (result.Value.Count > 1)
         {
             var scopeExprs = exprs.GroupBy(expr => expr.Scope);
-            Console.WriteLine("Debug: Scope Groups = {0}", scopeExprs.Count());
+            _logger.LogDebug("Scope Groups = {0}", scopeExprs.Count());
 
             var scope = scopeExprs.First();
-            Console.WriteLine("Debug: Scope Group Exprs = {0}", scope.Count());
+            _logger.LogDebug("Scope Group Exprs = {0}", scope.Count());
             ExplodeExpression(result.Value, scope.ToArray(), scope.Key);
             return true;
         }

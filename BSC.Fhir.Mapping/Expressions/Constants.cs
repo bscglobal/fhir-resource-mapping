@@ -16,7 +16,7 @@ public static class Constants
     public const string CALCULATED_EXPRESSION =
         "http://hl7.org/fhir/uv/sdc/StructureDefinition-sdc-questionnaire-calculatedExpression.html";
     public const string HIDDEN = "http://hl7.org/fhir/StructureDefinition/questionnaire-hidden";
-    public const string EXTRACTION_CONTEXT_ID = "extractionId";
+    public const string EXTRACTION_CONTEXT_ID = "extractionContextId";
 
     public const string FHIR_QUERY_MIME = "application/x-fhir-query";
     public const string FHIRPATH_MIME = "text/fhirpath";

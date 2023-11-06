@@ -1,8 +1,11 @@
 using System.Collections;
 using System.Reflection;
 using BSC.Fhir.Mapping.Core;
+using BSC.Fhir.Mapping.Core.Expressions;
 using BSC.Fhir.Mapping.Expressions;
+using BSC.Fhir.Mapping.Logging;
 using Hl7.Fhir.Model;
+using Microsoft.Extensions.Logging;
 using Task = System.Threading.Tasks.Task;
 
 namespace BSC.Fhir.Mapping;
@@ -12,6 +15,7 @@ public class Extractor
     private readonly INumericIdProvider _idProvider;
     private readonly IResourceLoader _resourceLoader;
     private readonly IProfileLoader _profileLoader;
+    private readonly ILogger<Extractor> _logger;
 
     public Extractor(
         IResourceLoader resourceLoader,
@@ -22,6 +26,7 @@ public class Extractor
         _idProvider = idProvider ?? new NumericIdProvider();
         _resourceLoader = resourceLoader;
         _profileLoader = new CachingProfileLoader(profileLoader);
+        _logger = FhirMappingLogging.GetLogger<Extractor>();
     }
 
     public async Task<Bundle> Extract(
@@ -55,7 +60,7 @@ public class Extractor
         var rootResource = scope.ExtractionContext()?.Value?.FirstOrDefault() as Resource;
         var extractedResources = new List<Resource>();
 
-        await ExtractByDefinition(scope, extractedResources, cancellationToken);
+        await ExtractByDefinition(scope.Children, extractedResources, cancellationToken);
 
         if (rootResource is not null)
         {
@@ -99,7 +104,11 @@ public class Extractor
 
         if (scope.Item.Type == Questionnaire.QuestionnaireItemType.Group)
         {
-            if (scope.Item.Definition is not null)
+            if (scope.Context.Any(ctx => ctx.Type == QuestionnaireContextType.ExtractionContext))
+            {
+                await ExtractResourceByDefinition(scope, extractionResult, cancellationToken);
+            }
+            else if (scope.Item.Definition is not null)
             {
                 await ExtractComplexTypeValueByDefinition(scope, extractionResult, cancellationToken);
             }
@@ -118,34 +127,25 @@ public class Extractor
         }
     }
 
-    // private async Task ExtractResourceByDefinition(
-    //     MappingContext ctx,
-    //     List<Resource> extractionResult,
-    //     IProfileLoader profileLoader,
-    //     CancellationToken cancellationToken = default
-    // )
-    // {
-    //     var contextResult = ctx.QuestionnaireItem.GetContext(ctx);
-    //     var context = contextResult?.Resources.FirstOrDefault() ?? contextResult?.CreateNewResource();
-    //
-    //     if (context is null)
-    //     {
-    //         throw new InvalidOperationException("Unable to create a resource from questionnaire item");
-    //     }
-    //
-    //     ctx.SetCurrentExtractionContext(context);
-    //     await ExtractByDefinition(
-    //         ctx.QuestionnaireItem.Item,
-    //         ctx.QuestionnaireResponseItem.Item,
-    //         ctx,
-    //         extractionResult,
-    //         profileLoader,
-    //         cancellationToken
-    //     );
-    //
-    //     extractionResult.Add(context);
-    //     ctx.PopCurrentExtractionContext();
-    // }
+    private async Task ExtractResourceByDefinition(
+        Scope scope,
+        List<Resource> extractionResult,
+        CancellationToken cancellationToken = default
+    )
+    {
+        var context = scope.ExtractionContextValue()?.Value as Resource;
+
+        if (context is null)
+        {
+            throw new InvalidOperationException("Unable to create a resource from questionnaire item");
+        }
+
+        _logger.LogDebug("Extracting Resource {FhirType}", ModelInfo.GetFhirTypeNameForType(context.GetType()));
+
+        await ExtractByDefinition(scope.Children, extractionResult, cancellationToken);
+
+        extractionResult.Add(context);
+    }
 
     // private async Task ExtractResourcesByDefinition(
     //     IReadOnlyCollection<QuestionnaireResponse.ItemComponent> responseItems,
@@ -278,7 +278,7 @@ public class Extractor
             throw new InvalidOperationException($"QuestionnaireResponse Item is null at LinkId {scope.Item.LinkId}");
         }
 
-        var extractionContext = scope.ExtractionContextValue();
+        var extractionContext = scope.Parent?.ExtractionContextValue();
         if (extractionContext is null)
         {
             throw new InvalidOperationException("Scope.ExtractionContext is null");
@@ -293,14 +293,18 @@ public class Extractor
             return;
         }
 
-        var fieldName = FieldNameByDefinition(scope.Item.Definition);
-        var fieldInfo = extractionContext.Value.GetType().GetProperty(fieldName);
-
         var definition = scope.Item.Definition;
+        var fieldInfo = GetField(extractionContext.Value, definition);
+
         if (fieldInfo is null)
         {
+            _logger.LogDebug(
+                "Could not find field on ExtractionContext for definition {Definition}. Checking if Extension is defined",
+                definition
+            );
+
             await UseSliceFromProfile(
-                fieldName,
+                scope.Item.Definition.Split('.').Last(),
                 extractionContext,
                 scope.Item,
                 extractionResult,
@@ -334,9 +338,10 @@ public class Extractor
                 fieldInfo.SetValue(extractionContext.Value, value);
             }
 
+            scope.DefinitionResolution = value;
             extractionContext.DirtyFields.Add(fieldInfo);
 
-            await ExtractByDefinition(scope, extractionResult, cancellationToken);
+            await ExtractByDefinition(scope.Children, extractionResult, cancellationToken);
         }
     }
 
@@ -352,10 +357,17 @@ public class Extractor
             throw new InvalidOperationException($"QuestionnaireResponse Item is null at LinkId {scope.Item.LinkId}");
         }
 
-        if (!(scope.ExtractionContextValue() is ExtractionContext extractionContext))
+        if (!(scope.Parent?.ExtractionContextValue() is ExtractionContext extractionContext))
         {
             throw new InvalidOperationException($"ExtractionContext at LinkId {scope.Item?.LinkId ?? "root"} is null");
         }
+
+        _logger.LogDebug(
+            "Extracting primitive value for Defintion {Definition}. LinkId {LinkId}. Extraction Context: {ContextType}",
+            scope.Item.Definition,
+            scope.Item.LinkId,
+            ModelInfo.GetFhirTypeNameForType(extractionContext.Value.GetType())
+        );
 
         var calculatedValue =
             scope.Context.FirstOrDefault(
@@ -363,8 +375,8 @@ public class Extractor
             ) as FhirPathExpression;
         if (calculatedValue is not null && scope.ResponseItem.Answer.Count > 0)
         {
-            Console.WriteLine(
-                "Error: both calculated value and answer exist on QuestionnaireResponse item {0}",
+            _logger.LogError(
+                "Both calculated value and answer exist on QuestionnaireResponse item {0}",
                 scope.Item?.LinkId
             );
 
@@ -373,22 +385,13 @@ public class Extractor
 
         if (scope.ResponseItem.Answer.Count == 0 && calculatedValue?.Value?.Count is 0 or null)
         {
-            Console.WriteLine("Warning: no answer or calculated value for {0}", scope.Item.LinkId);
+            _logger.LogWarning("No answer or calculated value for {0}", scope.Item.LinkId);
             return;
         }
 
         var definition = scope.Item.Definition;
 
-        var fieldName = FieldNameByDefinition(definition, true);
-
-        var contextType = extractionContext.GetType();
-        var field = contextType.GetProperty(fieldName);
-
-        if (field is null)
-        {
-            fieldName = FieldNameByDefinition(definition, false);
-            field = contextType.GetProperty(fieldName);
-        }
+        var field = GetField(extractionContext.Value, definition);
 
         if (field is not null)
         {
@@ -428,8 +431,13 @@ public class Extractor
             return;
         }
 
+        _logger.LogDebug(
+            "Could not find field on ExtractionContext for definition {Definition}. Checking if Extension is defined",
+            definition
+        );
+
         await UseExtensionFromProfile(
-            fieldName,
+            definition.Split('.').Last(),
             extractionContext,
             scope.Item,
             scope.ResponseItem,
@@ -588,13 +596,10 @@ public class Extractor
 
         var discriminators = elementEnumerator.Current.Slicing!.Discriminator;
 
-        var fieldName = FieldNameByDefinition(baseType);
-        var contextType = extractionContext.Value.GetType();
-        var fieldInfo = contextType.GetProperty(fieldName);
+        var fieldInfo = GetField(extractionContext.Value, baseType);
 
         if (fieldInfo is null)
         {
-            Console.WriteLine("Could not find property {0} on {1}", fieldName, contextType.ToString());
             return;
         }
 
@@ -620,8 +625,7 @@ public class Extractor
             while (elementEnumerator.MoveNext() && string.IsNullOrEmpty(elementEnumerator.Current.SliceName))
             {
                 var current = elementEnumerator.Current;
-                var fixedFieldName = FieldNameByDefinition(current.Path);
-                var propInfo = type.GetProperty(fixedFieldName);
+                var propInfo = GetField(extractionContext.Value, current.Path);
                 if (propInfo is not null)
                 {
                     if (current.Fixed is not null)
@@ -701,6 +705,12 @@ public class Extractor
         Scope scope
     )
     {
+        _logger.LogDebug(
+            "Updating field {FieldName} of type {FieldType} with answer of type {AnswerType}",
+            field.Name,
+            field.PropertyType,
+            answers.GetType().NonParameterizedType()
+        );
         var fieldType = field.PropertyType;
         var answersOfFieldType = answers.Select(ans => WrapAnswerInFieldType(ans, fieldType)).ToArray();
 
@@ -796,22 +806,40 @@ public class Extractor
         return answer;
     }
 
-    private string FieldNameByDefinition(string definition, bool isElement = false)
+    private PropertyInfo? GetField(Base fieldOf, string definition)
     {
-        var last = definition.Substring(definition.LastIndexOf('.') + 1);
+        var baseType = fieldOf.GetType();
 
-        if (string.IsNullOrEmpty(last))
+        var propName = definition.Split('.').Last();
+        propName = propName[0..1].ToUpper() + propName[1..];
+
+        var fhirTypeName = ModelInfo.GetFhirTypeNameForType(baseType);
+        _logger.LogDebug("Getting field for definition {Definition} on type {Type}", definition, fhirTypeName);
+
+        Type fieldType = baseType;
+
+        var elementPropName = propName + "Element";
+        var propInfo = fieldType.GetProperty(elementPropName);
+
+        if (propInfo is null)
         {
-            throw new InvalidOperationException($"Invalid field definition: {definition}");
+            propInfo = fieldType.GetProperty(propName);
+        }
+        else
+        {
+            propName = elementPropName;
         }
 
-        last = last[0..1].ToUpper() + last[1..];
-        if (isElement)
+        if (propInfo is null)
         {
-            last += "Element";
+            _logger.LogDebug("Could not find property {PropName} on {Type}", propName, fieldType);
+        }
+        else
+        {
+            _logger.LogDebug("Found property {PropName} on {Type}", propName, fieldType);
         }
 
-        return last;
+        return propInfo;
     }
 
     private bool IsExtensionSupportedByProfile(StructureDefinition profile, string extensionForType, string fieldName)
