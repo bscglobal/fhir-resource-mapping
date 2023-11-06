@@ -10,4 +10,9 @@ public static class FhirMappingLogging
     {
         return LoggerFactory.CreateLogger<T>();
     }
+
+    public static ILogger GetLogger(string? categoryName = null)
+    {
+        return LoggerFactory.CreateLogger(categoryName ?? "FhirMapping");
+    }
 }

@@ -4,7 +4,6 @@ using BSC.Fhir.Mapping.Tests.Mocks;
 using FluentAssertions;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
-using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit.Abstractions;
 using Task = System.Threading.Tasks.Task;

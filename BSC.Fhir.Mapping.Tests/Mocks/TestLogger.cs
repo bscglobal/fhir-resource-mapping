@@ -13,10 +13,7 @@ public class TestLogger : ILogger
 {
     public class Scope : IDisposable
     {
-        public void Dispose()
-        {
-            throw new NotImplementedException();
-        }
+        public void Dispose() { }
     }
 
     private readonly ITestOutputHelper _output;

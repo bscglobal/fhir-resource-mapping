@@ -10,13 +10,13 @@ public class Populator
 {
     private readonly INumericIdProvider _idProvider;
     private readonly IResourceLoader _resourceLoader;
-    private readonly ILogger<Populator> _logger;
+    private readonly ILogger _logger;
 
-    public Populator(INumericIdProvider idProvider, IResourceLoader resourceLoader, ILogger<Populator>? logger = null)
+    public Populator(INumericIdProvider idProvider, IResourceLoader resourceLoader, ILogger? logger = null)
     {
         _idProvider = idProvider;
         _resourceLoader = resourceLoader;
-        _logger = logger ?? FhirMappingLogging.GetLogger<Populator>();
+        _logger = logger ?? FhirMappingLogging.GetLogger();
     }
 
     public async Task<QuestionnaireResponse> PopulateAsync(
@@ -34,7 +34,8 @@ public class Populator
             response,
             launchContext,
             _resourceLoader,
-            ResolvingContext.Population
+            ResolvingContext.Population,
+            _logger
         );
         var rootScope = await resolver.ParseQuestionnaireAsync(cancellationToken);
 

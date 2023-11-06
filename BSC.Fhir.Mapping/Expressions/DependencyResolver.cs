@@ -20,7 +20,7 @@ public class DependencyResolver
     private readonly ResolvingContext _resolvingContext;
     private readonly QuestionnaireContextType[] _notAllowedContextTypes;
     private readonly Dictionary<string, IReadOnlyCollection<Resource>> _queryResults = new();
-    private readonly ILogger<DependencyResolver> _logger;
+    private readonly ILogger _logger;
 
     public DependencyResolver(
         INumericIdProvider idProvider,
@@ -28,7 +28,8 @@ public class DependencyResolver
         QuestionnaireResponse? questionnaireResponse,
         IDictionary<string, Resource> launchContext,
         IResourceLoader resourceLoader,
-        ResolvingContext resolvingContext
+        ResolvingContext resolvingContext,
+        ILogger? logger = null
     )
     {
         _questionnaire = questionnaire;
@@ -43,7 +44,7 @@ public class DependencyResolver
             ResolvingContext.Extraction => Constants.POPULATION_ONLY_CONTEXTS,
             _ => Array.Empty<QuestionnaireContextType>()
         };
-        _logger = FhirMappingLogging.GetLogger<DependencyResolver>();
+        _logger = logger ?? FhirMappingLogging.GetLogger();
 
         AddLaunchContextToScope(launchContext);
     }
