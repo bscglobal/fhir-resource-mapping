@@ -61,7 +61,7 @@ public class Populator
     {
         if (scope.Item is null)
         {
-            Console.WriteLine("Error: Scope QuestionnaireItem is null on level {0}", scope.Level);
+            _logger.LogError("Scope QuestionnaireItem is null on level {0}", scope.Level);
             return;
         }
 
@@ -80,7 +80,7 @@ public class Populator
     {
         if (scope.Item is null)
         {
-            Console.WriteLine("Error: Scope QuestionnaireItem is null on level {0}", scope.Level);
+            _logger.LogError("Scope QuestionnaireItem is null on level {0}", scope.Level);
             return null;
         }
 
@@ -103,7 +103,7 @@ public class Populator
         {
             if (initialExpression.Value is null)
             {
-                Console.WriteLine("Could not find a value for {0}", initialExpression.Expression);
+                _logger.LogDebug("Could not find a value for {0}", initialExpression.Expression);
             }
             else
             {
@@ -130,8 +130,8 @@ public class Populator
                 }
                 else if (initialExpression.Value.Count > 1)
                 {
-                    Console.WriteLine(
-                        "Warning: expression {0} resolved to more than one answer. LinkId: {1}",
+                    _logger.LogWarning(
+                        "expression {0} resolved to more than one answer. LinkId: {1}",
                         initialExpression.Expression,
                         scope.Item.LinkId
                     );
