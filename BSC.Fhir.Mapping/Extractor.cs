@@ -5,6 +5,7 @@ using BSC.Fhir.Mapping.Core.Expressions;
 using BSC.Fhir.Mapping.Expressions;
 using BSC.Fhir.Mapping.Logging;
 using Hl7.Fhir.Model;
+using Hl7.Fhir.Validation;
 using Microsoft.Extensions.Logging;
 using Task = System.Threading.Tasks.Task;
 
@@ -263,6 +264,29 @@ public class Extractor
         else
         {
             var type = fieldInfo.NonParameterizedType();
+
+            if (type == typeof(Hl7.Fhir.Model.DataType))
+            {
+                var allowedTypes = fieldInfo.GetCustomAttribute<AllowedTypesAttribute>()?.Types;
+                if (allowedTypes is not null)
+                {
+                    var specifiedType = scope.Item.GetExtension("FhirType").Value.ToString();
+                    type = allowedTypes.FirstOrDefault(type => type.Name == specifiedType);
+                    if (type is null)
+                    {
+                        throw new InvalidOperationException(
+                            $"Error: type sepcified in extension is {specifiedType}, which does not match any AllowedTypesAttribute defined for {fieldInfo.Name}"
+                        );
+                    }
+                }
+                else
+                {
+                    throw new InvalidOperationException(
+                        $"Error: no AllowedTypesAttribute defined for {fieldInfo.Name}"
+                    );
+                }
+            }
+
             var value = Activator.CreateInstance(type) as Base;
             if (value is null)
             {
