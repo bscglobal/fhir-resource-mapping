@@ -1,7 +1,9 @@
 using System.Text.Json;
 using BSC.Fhir.Mapping.Core;
 using BSC.Fhir.Mapping.Expressions;
+using BSC.Fhir.Mapping.Logging;
 using BSC.Fhir.Mapping.Tests.Data;
+using BSC.Fhir.Mapping.Tests.Mocks;
 using FluentAssertions;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
@@ -18,6 +20,7 @@ public class DependencyResolverTests
     public DependencyResolverTests(ITestOutputHelper output)
     {
         _output = output;
+        FhirMappingLogging.LoggerFactory = new TestLoggerFactory(output);
     }
 
     [Fact]
@@ -26,7 +29,7 @@ public class DependencyResolverTests
         var idProvider = new NumericIdProvider();
         var questionnaire = Demographics.CreateQuestionnaire();
         var patientId = Guid.NewGuid().ToString();
-        var relativeIds = new[] { Guid.NewGuid().ToString(), Guid.NewGuid().ToString() };
+        var relativeIds = (Guid.NewGuid().ToString(), Guid.NewGuid().ToString(), Guid.NewGuid().ToString());
         var demoQuestionnaire = Demographics.CreateQuestionnaire();
         var demoQuestionnaireResponse = Demographics.CreateQuestionnaireResponse(patientId, relativeIds);
         var familyName = "Smith";
@@ -40,19 +43,39 @@ public class DependencyResolverTests
                 new() { Family = familyName, Given = new[] { "Elisabeth", "Charlotte" } }
             }
         };
-        var relatives = relativeIds.Select(
-            id =>
-                new RelatedPerson
+        var relatives = new[]
+        {
+            new RelatedPerson
+            {
+                Id = relativeIds.Item1,
+                Patient = new ResourceReference($"Patient/{patientId}"),
+                BirthDate = "1964-06-01",
+                Name =
                 {
-                    Id = id,
-                    Patient = new ResourceReference($"Patient/{patientId}"),
-                    BirthDate = "1964-06-01",
-                    Name =
-                    {
-                        new() { Family = "Paul", Given = new[] { "Annabel" } }
-                    }
+                    new() { Family = "Paul", Given = new[] { "Annabel" } }
                 }
-        );
+            },
+            new RelatedPerson
+            {
+                Id = relativeIds.Item2,
+                Patient = new ResourceReference($"Patient/{patientId}"),
+                BirthDate = "1972-02-28",
+                Name =
+                {
+                    new() { Family = "Rutherford", Given = new[] { "Annette" } }
+                }
+            },
+            new RelatedPerson
+            {
+                Id = relativeIds.Item2,
+                Patient = new ResourceReference($"Patient/{patientId}"),
+                BirthDate = "1992-10-11",
+                Name =
+                {
+                    new() { Family = "Wesley", Given = new[] { "Schuster" } }
+                }
+            },
+        };
         var resourceLoader = ResourceLoaderMock(
             new()
             {

@@ -263,7 +263,14 @@ public partial class Demographics
                             "language": "text/fhirpath",
                             "expression": "%relatedPerson.patient"
                           }
-                        }
+                        },
+                        {
+                          "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition-sdc-questionnaire-calculatedExpression.html",
+                          "valueExpression": {
+                            "language": "text/fhirpath",
+                            "expression": "%patient.id"
+                          }
+                        },
                       ],
                       "linkId": "relative.patient",
                       "definition": "RelatedPerson.patient",

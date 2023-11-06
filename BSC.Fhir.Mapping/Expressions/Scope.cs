@@ -16,6 +16,7 @@ public class Scope : IClonable<Scope>
     public List<IQuestionnaireContext<BaseList>> Context { get; private init; } = new();
     public Scope? Parent { get; private init; }
     public List<Scope> Children { get; private init; } = new();
+    public Base? DefinitionResolution { get; set; }
 
     public Scope? ClonedFrom { get; private init; }
 
@@ -171,13 +172,24 @@ public class Scope : IClonable<Scope>
             return _extractionContext;
         }
 
-        var context = ExtractionContext();
-
-        _extractionContextSearched = true;
-
-        if (context?.Resolved() == true)
+        if (DefinitionResolution is not null)
         {
-            _extractionContext = new ExtractionContext(context.Value!.First());
+            _extractionContext = new ExtractionContext(DefinitionResolution);
+        }
+        else if (!_extractionContextSearched)
+        {
+            var context = Context.FirstOrDefault(ctx => ctx.Type == QuestionnaireContextType.ExtractionContext);
+            _extractionContextSearched = true;
+
+            if (context is not null && context.Resolved())
+            {
+                _extractionContext = new(context.Value!.First());
+            }
+        }
+
+        if (_extractionContext is null)
+        {
+            _extractionContext = Parent?._extractionContext;
         }
 
         return _extractionContext;

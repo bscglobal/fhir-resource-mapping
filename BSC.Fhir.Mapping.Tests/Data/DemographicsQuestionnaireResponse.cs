@@ -4,7 +4,10 @@ namespace BSC.Fhir.Mapping.Tests.Data;
 
 public partial class Demographics
 {
-    public static QuestionnaireResponse CreateQuestionnaireResponse(string patientId, string[] relativeIds)
+    public static QuestionnaireResponse CreateQuestionnaireResponse(
+        string patientId,
+        (string, string, string) relativeIds
+    )
     {
         var response = new QuestionnaireResponse
         {
@@ -80,12 +83,7 @@ public partial class Demographics
                         }
                     }
                 },
-            }
-        };
-
-        var relatives = relativeIds.Select(
-            id =>
-                new QuestionnaireResponse.ItemComponent
+                new()
                 {
                     LinkId = "relative",
                     Item =
@@ -95,7 +93,7 @@ public partial class Demographics
                             LinkId = "relative.id",
                             Definition = "RelatedPerson.id",
                             Text = "(internal use)",
-                            Answer = { new() { Value = new FhirString(id) } }
+                            Answer = { new() { Value = new FhirString(relativeIds.Item1) } }
                         },
                         new()
                         {
@@ -125,10 +123,94 @@ public partial class Demographics
                             }
                         }
                     }
-                }
-        );
-
-        response.Item.AddRange(relatives);
+                },
+                new()
+                {
+                    LinkId = "relative",
+                    Item =
+                    {
+                        new()
+                        {
+                            LinkId = "relative.id",
+                            Definition = "RelatedPerson.id",
+                            Text = "(internal use)",
+                            Answer = { new() { Value = new FhirString(relativeIds.Item2) } }
+                        },
+                        new()
+                        {
+                            LinkId = "relative.name",
+                            Definition = "RelatedPerson.name",
+                            Text = "Name(s)",
+                            Item =
+                            {
+                                new()
+                                {
+                                    LinkId = "relative.name.family",
+                                    Definition = "RelatedPerson.name.family",
+                                    Text = "Family name",
+                                    Answer = { new() { Value = new FhirString("Terry") } }
+                                },
+                                new()
+                                {
+                                    LinkId = "relative.name.given",
+                                    Definition = "RelatedPerson.name.given",
+                                    Text = "Given name(s)",
+                                    Answer =
+                                    {
+                                        new() { Value = new FhirString("Heidi") },
+                                        new() { Value = new FhirString("Stacey") }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                new()
+                {
+                    LinkId = "relative",
+                    Item =
+                    {
+                        new()
+                        {
+                            LinkId = "relative.id",
+                            Definition = "RelatedPerson.id",
+                            Text = "(internal use)",
+                            Answer = { new() { Value = new FhirString(relativeIds.Item3) } }
+                        }
+                    }
+                },
+                new()
+                {
+                    LinkId = "relative",
+                    Item =
+                    {
+                        new()
+                        {
+                            LinkId = "relative.name",
+                            Definition = "RelatedPerson.name",
+                            Text = "Name(s)",
+                            Item =
+                            {
+                                new()
+                                {
+                                    LinkId = "relative.name.family",
+                                    Definition = "RelatedPerson.name.family",
+                                    Text = "Family name",
+                                    Answer = { new() { Value = new FhirString("Green") } }
+                                },
+                                new()
+                                {
+                                    LinkId = "relative.name.given",
+                                    Definition = "RelatedPerson.name.given",
+                                    Text = "Given name(s)",
+                                    Answer = { new() { Value = new FhirString("Hugh") }, }
+                                }
+                            }
+                        }
+                    }
+                },
+            }
+        };
 
         return response;
     }
