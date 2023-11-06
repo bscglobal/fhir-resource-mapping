@@ -1,10 +1,10 @@
 using BSC.Fhir.Mapping.Core;
-using BSC.Fhir.Mapping.Logging;
 using BSC.Fhir.Mapping.Tests.Data;
 using BSC.Fhir.Mapping.Tests.Mocks;
 using FluentAssertions;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
+using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit.Abstractions;
 using Task = System.Threading.Tasks.Task;
@@ -18,7 +18,6 @@ public class ExtractorTests
     public ExtractorTests(ITestOutputHelper output)
     {
         _output = output;
-        FhirMappingLogging.LoggerFactory = new TestLoggerFactory(output);
     }
 
     [Fact]
@@ -115,7 +114,11 @@ public class ExtractorTests
             },
         };
 
-        var extractor = new Extractor(resourceLoaderMock.Object, profileLoaderMock.Object);
+        var extractor = new Extractor(
+            resourceLoaderMock.Object,
+            profileLoaderMock.Object,
+            logger: new TestLogger<Extractor>(_output)
+        );
         var bundle = await extractor.Extract(
             demoQuestionnaire,
             demoQuestionnaireResponse,

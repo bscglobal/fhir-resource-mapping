@@ -21,13 +21,14 @@ public class Extractor
     public Extractor(
         IResourceLoader resourceLoader,
         IProfileLoader profileLoader,
-        INumericIdProvider? idProvider = null
+        INumericIdProvider? idProvider = null,
+        ILogger<Extractor>? logger = null
     )
     {
         _idProvider = idProvider ?? new NumericIdProvider();
         _resourceLoader = resourceLoader;
         _profileLoader = new CachingProfileLoader(profileLoader);
-        _logger = FhirMappingLogging.GetLogger<Extractor>();
+        _logger = logger ?? FhirMappingLogging.GetLogger<Extractor>();
     }
 
     public async Task<Bundle> Extract(

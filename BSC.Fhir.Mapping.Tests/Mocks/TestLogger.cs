@@ -3,6 +3,12 @@ using Xunit.Abstractions;
 
 namespace BSC.Fhir.Mapping.Tests.Mocks;
 
+public class TestLogger<T> : TestLogger, ILogger<T>
+{
+    public TestLogger(ITestOutputHelper output)
+        : base(output) { }
+}
+
 public class TestLogger : ILogger
 {
     public class Scope : IDisposable

@@ -12,11 +12,11 @@ public class Populator
     private readonly IResourceLoader _resourceLoader;
     private readonly ILogger<Populator> _logger;
 
-    public Populator(INumericIdProvider idProvider, IResourceLoader resourceLoader)
+    public Populator(INumericIdProvider idProvider, IResourceLoader resourceLoader, ILogger<Populator>? logger = null)
     {
         _idProvider = idProvider;
         _resourceLoader = resourceLoader;
-        _logger = FhirMappingLogging.GetLogger<Populator>();
+        _logger = logger ?? FhirMappingLogging.GetLogger<Populator>();
     }
 
     public async Task<QuestionnaireResponse> Populate(
