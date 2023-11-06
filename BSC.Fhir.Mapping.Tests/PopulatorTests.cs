@@ -105,7 +105,7 @@ public class PopulatorTests
             new TestLogger<Populator>(_output)
         );
 
-        var response = await populator.Populate(
+        var response = await populator.PopulateAsync(
             demoQuestionnaire,
             new Dictionary<string, Resource> { { "patient", patient } }
         );

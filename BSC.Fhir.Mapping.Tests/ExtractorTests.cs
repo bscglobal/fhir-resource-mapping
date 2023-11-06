@@ -119,7 +119,7 @@ public class ExtractorTests
             profileLoaderMock.Object,
             logger: new TestLogger<Extractor>(_output)
         );
-        var bundle = await extractor.Extract(
+        var bundle = await extractor.ExtractAsync(
             demoQuestionnaire,
             demoQuestionnaireResponse,
             new Dictionary<string, Resource> { { "patient", patient } }
