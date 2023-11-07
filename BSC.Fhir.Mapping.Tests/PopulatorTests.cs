@@ -3,7 +3,6 @@ using BSC.Fhir.Mapping.Expressions;
 using BSC.Fhir.Mapping.Tests.Data;
 using BSC.Fhir.Mapping.Tests.Mocks;
 using Hl7.Fhir.Model;
-using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit.Abstractions;
 using Task = System.Threading.Tasks.Task;

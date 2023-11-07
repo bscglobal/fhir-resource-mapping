@@ -1,12 +1,9 @@
-using System.Text.Json;
 using BSC.Fhir.Mapping.Core;
 using BSC.Fhir.Mapping.Expressions;
-using BSC.Fhir.Mapping.Logging;
 using BSC.Fhir.Mapping.Tests.Data;
 using BSC.Fhir.Mapping.Tests.Mocks;
 using FluentAssertions;
 using Hl7.Fhir.Model;
-using Hl7.Fhir.Serialization;
 using Moq;
 using Xunit.Abstractions;
 using Task = System.Threading.Tasks.Task;
@@ -20,7 +17,6 @@ public class DependencyResolverTests
     public DependencyResolverTests(ITestOutputHelper output)
     {
         _output = output;
-        FhirMappingLogging.LoggerFactory = new TestLoggerFactory(output);
     }
 
     [Fact]
@@ -100,11 +96,10 @@ public class DependencyResolverTests
             questionnaireResponse,
             launchContext,
             resourceLoader.Object,
-            ResolvingContext.Population
+            ResolvingContext.Population,
+            new TestLogger(_output)
         );
         await resolver.ParseQuestionnaireAsync();
-
-        // Console.WriteLine(questionnaireResponse.ToJson(new() { Pretty = true }));
     }
 
     private Mock<IResourceLoader> ResourceLoaderMock(Dictionary<string, IReadOnlyCollection<Resource>> results)
