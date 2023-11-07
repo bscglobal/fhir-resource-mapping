@@ -2,7 +2,7 @@ using Hl7.Fhir.Model;
 
 namespace BSC.Fhir.Mapping.Tests.Data;
 
-public partial class ServiceRequest
+public partial class TestServiceRequest
 {
     public static QuestionnaireResponse CreateQuestionnaireResponse(string patientId, string servreqId)
     {
@@ -18,21 +18,13 @@ public partial class ServiceRequest
                     {
                         new()
                         {
-                            LinkId = "extension.url",
+                            LinkId = "extension.value",
                             Answer =
                             {
                                 new QuestionnaireResponse.AnswerComponent
                                 {
-                                    Value = new FhirString("CareUnitExtension")
+                                    Value = new FhirString("this is a care unit")
                                 }
-                            }
-                        },
-                        new()
-                        {
-                            LinkId = "extension.value",
-                            Answer =
-                            {
-                                new QuestionnaireResponse.AnswerComponent { Value = new FhirString("extensionText") }
                             }
                         }
                     }
@@ -42,14 +34,6 @@ public partial class ServiceRequest
                     LinkId = "extensionTeam",
                     Item =
                     {
-                        new()
-                        {
-                            LinkId = "extensionTeam.url",
-                            Answer =
-                            {
-                                new QuestionnaireResponse.AnswerComponent { Value = new FhirString("TeamExtension") }
-                            }
-                        },
                         new()
                         {
                             LinkId = "extensionTeam.value",
