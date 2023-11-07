@@ -580,7 +580,12 @@ public class Extractor : IExtractor
 
         SliceDefinition? slice = null;
 
-        while (elementEnumerator.MoveNext() && elementEnumerator.Current.Path.StartsWith(baseType))
+        elementEnumerator.MoveNext();
+        while (
+            elementEnumerator.Current is not null
+            && elementEnumerator.Current.Path.StartsWith(baseType)
+            && slice is null
+        )
         {
             var currentSliceName = elementEnumerator.Current.SliceName;
 
@@ -598,9 +603,10 @@ public class Extractor : IExtractor
             while (elementEnumerator.MoveNext() && string.IsNullOrEmpty(elementEnumerator.Current.SliceName))
             {
                 var current = elementEnumerator.Current;
-                var propInfo = GetField(extractionContext.Value, current.Path);
+                var propInfo = GetField(type, current.Path);
                 if (propInfo is not null)
                 {
+                    _logger.LogDebug("Found slice propInfo {Type} for path {Path}", propInfo.Name, current.Path);
                     if (current.Fixed is not null)
                     {
                         slice?.Fixed.Add(new SliceDefinition.SliceFilter(propInfo, current.Fixed));
@@ -629,7 +635,7 @@ public class Extractor : IExtractor
 
         foreach (var fixedVal in slice.Fixed)
         {
-            fixedVal.PropertyInfo.SetValue(value, fixedVal.Value);
+            SetFieldElementValue(value, fixedVal.PropertyInfo, fixedVal.Value);
         }
 
         if (fieldInfo.IsNonStringEnumerable())
@@ -648,6 +654,7 @@ public class Extractor : IExtractor
 
         extractionContext.DirtyFields.Add(fieldInfo);
 
+        scope.DefinitionResolution = value;
         await ExtractByDefinition(scope.Children, extractionResult, cancellationToken);
     }
 
@@ -797,14 +804,18 @@ public class Extractor : IExtractor
     private PropertyInfo? GetField(Base fieldOf, string definition)
     {
         var baseType = fieldOf.GetType();
+        return GetField(baseType, definition);
+    }
 
+    private PropertyInfo? GetField(Type fieldOfType, string definition)
+    {
         var propName = definition.Split('.').Last();
         propName = propName[0..1].ToUpper() + propName[1..];
 
-        var fhirTypeName = ModelInfo.GetFhirTypeNameForType(baseType);
+        var fhirTypeName = ModelInfo.GetFhirTypeNameForType(fieldOfType);
         _logger.LogDebug("Getting field for definition {Definition} on type {Type}", definition, fhirTypeName);
 
-        Type fieldType = baseType;
+        Type fieldType = fieldOfType;
 
         var elementPropName = propName + "Element";
         var propInfo = fieldType.GetProperty(elementPropName);
