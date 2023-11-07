@@ -95,7 +95,9 @@ public class DependencyResolver
     )
     {
         var sortedItems = items.OrderBy(item => item.LinkId);
-        var sortedResponseItems = responseItems.OrderBy(responseItem => responseItem.LinkId);
+        var sortedResponseItems = responseItems
+            .Where(responseItem => sortedItems.Any(item => item.LinkId == responseItem.LinkId))
+            .OrderBy(responseItem => responseItem.LinkId);
         var responseItemQueue = new Queue<QuestionnaireResponse.ItemComponent>(sortedResponseItems);
         foreach (var item in sortedItems)
         {
