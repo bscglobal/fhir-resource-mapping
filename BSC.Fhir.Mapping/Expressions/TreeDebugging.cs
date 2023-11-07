@@ -43,22 +43,36 @@ internal static class TreeDebugging
         {
             Console.WriteLine(prefix + "│");
             Console.WriteLine(prefix + (hasChildren ? "├─ " : "└─ ") + "Context");
+
+            for (var i = 0; i < scope.Context.Count; i++)
+            {
+                var context = scope.Context[i];
+
+                var lastContext = i == scope.Context.Count - 1;
+                PrintContext(
+                    context,
+                    prefix + (hasChildren ? "│     " : "      "),
+                    lastContext ? "└─ " : "├─ ",
+                    true,
+                    !lastContext,
+                    printDeps
+                );
+            }
         }
 
-        for (var i = 0; i < scope.Context.Count; i++)
-        {
-            var context = scope.Context[i];
-
-            var lastContext = i == scope.Context.Count - 1;
-            PrintContext(
-                context,
-                prefix + (hasChildren ? "│     " : "      "),
-                lastContext ? "└─ " : "├─ ",
-                true,
-                !lastContext,
-                printDeps
-            );
-        }
+        Console.WriteLine(prefix + "│");
+        Console.WriteLine(prefix + (hasChildren ? "├─ " : "└─ ") + "ResponseItem Answer");
+        var childPrefix = prefix + (hasChildren ? "│     " : "      ");
+        Console.WriteLine(childPrefix + "│");
+        Console.WriteLine(
+            childPrefix
+                + "└─ "
+                + (
+                    scope.ResponseItem is not null && scope.ResponseItem.Answer.Count > 0
+                        ? JsonSerializer.Serialize(scope.ResponseItem.Answer)
+                        : "Nope"
+                )
+        );
 
         if (hasChildren)
         {
