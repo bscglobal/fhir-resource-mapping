@@ -124,7 +124,7 @@ public class ExtractorTests
             new Dictionary<string, Resource> { { "patient", patient } }
         );
 
-        _output.WriteLine(bundle.ToJson(new() { Pretty = true }));
+        // _output.WriteLine(bundle.ToJson(new() { Pretty = true }));
 
         var createdPatient = bundle.Entry.Select(e => e.Resource).OfType<Patient>().FirstOrDefault();
 
@@ -163,5 +163,75 @@ public class ExtractorTests
         relatedPersons[3].Name.Should().BeEquivalentTo(expectedRelativeNames[3]);
         relatedPersons[3].Patient.Should().BeEquivalentTo(new ResourceReference($"Patient/{patientId}"));
         relatedPersons[3].BirthDate.Should().BeNullOrEmpty();
+    }
+
+    [Fact]
+    public async Task Extract_GivesCorrectBundleForSR()
+    {
+        var patientId = Guid.NewGuid().ToString();
+        var srID = Guid.NewGuid().ToString();
+        var srQuestionnaire = TestServiceRequest.CreateQuestionnaire();
+        var srQuestionnaireResponse = TestServiceRequest.CreateQuestionnaireResponse(patientId, srID);
+
+        var serviceRequest = new ServiceRequest()
+        {
+            Id = srID,
+            Subject = new ResourceReference($"Patient/{patientId}"),
+            Occurrence = new Period() { Start = "2021-01-01T00:00:00Z" }
+        };
+
+        var profileLoaderMock = new Mock<IProfileLoader>();
+        profileLoaderMock
+            .Setup(x => x.LoadProfileAsync(It.IsAny<Canonical>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(TestServiceRequest.CreateProfile());
+
+        var context = new MappingContext(srQuestionnaire, srQuestionnaireResponse);
+        var resourceLoaderMock = new Mock<IResourceLoader>();
+        resourceLoaderMock
+            .Setup(
+                mock => mock.GetResourcesAsync(It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>())
+            )
+            .ReturnsAsync(
+                new Dictionary<string, IReadOnlyCollection<Resource>>
+                {
+                    { $"ServiceRequest?_id={serviceRequest.Id}", new[] { serviceRequest } }
+                }
+            );
+
+        var extractor = new Extractor(
+            resourceLoaderMock.Object,
+            profileLoaderMock.Object,
+            logger: new TestLogger<Extractor>(_output)
+        );
+        var bundle = await extractor.ExtractAsync(
+            srQuestionnaire,
+            srQuestionnaireResponse,
+            new Dictionary<string, Resource>
+            {
+                {
+                    "user",
+                    new Practitioner { Id = Guid.NewGuid().ToString() }
+                },
+                {
+                    "serviceRequest",
+                    new ServiceRequest { Id = serviceRequest.Id }
+                }
+            }
+        );
+
+        var extractedServiceRequest = bundle.Entry.FirstOrDefault()?.Resource as ServiceRequest;
+
+        Assert.NotNull(extractedServiceRequest);
+        extractedServiceRequest.Extension.Should().HaveCount(2);
+
+        extractedServiceRequest.Extension
+            .Should()
+            .BeEquivalentTo(
+                new[]
+                {
+                    new Extension { Url = "CareUnitExtension", Value = new FhirString("this is a care unit") },
+                    new Extension { Url = "TeamExtension", Value = new FhirString("extension-team-Text") },
+                }
+            );
     }
 }

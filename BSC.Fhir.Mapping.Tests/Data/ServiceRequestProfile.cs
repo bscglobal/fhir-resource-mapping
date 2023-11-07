@@ -2,7 +2,7 @@ using Hl7.Fhir.Model;
 
 namespace BSC.Fhir.Mapping.Tests.Data;
 
-public partial class ServiceRequest
+public partial class TestServiceRequest
 {
     public static StructureDefinition CreateProfile()
     {
