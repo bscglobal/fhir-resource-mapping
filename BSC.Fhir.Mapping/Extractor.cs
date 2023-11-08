@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Reflection;
+using System.Text.Json;
 using BSC.Fhir.Mapping.Core;
 using BSC.Fhir.Mapping.Core.Expressions;
 using BSC.Fhir.Mapping.Expressions;
@@ -44,7 +45,8 @@ public class Extractor : IExtractor
             questionnaireResponse,
             launchContext,
             _resourceLoader,
-            ResolvingContext.Extraction
+            ResolvingContext.Extraction,
+            _logger
         );
 
         var rootScope = await resolver.ParseQuestionnaireAsync(cancellationToken);
@@ -377,7 +379,7 @@ public class Extractor : IExtractor
                 var propertyType = field.PropertyType.NonParameterizedType();
                 IEnumerable<DataType> answers;
 
-                if (calculatedValue?.Value is null || calculatedValue?.SourceResource is null)
+                if (calculatedValue?.Value is null)
                 {
                     answers = scope.ResponseItem.Answer.Select(ans => ans.Value);
                 }
@@ -385,7 +387,10 @@ public class Extractor : IExtractor
                 {
                     var calculatedValues = calculatedValue.Value.OfType<DataType>();
 
-                    if (field.PropertyType.NonParameterizedType() == typeof(ResourceReference))
+                    if (
+                        field.PropertyType.NonParameterizedType() == typeof(ResourceReference)
+                        && calculatedValue.SourceResource is not null
+                    )
                     {
                         var sourceType = calculatedValue.SourceResource.GetType();
                         answers = calculatedValues.Select(value => CreateResourceReference(value, sourceType));

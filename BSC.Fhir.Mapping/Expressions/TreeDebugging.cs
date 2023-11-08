@@ -42,21 +42,14 @@ internal static class TreeDebugging
         if (scope.Context.Count > 0)
         {
             Console.WriteLine(prefix + "│");
-            Console.WriteLine(prefix + (hasChildren ? "├─ " : "└─ ") + "Context");
+            Console.WriteLine(prefix + "├─ Context");
 
             for (var i = 0; i < scope.Context.Count; i++)
             {
                 var context = scope.Context[i];
 
                 var lastContext = i == scope.Context.Count - 1;
-                PrintContext(
-                    context,
-                    prefix + (hasChildren ? "│     " : "      "),
-                    lastContext ? "└─ " : "├─ ",
-                    true,
-                    !lastContext,
-                    printDeps
-                );
+                PrintContext(context, prefix + "│     ", lastContext ? "└─ " : "├─ ", true, !lastContext, printDeps);
             }
         }
 

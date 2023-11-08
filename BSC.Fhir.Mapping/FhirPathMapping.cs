@@ -5,12 +5,14 @@ using Hl7.Fhir.ElementModel;
 using Hl7.Fhir.FhirPath;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
+using Hl7.FhirPath;
+using Hl7.FhirPath.Expressions;
 
 namespace BSC.Fhir.Mapping;
 
 using BaseList = IReadOnlyCollection<Base>;
 
-public record EvaluationResult(Base SourceResource, Base[] Result, string? Name);
+public record EvaluationResult(Base[] Result, Base? SourceResource, string? Name);
 
 public static class FhirPathMapping
 {
@@ -29,24 +31,28 @@ public static class FhirPathMapping
     public static EvaluationResult? EvaluateExpr(FhirPathExpression expr, string? expressionName = null)
     {
         var evaluationCtx = GetEvaluationContext(expr);
-        if (evaluationCtx?.Resource is null)
+        if (evaluationCtx is null)
         {
             return null;
         }
 
         try
         {
-            var result = FhirPathExtensions
+            var compiler = new FhirPathCompiler(new SymbolTable().AddStandardFP().AddFhirExtensions());
+            var cache = new FhirPathCompilerCache(compiler);
+            var element = evaluationCtx.Resource?.ToTypedElement() ?? ElementNode.ForPrimitive(true);
+            var result = cache
                 .Select(
-                    evaluationCtx.Resource,
+                    element,
                     evaluationCtx.Expression,
-                    new FhirEvaluationContext(
-                        ElementNodeExtensions.ToScopedNode(evaluationCtx.Resource.ToTypedElement())
-                    )
+                    evaluationCtx.Resource is not null
+                        ? new FhirEvaluationContext(ElementNodeExtensions.ToScopedNode(element))
+                        : null
                 )
+                .ToFhirValues()
                 .ToArray();
 
-            return new EvaluationResult(evaluationCtx.Resource, result, expressionName);
+            return new EvaluationResult(result, evaluationCtx.Resource, expressionName);
         }
         catch (Exception e)
         {
@@ -123,6 +129,7 @@ public static class FhirPathMapping
         else
         {
             Console.WriteLine("Error: Could not find evaluation context for expression {0}", expr);
+            evaluationCtx = new(expr.Expression);
         }
 
         return evaluationCtx;

@@ -48,7 +48,7 @@ public partial class GeneralNote
                             }
                         }
                     },
-                    new() { Path = "composition.extension", ElementId = ":ExtraField" }
+                    new() { Path = "composition.extension", ElementId = ":extraField" }
                 }
             }
         };

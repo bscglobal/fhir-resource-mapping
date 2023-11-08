@@ -1,3 +1,4 @@
+using System.Text.Json;
 using BSC.Fhir.Mapping.Core;
 using BSC.Fhir.Mapping.Tests.Data;
 using BSC.Fhir.Mapping.Tests.Mocks;
@@ -185,7 +186,6 @@ public class ExtractorTests
             .Setup(x => x.LoadProfileAsync(It.IsAny<Canonical>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(TestServiceRequest.CreateProfile());
 
-        var context = new MappingContext(srQuestionnaire, srQuestionnaireResponse);
         var resourceLoaderMock = new Mock<IResourceLoader>();
         resourceLoaderMock
             .Setup(
@@ -233,5 +233,78 @@ public class ExtractorTests
                     new Extension { Url = "TeamExtension", Value = new FhirString("extension-team-Text") },
                 }
             );
+    }
+
+    [Fact]
+    public async Task Extract_GivesCorrectBundleForGeneralNote()
+    {
+        var composition = new Composition { Id = Guid.NewGuid().ToString() };
+        var questionnaire = GeneralNote.CreateQuestionnaire();
+        var response = GeneralNote.CreateQuestionnaireResponse(composition.Id);
+        var profileLoaderMock = new Mock<IProfileLoader>();
+        profileLoaderMock
+            .Setup(x => x.LoadProfileAsync(It.IsAny<Canonical>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(GeneralNote.CreateProfile());
+
+        var resourceLoaderMock = new Mock<IResourceLoader>();
+        resourceLoaderMock
+            .Setup(
+                mock => mock.GetResourcesAsync(It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>())
+            )
+            .ReturnsAsync(
+                new Dictionary<string, IReadOnlyCollection<Resource>>
+                {
+                    { $"Composition?_id={composition.Id}", new[] { composition } }
+                }
+            );
+
+        var extractor = new Extractor(
+            resourceLoaderMock.Object,
+            profileLoaderMock.Object,
+            logger: new TestLogger<Extractor>(_output)
+        );
+        var bundle = await extractor.ExtractAsync(
+            questionnaire,
+            response,
+            new Dictionary<string, Resource>
+            {
+                {
+                    "user",
+                    new Practitioner { Id = Guid.NewGuid().ToString() }
+                },
+                {
+                    "patient",
+                    new Patient { Id = Guid.NewGuid().ToString() }
+                },
+                {
+                    "composition",
+                    new Composition { Id = composition.Id }
+                }
+            }
+        );
+
+        var extractedResources = bundle.Entry.Select(e => e.Resource);
+        var now = DateTime.Now;
+        var actualComposition = extractedResources.OfType<Composition>().FirstOrDefault();
+        Assert.NotNull(actualComposition);
+
+        actualComposition.Id.Should().Be(composition.Id);
+        actualComposition.Date.Should().NotBeNull();
+        DateTime.Parse(actualComposition.Date).Should().BeBefore(now).And.BeAfter(now.Subtract(new TimeSpan(0, 0, 1)));
+
+        actualComposition.Event.Should().HaveCount(1);
+        var actualEvent = actualComposition.Event.First();
+        actualEvent.Period.Start.Should().Be("2023-10-29");
+        actualEvent.Period.End.Should().Be("2023-10-29");
+
+        actualComposition.Type.Coding.Should().HaveCount(1);
+        actualComposition.Type.Coding
+            .First()
+            .Should()
+            .BeEquivalentTo(new Coding { System = "ProcedureCode", Code = "DEF002" });
+
+        var actualExtensions = actualComposition.AllExtensions();
+        actualExtensions.Should().HaveCount(1);
+        actualExtensions.First().Value.Should().BeEquivalentTo(new FhirString("extension test"));
     }
 }
