@@ -88,6 +88,7 @@ public partial class GeneralNote
                     Url = ITEM_EXTRACTION_CONTEXT_EXTENSION_URL,
                     Value = new Expression
                     {
+                        Name = "extractionComposition",
                         Language = "application/x-fhir-query",
                         Expression_ = "Composition?_id={{%composition.id}}"
                     }
@@ -260,42 +261,42 @@ public partial class GeneralNote
                         new() { Url = "answerSetCodeSearch", Value = new FhirString("ProcedureCode") }
                     }
                 },
-                // new()
-                // {
-                //     LinkId = "noteSection",
-                //     Type = Questionnaire.QuestionnaireItemType.Group,
-                //     Definition = "Composition#composition.section:note",
-                //     Item =
-                //     {
-                //         new()
-                //         {
-                //             Definition = "Composition.section.title",
-                //             LinkId = "noteSection.title",
-                //             Type = Questionnaire.QuestionnaireItemType.Text,
-                //             Initial = { new() { Value = new FhirString("Note") } }
-                //         },
-                //         new()
-                //         {
-                //             Definition = "Composition.section.entry",
-                //             LinkId = "noteSection.entry",
-                //             Type = Questionnaire.QuestionnaireItemType.Reference,
-                //             Extension =
-                //             {
-                //                 new() { Url = QUESTIONNAIRE_HIDDEN_URL, Value = new FhirBoolean(true) },
-                //                 new()
-                //                 {
-                //                     Url = QUESTIONNAIRE_ITEM_CALCULATED_EXPRESSION,
-                //                     Value = new Expression
-                //                     {
-                //                         Language = "text/fhirpath",
-                //                         Expression_ =
-                //                             "%resource.item.where(linkId='noteDocumentReference').first().item.where(linkId='note.id').first()"
-                //                     }
-                //                 }
-                //             }
-                //         }
-                //     },
-                // },
+                new()
+                {
+                    LinkId = "noteSection",
+                    Type = Questionnaire.QuestionnaireItemType.Group,
+                    Definition = "Composition#composition.section:note",
+                    Item =
+                    {
+                        new()
+                        {
+                            Definition = "Composition.section.title",
+                            LinkId = "noteSection.title",
+                            Type = Questionnaire.QuestionnaireItemType.Text,
+                            Initial = { new() { Value = new FhirString("Note") } }
+                        },
+                        new()
+                        {
+                            Definition = "Composition.section.entry",
+                            LinkId = "noteSection.entry",
+                            Type = Questionnaire.QuestionnaireItemType.Reference,
+                            Extension =
+                            {
+                                new() { Url = QUESTIONNAIRE_HIDDEN_URL, Value = new FhirBoolean(true) },
+                                new()
+                                {
+                                    Url = QUESTIONNAIRE_ITEM_CALCULATED_EXPRESSION,
+                                    Value = new Expression
+                                    {
+                                        Language = "text/fhirpath",
+                                        Expression_ =
+                                            "%resource.item.where(linkId='noteDocumentReference').first().item.where(linkId='note.id').first()"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                },
                 // new()
                 // {
                 //     LinkId = "imageSection",
@@ -339,160 +340,239 @@ public partial class GeneralNote
                     Definition = "Composition#composition.extraField",
                     Initial = { new() { Value = new FhirString("extension test") } }
                 },
-                // new()
-                // {
-                //     LinkId = "noteDocumentReference",
-                //     Type = Questionnaire.QuestionnaireItemType.Group,
-                //     Extension =
-                //     {
-                //         new()
-                //         {
-                //             Url = ITEM_EXTRACTION_CONTEXT_EXTENSION_URL,
-                //             Value = new Expression
-                //             {
-                //                 Name = "note",
-                //                 Language = "application/x-fhir-query",
-                //                 Expression_ =
-                //                     "DocumentReference?_id={{%composition.section.where(title = 'Note').first().entry.first()}}"
-                //             }
-                //         }
-                //     },
-                //     Item =
-                //     {
-                //         new()
-                //         {
-                //             LinkId = "note.id",
-                //             Definition = "DocumentReference.id",
-                //             Text = "Note",
-                //             Type = Questionnaire.QuestionnaireItemType.String,
-                //             ReadOnly = true,
-                //             Extension =
-                //             {
-                //                 new() { Url = QUESTIONNAIRE_HIDDEN_URL, Value = new FhirBoolean(true) }
-                //             }
-                //         },
-                //         new()
-                //         {
-                //             LinkId = "note.subject",
-                //             Definition = "DocumentReference.subject",
-                //             Type = Questionnaire.QuestionnaireItemType.Reference,
-                //             ReadOnly = true,
-                //             Extension =
-                //             {
-                //                 new()
-                //                 {
-                //                     Url = ITEM_INITIAL_EXPRESSION,
-                //                     Value = new Expression { Language = "text/fhirpath", Expression_ = "%patient.id" }
-                //                 },
-                //                 new() { Url = QUESTIONNAIRE_HIDDEN_URL, Value = new FhirBoolean(true) }
-                //             }
-                //         },
-                //         new()
-                //         {
-                //             LinkId = "note.content",
-                //             Definition = "DocumentReference.content",
-                //             Type = Questionnaire.QuestionnaireItemType.Group,
-                //             Repeats = true,
-                //             Item =
-                //             {
-                //                 new()
-                //                 {
-                //                     LinkId = "documentReference.content.attachment",
-                //                     Definition = "DocumentReference.content.attachment",
-                //                     Text = "Note",
-                //                     Type = Questionnaire.QuestionnaireItemType.Attachment,
-                //                     Extension =
-                //                     {
-                //                         new() { Url = "attachment-type", Value = new FhirString("Text") }
-                //                     }
-                //                 },
-                //             }
-                //         },
-                //         new()
-                //         {
-                //             LinkId = "note.author",
-                //             Definition = "DocumentReference.author",
-                //             Text = "(internal use)",
-                //             Type = Questionnaire.QuestionnaireItemType.Reference,
-                //             Repeats = true,
-                //             Extension =
-                //             {
-                //                 new()
-                //                 {
-                //                     Url = QUESTIONNAIRE_ITEM_CALCULATED_EXPRESSION,
-                //                     Value = new Expression { Language = "text/fhirpath", Expression_ = "%user.id" }
-                //                 },
-                //                 new() { Url = "allow-duplicates", Value = new FhirBoolean(false) },
-                //                 new() { Url = QUESTIONNAIRE_HIDDEN_URL, Value = new FhirBoolean(true) }
-                //             }
-                //         },
-                //     }
-                // },
-                // new()
-                // {
-                //     LinkId = "image",
-                //     Text = "Image",
-                //     Type = Questionnaire.QuestionnaireItemType.Group,
-                //     Repeats = true,
-                //     Extension =
-                //     {
-                //         new()
-                //         {
-                //             Url = ITEM_EXTRACTION_CONTEXT_EXTENSION_URL,
-                //             Value = new Expression
-                //             {
-                //                 Name = "images",
-                //                 Language = "application/x-fhir-query",
-                //                 Expression_ = "DocumentReference?_id={{%context.item.where(linkId='image.id')}}"
-                //             }
-                //         }
-                //     },
-                //     Item =
-                //     {
-                //         new()
-                //         {
-                //             LinkId = "image.id",
-                //             Definition = "DocumentReference.id",
-                //             Text = "ImageId",
-                //             Type = Questionnaire.QuestionnaireItemType.String,
-                //             Extension =
-                //             {
-                //                 new() { Url = QUESTIONNAIRE_HIDDEN_URL, Value = new FhirBoolean(true) },
-                //             }
-                //         },
-                //         new()
-                //         {
-                //             LinkId = "image.author",
-                //             Definition = "DocumentReference.author",
-                //             Type = Questionnaire.QuestionnaireItemType.Reference,
-                //             Extension =
-                //             {
-                //                 new()
-                //                 {
-                //                     Url = QUESTIONNAIRE_ITEM_CALCULATED_EXPRESSION,
-                //                     Value = new Expression { Language = "text/fhirpath", Expression_ = "%user.id" }
-                //                 },
-                //                 new() { Url = QUESTIONNAIRE_HIDDEN_URL, Value = new FhirBoolean(true) }
-                //             },
-                //         },
-                //         new()
-                //         {
-                //             LinkId = "image.subject",
-                //             Definition = "DocumentReference.subject",
-                //             Text = "(internal use)",
-                //             Type = Questionnaire.QuestionnaireItemType.Reference,
-                //             Extension =
-                //             {
-                //                 new()
-                //                 {
-                //                     Url = QUESTIONNAIRE_ITEM_CALCULATED_EXPRESSION,
-                //                     Value = new Expression { Language = "text/fhirpath", Expression_ = "%patient.id" }
-                //                 },
-                //                 new() { Url = QUESTIONNAIRE_HIDDEN_URL, Value = new FhirBoolean(true) }
-                //             },
-                //         }
-                //     }
-                // }
+                new()
+                {
+                    LinkId = "noteDocumentReference",
+                    Type = Questionnaire.QuestionnaireItemType.Group,
+                    Extension =
+                    {
+                        new()
+                        {
+                            Url = ITEM_EXTRACTION_CONTEXT_EXTENSION_URL,
+                            Value = new Expression
+                            {
+                                Name = "note",
+                                Language = "application/x-fhir-query",
+                                Expression_ =
+                                    "DocumentReference?_has:Composition:entry:_id={{%composition.id}}&category=http://bscglobal.com/CodeSystem/free-text-type|note"
+                            }
+                        }
+                    },
+                    Item =
+                    {
+                        new()
+                        {
+                            LinkId = "note.id",
+                            Definition = "DocumentReference.id",
+                            Text = "Note",
+                            Type = Questionnaire.QuestionnaireItemType.String,
+                            ReadOnly = true,
+                            Extension =
+                            {
+                                new() { Url = QUESTIONNAIRE_HIDDEN_URL, Value = new FhirBoolean(true) }
+                            }
+                        },
+                        new()
+                        {
+                            LinkId = "note.category",
+                            Definition = "DocumentReference.category",
+                            Type = Questionnaire.QuestionnaireItemType.Choice,
+                            ReadOnly = true,
+                            Initial =
+                            {
+                                new()
+                                {
+                                    Value = new Coding
+                                    {
+                                        System = "http://bscglobal.com/CodeSystem/free-text-type",
+                                        Code = "note"
+                                    }
+                                },
+                            },
+                            Extension =
+                            {
+                                new() { Url = QUESTIONNAIRE_HIDDEN_URL, Value = new FhirBoolean(true) }
+                            }
+                        },
+                        new()
+                        {
+                            LinkId = "note.subject",
+                            Definition = "DocumentReference.subject",
+                            Type = Questionnaire.QuestionnaireItemType.Reference,
+                            ReadOnly = true,
+                            Extension =
+                            {
+                                new()
+                                {
+                                    Url = ITEM_INITIAL_EXPRESSION,
+                                    Value = new Expression { Language = "text/fhirpath", Expression_ = "%patient.id" }
+                                },
+                                new()
+                                {
+                                    Url = QUESTIONNAIRE_ITEM_CALCULATED_EXPRESSION,
+                                    Value = new Expression { Language = "text/fhirpath", Expression_ = "%patient.id" }
+                                },
+                                new() { Url = QUESTIONNAIRE_HIDDEN_URL, Value = new FhirBoolean(true) }
+                            }
+                        },
+                        new()
+                        {
+                            LinkId = "note.content",
+                            Definition = "DocumentReference.content",
+                            Type = Questionnaire.QuestionnaireItemType.Group,
+                            Repeats = true,
+                            Item =
+                            {
+                                new()
+                                {
+                                    LinkId = "note.content.attachment",
+                                    Definition = "DocumentReference.content.attachment",
+                                    Text = "Note",
+                                    Type = Questionnaire.QuestionnaireItemType.Attachment,
+                                    Extension =
+                                    {
+                                        new() { Url = "attachment-type", Value = new FhirString("Text") }
+                                    }
+                                },
+                            }
+                        },
+                        new()
+                        {
+                            LinkId = "note.author",
+                            Definition = "DocumentReference.author",
+                            Text = "(internal use)",
+                            Type = Questionnaire.QuestionnaireItemType.Reference,
+                            Repeats = true,
+                            Extension =
+                            {
+                                new()
+                                {
+                                    Url = QUESTIONNAIRE_ITEM_CALCULATED_EXPRESSION,
+                                    Value = new Expression { Language = "text/fhirpath", Expression_ = "%user.id" }
+                                },
+                                new() { Url = "allow-duplicates", Value = new FhirBoolean(false) },
+                                new() { Url = QUESTIONNAIRE_HIDDEN_URL, Value = new FhirBoolean(true) }
+                            }
+                        },
+                    }
+                },
+                new()
+                {
+                    LinkId = "image",
+                    Text = "Image",
+                    Type = Questionnaire.QuestionnaireItemType.Group,
+                    Repeats = true,
+                    Extension =
+                    {
+                        new()
+                        {
+                            Url = ITEM_EXTRACTION_CONTEXT_EXTENSION_URL,
+                            Value = new Expression
+                            {
+                                Name = "image",
+                                Language = "application/x-fhir-query",
+                                Expression_ =
+                                    "DocumentReference?_has:Composition:entry:_id={{%composition.id}}&category=http://bscglobal.com/CodeSystem/free-text-type|general-note-image"
+                            }
+                        }
+                    },
+                    Item =
+                    {
+                        new()
+                        {
+                            LinkId = "image.id",
+                            Definition = "DocumentReference.id",
+                            Text = "ImageId",
+                            Type = Questionnaire.QuestionnaireItemType.String,
+                            Extension =
+                            {
+                                new() { Url = QUESTIONNAIRE_HIDDEN_URL, Value = new FhirBoolean(true) },
+                                new()
+                                {
+                                    Url = ITEM_INITIAL_EXPRESSION,
+                                    Value = new Expression { Language = "text/fhirpath", Expression_ = "%image.id" }
+                                },
+                            }
+                        },
+                        new()
+                        {
+                            LinkId = "image.author",
+                            Definition = "DocumentReference.author",
+                            Type = Questionnaire.QuestionnaireItemType.Reference,
+                            Extension =
+                            {
+                                new()
+                                {
+                                    Url = ITEM_INITIAL_EXPRESSION,
+                                    Value = new Expression { Language = "text/fhirpath", Expression_ = "%image.author" }
+                                },
+                                new()
+                                {
+                                    Url = QUESTIONNAIRE_ITEM_CALCULATED_EXPRESSION,
+                                    Value = new Expression { Language = "text/fhirpath", Expression_ = "%user.id" }
+                                },
+                                new() { Url = QUESTIONNAIRE_HIDDEN_URL, Value = new FhirBoolean(true) }
+                            },
+                        },
+                        new()
+                        {
+                            LinkId = "image.category",
+                            Definition = "DocumentReference.category",
+                            Text = "(internal use)",
+                            Type = Questionnaire.QuestionnaireItemType.Choice,
+                            Repeats = true,
+                            Initial =
+                            {
+                                new()
+                                {
+                                    Value = new Coding
+                                    {
+                                        System = "http://bscglobal.com/CodeSystem/free-text-type",
+                                        Code = "general-note-image"
+                                    }
+                                },
+                            },
+                            Extension =
+                            {
+                                new()
+                                {
+                                    Url = ITEM_INITIAL_EXPRESSION,
+                                    Value = new Expression
+                                    {
+                                        Language = "text/fhirpath",
+                                        Expression_ = "%image.category"
+                                    }
+                                },
+                                new() { Url = QUESTIONNAIRE_HIDDEN_URL, Value = new FhirBoolean(true) }
+                            }
+                        },
+                        new()
+                        {
+                            LinkId = "image.subject",
+                            Definition = "DocumentReference.subject",
+                            Text = "(internal use)",
+                            Type = Questionnaire.QuestionnaireItemType.Reference,
+                            Extension =
+                            {
+                                new()
+                                {
+                                    Url = ITEM_INITIAL_EXPRESSION,
+                                    Value = new Expression
+                                    {
+                                        Language = "text/fhirpath",
+                                        Expression_ = "%image.subject"
+                                    }
+                                },
+                                new()
+                                {
+                                    Url = QUESTIONNAIRE_ITEM_CALCULATED_EXPRESSION,
+                                    Value = new Expression { Language = "text/fhirpath", Expression_ = "%patient.id" }
+                                },
+                                new() { Url = QUESTIONNAIRE_HIDDEN_URL, Value = new FhirBoolean(true) }
+                            },
+                        }
+                    }
+                }
             }
         };
 

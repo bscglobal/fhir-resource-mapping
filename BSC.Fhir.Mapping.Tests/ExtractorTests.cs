@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 using BSC.Fhir.Mapping.Core;
 using BSC.Fhir.Mapping.Tests.Data;
@@ -239,8 +240,14 @@ public class ExtractorTests
     public async Task Extract_GivesCorrectBundleForGeneralNote()
     {
         var composition = new Composition { Id = Guid.NewGuid().ToString() };
+        var note = new DocumentReference { Id = Guid.NewGuid().ToString() };
+        var imageIds = new string[4]
+            .Select(_ => Guid.NewGuid().ToString())
+            .ToArray();
+        var patientId = Guid.NewGuid().ToString();
+        var userId = Guid.NewGuid().ToString();
         var questionnaire = GeneralNote.CreateQuestionnaire();
-        var response = GeneralNote.CreateQuestionnaireResponse(composition.Id);
+        var response = GeneralNote.CreateQuestionnaireResponse(composition.Id, note.Id, imageIds);
         var profileLoaderMock = new Mock<IProfileLoader>();
         profileLoaderMock
             .Setup(x => x.LoadProfileAsync(It.IsAny<Canonical>(), It.IsAny<CancellationToken>()))
@@ -270,11 +277,11 @@ public class ExtractorTests
             {
                 {
                     "user",
-                    new Practitioner { Id = Guid.NewGuid().ToString() }
+                    new Practitioner { Id = userId }
                 },
                 {
                     "patient",
-                    new Patient { Id = Guid.NewGuid().ToString() }
+                    new Patient { Id = patientId }
                 },
                 {
                     "composition",
@@ -306,5 +313,76 @@ public class ExtractorTests
         var actualExtensions = actualComposition.AllExtensions();
         actualExtensions.Should().HaveCount(1);
         actualExtensions.First().Value.Should().BeEquivalentTo(new FhirString("extension test"));
+
+        var documentReferences = extractedResources.OfType<DocumentReference>();
+
+        documentReferences.Should().HaveCount(5);
+
+        var actualNotes = documentReferences.Where(
+            dr => dr.Category.Any(cat => cat.Coding.Any(coding => coding.Code == "note"))
+        );
+        actualNotes.Should().HaveCount(1);
+        var actualNote = actualNotes.First();
+
+        actualNote.Subject.Should().BeEquivalentTo(new ResourceReference($"Patient/{patientId}"));
+        actualNote.Content
+            .Should()
+            .BeEquivalentTo(
+                new[]
+                {
+                    new DocumentReference.ContentComponent
+                    {
+                        Attachment = new() { Data = Encoding.UTF8.GetBytes("Hello World") }
+                    }
+                }
+            );
+        actualNote.Author.Should().BeEquivalentTo(new[] { new ResourceReference($"Practitioner/{userId}") });
+        actualNote.Category
+            .Should()
+            .BeEquivalentTo(
+                new[]
+                {
+                    new CodeableConcept
+                    {
+                        Coding =
+                        {
+                            new() { System = "http://bscglobal.com/CodeSystem/free-text-type", Code = "note" }
+                        }
+                    }
+                }
+            );
+
+        var actualImages = documentReferences.Where(
+            dr => dr.Category.Any(cat => cat.Coding.Any(coding => coding.Code == "general-note-image"))
+        );
+
+        actualImages.Should().HaveCount(4);
+        actualImages
+            .Should()
+            .BeEquivalentTo(
+                imageIds.Select(
+                    id =>
+                        new DocumentReference
+                        {
+                            Id = id,
+                            Author = { new ResourceReference($"Practitioner/{userId}") },
+                            Category =
+                            {
+                                new()
+                                {
+                                    Coding =
+                                    {
+                                        new()
+                                        {
+                                            System = "http://bscglobal.com/CodeSystem/free-text-type",
+                                            Code = "general-note-image"
+                                        }
+                                    }
+                                }
+                            },
+                            Subject = new ResourceReference($"Patient/{patientId}")
+                        }
+                )
+            );
     }
 }
