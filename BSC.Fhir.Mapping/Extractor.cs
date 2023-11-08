@@ -73,7 +73,7 @@ public class Extractor : IExtractor
 
         return new Bundle
         {
-            Type = Bundle.BundleType.Transaction,
+            Type = Bundle.BundleType.Collection,
             Entry = extractedResources.Select(resource => new Bundle.EntryComponent { Resource = resource }).ToList()
         };
     }
