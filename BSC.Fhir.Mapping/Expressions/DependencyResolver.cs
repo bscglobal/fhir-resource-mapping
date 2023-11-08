@@ -4,6 +4,7 @@ using BSC.Fhir.Mapping.Core;
 using BSC.Fhir.Mapping.Core.Expressions;
 using BSC.Fhir.Mapping.Logging;
 using Hl7.Fhir.Model;
+using Hl7.Fhir.Serialization;
 using Microsoft.Extensions.Logging;
 
 namespace BSC.Fhir.Mapping.Expressions;
@@ -136,6 +137,13 @@ public class DependencyResolver
 
         var extensions = item.AllExtensions();
         ParseExtensions(extensions.ToArray(), item.LinkId);
+
+        if (responseItem.Answer.Count == 0 && item.Initial.Count > 0)
+        {
+            responseItem.Answer = item.Initial
+                .Select(initial => new QuestionnaireResponse.AnswerComponent { Value = initial.Value })
+                .ToList();
+        }
 
         ParseQuestionnaireItems(item.Item, responseItem.Item);
     }
@@ -585,7 +593,7 @@ public class DependencyResolver
             var evalResult = FhirPathMapping.EvaluateExpr(query);
             if (evalResult is null)
             {
-                _logger.LogWarning("Something went  wrong during evaluation for {0}", query.Expression);
+                _logger.LogWarning("Something went wrong during evaluation for {0}", query.Expression);
                 query.SetValue(null);
                 continue;
             }
@@ -625,6 +633,15 @@ public class DependencyResolver
                         )
                     );
                 }
+            }
+            else if (
+                fhirpathResult.Length == 1 && fhirpathResult.First() is QuestionnaireResponse.ItemComponent responseItem
+            )
+            {
+                _logger.LogDebug(
+                    "FHIRPath resolves to QuestionnaireResponse item. Setting value on expression to answer"
+                );
+                query.SetValue(responseItem.Answer.Select(a => a.Value).ToArray());
             }
             else if (!fhirpathResult.First().GetType().IsSubclassOf(typeof(PrimitiveType)) && fhirpathResult.Length > 1)
             {

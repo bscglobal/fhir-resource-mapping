@@ -50,7 +50,7 @@ public class FhirPathExpression : QuestionnaireExpression<BaseList>
         };
     }
 
-    public void SetValue(BaseList value, Base source)
+    public void SetValue(BaseList value, Base? source)
     {
         SetValue(value);
         SourceResource = source;
