@@ -16,6 +16,9 @@ public record EvaluationResult(Base[] Result, Base? SourceResource, string? Name
 
 public static class FhirPathMapping
 {
+    private static FhirPathCompiler COMPILER = new(new SymbolTable().AddStandardFP().AddFhirExtensions());
+    private static FhirPathCompilerCache CACHE = new(COMPILER);
+
     private class EvaluationContext
     {
         public Base? Resource { get; set; }
@@ -38,10 +41,8 @@ public static class FhirPathMapping
 
         try
         {
-            var compiler = new FhirPathCompiler(new SymbolTable().AddStandardFP().AddFhirExtensions());
-            var cache = new FhirPathCompilerCache(compiler);
             var element = evaluationCtx.Resource?.ToTypedElement() ?? ElementNode.ForPrimitive(true);
-            var result = cache
+            var result = CACHE
                 .Select(
                     element,
                     evaluationCtx.Expression,
