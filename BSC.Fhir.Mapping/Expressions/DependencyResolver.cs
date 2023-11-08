@@ -433,9 +433,8 @@ public class DependencyResolver
 
     private async Task<bool> ResolveDependenciesAsync(CancellationToken cancellationToken = default)
     {
-        var runs = 0;
         var oldLength = 0;
-        while (runs++ < 5)
+        while (true)
         {
             var expressions = _scopeTree.CurrentScope
                 .AllContextInSubtree()
@@ -855,12 +854,20 @@ public class DependencyResolver
         {
             HandleFhirQueryResult(result, unresolvedExpressions);
         }
+
         foreach (var result in resourceResult)
         {
             _queryResults[result.Key] = result.Value;
 
             HandleFhirQueryResult(result, unresolvedExpressions);
         }
+
+        var failedQueries = unresolvedExpressions.Where(expr => !expr.Resolved());
+        foreach (var query in failedQueries)
+        {
+            query.SetValue(null);
+        }
+
         return false;
     }
 
