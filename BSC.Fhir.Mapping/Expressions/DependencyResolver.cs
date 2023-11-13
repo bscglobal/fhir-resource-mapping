@@ -845,7 +845,7 @@ public class DependencyResolver
             HandleFhirQueryResult(result, unresolvedExpressions);
         }
 
-        var failedQueries = unresolvedExpressions.Where(expr => !expr.Resolved()).ToArray();
+        var failedQueries = unresolvedExpressions.Where(expr => !(expr.Value?.Count > 0)).ToArray();
         foreach (var query in failedQueries)
         {
             var fhirTypeName = query.Expression.Split('?').FirstOrDefault();
