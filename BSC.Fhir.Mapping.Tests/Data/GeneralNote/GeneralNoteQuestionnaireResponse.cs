@@ -52,7 +52,7 @@ public partial class GeneralNote
                     new() { LinkId = "composition.extension" },
                     new()
                     {
-                        LinkId = "noteDocumentReference",
+                        LinkId = "note",
                         Item =
                         {
                             new() { LinkId = "note.id", Answer = { new() { Value = new FhirString(noteId) } } },

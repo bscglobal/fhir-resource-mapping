@@ -93,6 +93,28 @@ public partial class GeneralNote
                         Expression_ = "Composition?_id={{%composition.id}}"
                     }
                 },
+                new Extension
+                {
+                    Url = VARIABLE_EXTENSION_URL,
+                    Value = new Expression
+                    {
+                        Name = "note",
+                        Language = "application/x-fhir-query",
+                        Expression_ =
+                            "DocumentReference?_has:Composition:entry:_id={{%composition.id}}&category=http://bscglobal.com/CodeSystem/free-text-type|note"
+                    }
+                },
+                new Extension
+                {
+                    Url = VARIABLE_EXTENSION_URL,
+                    Value = new Expression
+                    {
+                        Name = "images",
+                        Language = "application/x-fhir-query",
+                        Expression_ =
+                            "DocumentReference?_has:Composition:entry:_id={{%composition.id}}&category=http://bscglobal.com/CodeSystem/free-text-type|general-note-image"
+                    }
+                }
             },
             Item =
             {
@@ -290,9 +312,10 @@ public partial class GeneralNote
                                     {
                                         Language = "text/fhirpath",
                                         Expression_ =
-                                            "%resource.item.where(linkId='noteDocumentReference').first().item.where(linkId='note.id').first()"
+                                            "%resource.item.where(linkId='note').first().item.where(linkId='note.id').first()"
                                     }
-                                }
+                                },
+                                new() { Url = "referenceType", Value = new FhirString("DocumentReference") }
                             }
                         }
                     },
@@ -342,20 +365,14 @@ public partial class GeneralNote
                 },
                 new()
                 {
-                    LinkId = "noteDocumentReference",
+                    LinkId = "note",
                     Type = Questionnaire.QuestionnaireItemType.Group,
                     Extension =
                     {
                         new()
                         {
                             Url = ITEM_EXTRACTION_CONTEXT_EXTENSION_URL,
-                            Value = new Expression
-                            {
-                                Name = "note",
-                                Language = "application/x-fhir-query",
-                                Expression_ =
-                                    "DocumentReference?_has:Composition:entry:_id={{%composition.id}}&category=http://bscglobal.com/CodeSystem/free-text-type|note"
-                            }
+                            Value = new Expression { Language = "text/fhirpath", Expression_ = "%note" }
                         }
                     },
                     Item =
@@ -467,13 +484,7 @@ public partial class GeneralNote
                         new()
                         {
                             Url = ITEM_EXTRACTION_CONTEXT_EXTENSION_URL,
-                            Value = new Expression
-                            {
-                                Name = "image",
-                                Language = "application/x-fhir-query",
-                                Expression_ =
-                                    "DocumentReference?_has:Composition:entry:_id={{%composition.id}}&category=http://bscglobal.com/CodeSystem/free-text-type|general-note-image"
-                            }
+                            Value = new Expression { Language = "text/fhirpath", Expression_ = "%images" }
                         }
                     },
                     Item =
