@@ -19,17 +19,12 @@ public class ScopeTree
     )
     {
         _idProvider = idProvider;
-        _currentScope = new(idProvider, questionnaire, questionnaireResponse);
+        _currentScope = new(questionnaire, questionnaireResponse, idProvider);
     }
 
-    public void PushScope(Questionnaire.ItemComponent item)
+    public void PushScope(Questionnaire.ItemComponent item, QuestionnaireResponse.ItemComponent? responseItem = null)
     {
-        _currentScope = new(item, _currentScope, _idProvider);
-    }
-
-    public void PushScope(Questionnaire.ItemComponent item, QuestionnaireResponse.ItemComponent responseItem)
-    {
-        _currentScope = new(item, responseItem, _currentScope, _idProvider);
+        _currentScope = new(_currentScope, item, responseItem, _idProvider);
     }
 
     public bool PopScope()

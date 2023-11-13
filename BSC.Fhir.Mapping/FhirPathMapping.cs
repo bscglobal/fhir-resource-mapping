@@ -7,6 +7,7 @@ using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
 using Hl7.FhirPath;
 using Hl7.FhirPath.Expressions;
+using Microsoft.Extensions.Logging;
 
 namespace BSC.Fhir.Mapping;
 
@@ -14,7 +15,7 @@ using BaseList = IReadOnlyCollection<Base>;
 
 public record EvaluationResult(Base[] Result, Base? SourceResource, string? Name);
 
-public static class FhirPathMapping
+public class FhirPathMapping
 {
     private static FhirPathCompiler COMPILER = new(new SymbolTable().AddStandardFP().AddFhirExtensions());
     private static FhirPathCompilerCache CACHE = new(COMPILER);
@@ -31,12 +32,19 @@ public static class FhirPathMapping
         }
     }
 
-    public static EvaluationResult? EvaluateExpr(FhirPathExpression expr, string? expressionName = null)
+    private readonly ILogger<FhirPathMapping> _logger;
+
+    public FhirPathMapping(ILogger<FhirPathMapping> logger)
+    {
+        _logger = logger;
+    }
+
+    public EvaluationResult? EvaluateExpr(FhirPathExpression expr, string? expressionName = null)
     {
         var evaluationCtx = GetEvaluationContext(expr);
         if (evaluationCtx is null)
         {
-            return null;
+            return new EvaluationResult(Array.Empty<Base>(), null, expressionName);
         }
 
         try
@@ -57,19 +65,22 @@ public static class FhirPathMapping
         }
         catch (Exception e)
         {
-            Console.WriteLine(
-                "\nException thrown: {0}\nMessage: {1}\nExpr: {2}\nResource: {3}\n\nStack Trace:\n\n{4}\n\n",
-                e.GetType().ToString(),
-                e.Message,
-                evaluationCtx.Expression,
-                JsonSerializer.Serialize(evaluationCtx.Resource),
-                e.StackTrace
+            _logger.LogError(
+                e,
+                string.Format(
+                    "Problem during FHIRPath evaluation: {0}\n\nMessage: {1}\nExpr: {2}\nResource: {3}\n\nStack Trace:\n\n{4}\n\n",
+                    e.GetType().ToString(),
+                    e.Message,
+                    evaluationCtx.Expression,
+                    JsonSerializer.Serialize(evaluationCtx.Resource),
+                    e.StackTrace
+                )
             );
             return null;
         }
     }
 
-    public static Type? EvaluateTypeFromExpr(FhirPathExpression expr)
+    public Type? EvaluateTypeFromExpr(FhirPathExpression expr)
     {
         var evaluationCtx = GetEvaluationContext(expr);
 
@@ -107,7 +118,7 @@ public static class FhirPathMapping
         return null;
     }
 
-    private static EvaluationContext? GetEvaluationContext(FhirPathExpression expr)
+    private EvaluationContext? GetEvaluationContext(FhirPathExpression expr)
     {
         EvaluationContext? evaluationCtx = null;
         var expressionParts = expr.Expression.Split('.');
@@ -129,16 +140,16 @@ public static class FhirPathMapping
         }
         else
         {
-            Console.WriteLine("Error: Could not find evaluation context for expression {0}", expr);
+            _logger.LogError("Could not find evaluation context for expression {0}", expr);
             evaluationCtx = new(expr.Expression);
         }
 
         return evaluationCtx;
     }
 
-    private static EvaluationContext ResourceEvaluationSource(string expr, Scope scope)
+    private EvaluationContext ResourceEvaluationSource(string expr, Scope scope)
     {
-        return new(expr, scope.ResponseItem);
+        return new(expr, scope.QuestionnaireResponse);
     }
 
     private static EvaluationContext QuestionnaireEvaluationSource(string[] exprParts, Scope scope)
@@ -176,23 +187,25 @@ public static class FhirPathMapping
         return new(execExpr, source);
     }
 
-    private static EvaluationContext? VariableEvaluationSource(string[] exprParts, FhirPathExpression expression)
+    private EvaluationContext? VariableEvaluationSource(string[] exprParts, FhirPathExpression expression)
     {
         EvaluationContext? evaluationCtx = null;
         var variableName = exprParts[0][1..];
-        if (
-            expression.Dependencies.FirstOrDefault(dep => dep.Resolved() && dep.Name == variableName)
-                is IQuestionnaireContext<BaseList> context
-            && context.Value is not null
-        )
+        var context = expression.Dependencies.FirstOrDefault(dep => dep.Resolved() && dep.Name == variableName);
+
+        if (context?.Value?.Count > 0)
         {
             exprParts[0] = "%resource";
             var execExpr = string.Join('.', exprParts);
             evaluationCtx = new(execExpr, context.Value.First());
         }
+        else if (context?.Value?.Count == 0)
+        {
+            _logger.LogDebug("Context %{Variable} has an empty list of values", variableName);
+        }
         else
         {
-            Console.WriteLine("Error: Cannot find context in scope for variable {0}", variableName);
+            _logger.LogError("Cannot find context in scope for variable {0}", variableName);
         }
 
         return evaluationCtx;

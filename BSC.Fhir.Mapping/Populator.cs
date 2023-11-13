@@ -1,4 +1,5 @@
 using BSC.Fhir.Mapping.Core;
+using BSC.Fhir.Mapping.Core.Expressions;
 using BSC.Fhir.Mapping.Expressions;
 using BSC.Fhir.Mapping.Logging;
 using Hl7.Fhir.Model;
@@ -11,12 +12,19 @@ public class Populator : IPopulator
     private readonly INumericIdProvider _idProvider;
     private readonly IResourceLoader _resourceLoader;
     private readonly ILogger _logger;
+    private readonly IDependencyResolverFactory _dependencyResolverFactory;
 
-    public Populator(INumericIdProvider idProvider, IResourceLoader resourceLoader, ILogger? logger = null)
+    public Populator(
+        INumericIdProvider idProvider,
+        IResourceLoader resourceLoader,
+        ILogger logger,
+        IDependencyResolverFactory dependencyResolverFactory
+    )
     {
         _idProvider = idProvider;
         _resourceLoader = resourceLoader;
         _logger = logger ?? FhirMappingLogging.GetLogger();
+        _dependencyResolverFactory = dependencyResolverFactory;
     }
 
     public async Task<QuestionnaireResponse> PopulateAsync(
@@ -28,14 +36,11 @@ public class Populator : IPopulator
         _logger.LogDebug("Populating QuestionnaireResponse from Questionnaire ({Name})", questionnaire.Title);
         var response = new QuestionnaireResponse();
 
-        var resolver = new DependencyResolver(
-            _idProvider,
+        var resolver = _dependencyResolverFactory.CreateDependencyResolver(
             questionnaire,
             response,
             launchContext,
-            _resourceLoader,
-            ResolvingContext.Population,
-            _logger
+            ResolvingContext.Population
         );
         var rootScope = await resolver.ParseQuestionnaireAsync(cancellationToken);
 

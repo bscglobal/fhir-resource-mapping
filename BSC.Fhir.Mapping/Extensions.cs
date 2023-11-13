@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Reflection;
 using BSC.Fhir.Mapping.Core;
+using BSC.Fhir.Mapping.Expressions;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Utility;
 
@@ -8,16 +9,14 @@ namespace BSC.Fhir.Mapping;
 
 public static class MappingExtenstions
 {
-    private const string ITEM_EXTRACTION_CONTEXT_EXTENSION_URL =
-        "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-itemExtractionContext";
-    private const string ITEM_INITIAL_EXPRESSION_URL =
-        "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-initialExpression";
-    private const string ITEM_POPULATION_CONTEXT_EXTENSION_URL =
-        "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-itemPopulationContext";
+    public static bool HasAnswers(this QuestionnaireResponse.ItemComponent responseItem)
+    {
+        return responseItem.Answer.Count > 0 || responseItem.Item.Any(item => item.HasAnswers());
+    }
 
     public static DataType? ItemExtractionContextExtractionValue(this IEnumerable<Extension> extensions)
     {
-        var extension = extensions.SingleOrDefault(e => e.Url == ITEM_EXTRACTION_CONTEXT_EXTENSION_URL);
+        var extension = extensions.SingleOrDefault(e => e.Url == Constants.EXTRACTION_CONTEXT);
 
         return extension?.Value;
     }
@@ -133,7 +132,7 @@ public static class MappingExtenstions
     public static Expression? InitialExpression(this Questionnaire.ItemComponent questionnaireItem)
     {
         return questionnaireItem.Extension
-                .FirstOrDefault(extension => extension.Url == ITEM_INITIAL_EXPRESSION_URL)
+                .FirstOrDefault(extension => extension.Url == Constants.INITIAL_EXPRESSION)
                 ?.Value as Expression;
     }
 
@@ -206,9 +205,8 @@ public static class MappingExtenstions
     public static IReadOnlyCollection<Expression> GetPopulationContextExpressions(this Questionnaire questionnaire)
     {
         var expression =
-            questionnaire.Extension
-                .FirstOrDefault(extension => extension.Url == ITEM_POPULATION_CONTEXT_EXTENSION_URL)
-                ?.Value as Expression;
+            questionnaire.Extension.FirstOrDefault(extension => extension.Url == Constants.POPULATION_CONTEXT)?.Value
+            as Expression;
 
         var nestedExpessions = questionnaire.Item.SelectMany(item => item.GetPopulationContextExpressions()).ToArray();
 
@@ -228,7 +226,7 @@ public static class MappingExtenstions
     {
         var expression =
             questionnaireItem.Extension
-                .FirstOrDefault(extension => extension.Url == ITEM_POPULATION_CONTEXT_EXTENSION_URL)
+                .FirstOrDefault(extension => extension.Url == Constants.POPULATION_CONTEXT)
                 ?.Value as Expression;
 
         var nestedExpessions = questionnaireItem.Item
@@ -257,7 +255,7 @@ public static class MappingExtenstions
 
     public static Expression? PopulationContext(this IExtendable value)
     {
-        var extension = value.GetExtension(ITEM_POPULATION_CONTEXT_EXTENSION_URL);
+        var extension = value.GetExtension(Constants.POPULATION_CONTEXT);
 
         return extension?.Value as Expression;
     }

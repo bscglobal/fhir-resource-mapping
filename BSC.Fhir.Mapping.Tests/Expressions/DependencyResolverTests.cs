@@ -1,4 +1,5 @@
 using BSC.Fhir.Mapping.Core;
+using BSC.Fhir.Mapping.Core.Expressions;
 using BSC.Fhir.Mapping.Expressions;
 using BSC.Fhir.Mapping.Tests.Data;
 using BSC.Fhir.Mapping.Tests.Mocks;
@@ -97,8 +98,10 @@ public class DependencyResolverTests
             launchContext,
             resourceLoader.Object,
             ResolvingContext.Population,
+            new FhirPathMapping(new TestLogger<FhirPathMapping>(_output)),
             new TestLogger(_output)
         );
+
         await resolver.ParseQuestionnaireAsync();
     }
 

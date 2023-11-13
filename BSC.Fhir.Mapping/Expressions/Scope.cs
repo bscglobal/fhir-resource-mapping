@@ -24,20 +24,10 @@ public class Scope : IClonable<Scope>
     private ExtractionContext? _extractionContext;
     private bool _extractionContextSearched = false;
 
-    public Scope(Scope parent, INumericIdProvider idProvider)
-    {
-        parent.Children.Add(this);
-        Parent = parent;
-        Questionnaire = parent.Questionnaire;
-
-        Level = Parent?.Level + 1 ?? 0;
-        _idProvider = idProvider;
-    }
-
     public Scope(
-        INumericIdProvider idProvider,
         Questionnaire questionnaire,
-        QuestionnaireResponse? questionnaireResponse = null
+        QuestionnaireResponse? questionnaireResponse,
+        INumericIdProvider idProvider
     )
     {
         Questionnaire = questionnaire;
@@ -45,41 +35,18 @@ public class Scope : IClonable<Scope>
         _idProvider = idProvider;
     }
 
-    public Scope(Questionnaire.ItemComponent item, Scope parentScope, INumericIdProvider idProvider)
-        : this(parentScope, idProvider)
-    {
-        Item = item;
-    }
-
-    public Scope(Questionnaire.ItemComponent item, INumericIdProvider idProvider, Questionnaire questionnaire)
-        : this(idProvider, questionnaire)
-    {
-        Item = item;
-    }
-
     public Scope(
-        Questionnaire.ItemComponent item,
-        QuestionnaireResponse.ItemComponent responseItem,
         Scope parentScope,
+        Questionnaire.ItemComponent item,
+        QuestionnaireResponse.ItemComponent? responseItem,
         INumericIdProvider idProvider
     )
-        : this(item, parentScope, idProvider)
+        : this(parentScope.Questionnaire, parentScope.QuestionnaireResponse, idProvider)
     {
+        Parent = parentScope;
+        Item = item;
         ResponseItem = responseItem;
-    }
-
-    public Scope(
-        Questionnaire.ItemComponent item,
-        QuestionnaireResponse.ItemComponent responseItem,
-        INumericIdProvider idProvider,
-        Questionnaire questionnaire,
-        QuestionnaireResponse questionnaireResponse
-    )
-        : this(item, idProvider, questionnaire)
-    {
-        QuestionnaireResponse = questionnaireResponse;
-        ResponseItem = responseItem;
-        _idProvider = idProvider;
+        parentScope.Children.Add(this);
     }
 
     public IReadOnlyCollection<Scope> GetChildScope(Func<Scope, bool> predicate)
@@ -133,15 +100,12 @@ public class Scope : IClonable<Scope>
 
     public Scope Clone(dynamic? replacementFields = null)
     {
-        var newScope = new Scope(_idProvider, Questionnaire, QuestionnaireResponse)
+        var newScope = new Scope(Questionnaire, QuestionnaireResponse, _idProvider)
         {
             Item = Item,
-            ResponseItem = (
-                Item is not null
-                    ? new QuestionnaireResponse.ItemComponent { LinkId = Item.LinkId, Answer = ResponseItem?.Answer }
-                    : null
-            ),
-            QuestionnaireResponse = QuestionnaireResponse,
+            ResponseItem = Item is not null
+                ? new QuestionnaireResponse.ItemComponent { LinkId = Item.LinkId, Answer = ResponseItem?.Answer }
+                : null,
             Parent = replacementFields?.Parent ?? Parent,
             ClonedFrom = this
         };
@@ -217,7 +181,6 @@ public class Scope : IClonable<Scope>
 
         if (name == "patientName")
         {
-            // TreeDebugging.PrintTree(this);
             Console.WriteLine("Debug: scope level - {0}", Level);
         }
 

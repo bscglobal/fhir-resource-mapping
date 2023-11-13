@@ -1,4 +1,5 @@
 using BSC.Fhir.Mapping.Core;
+using BSC.Fhir.Mapping.Core.Expressions;
 using BSC.Fhir.Mapping.Expressions;
 using BSC.Fhir.Mapping.Tests.Data;
 using BSC.Fhir.Mapping.Tests.Mocks;
@@ -98,10 +99,35 @@ public class PopulatorTests
                 }
             );
 
+        var factoryMock = new Mock<IDependencyResolverFactory>();
+        factoryMock
+            .Setup(
+                factory =>
+                    factory.CreateDependencyResolver(
+                        It.IsAny<Questionnaire>(),
+                        It.IsAny<QuestionnaireResponse>(),
+                        It.IsAny<Dictionary<string, Resource>>(),
+                        It.IsAny<ResolvingContext>()
+                    )
+            )
+            .Returns<Questionnaire, QuestionnaireResponse, Dictionary<string, Resource>, ResolvingContext>(
+                (questionnaire, questionnaireResponse, launchContext, resolvingContext) =>
+                    new DependencyResolver(
+                        new NumericIdProvider(),
+                        questionnaire,
+                        questionnaireResponse,
+                        launchContext,
+                        resourceLoaderMock.Object,
+                        resolvingContext,
+                        new FhirPathMapping(new TestLogger<FhirPathMapping>(_output)),
+                        new TestLogger<DependencyResolver>(_output)
+                    )
+            );
         var populator = new Populator(
             new NumericIdProvider(),
             resourceLoaderMock.Object,
-            new TestLogger<Populator>(_output)
+            new TestLogger<Populator>(_output),
+            factoryMock.Object
         );
 
         var response = await populator.PopulateAsync(
