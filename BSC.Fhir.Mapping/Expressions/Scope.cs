@@ -10,7 +10,7 @@ public class Scope : IClonable<Scope>
 {
     public int Level { get; }
     public Questionnaire Questionnaire { get; private init; }
-    public QuestionnaireResponse? QuestionnaireResponse { get; set; }
+    public QuestionnaireResponse QuestionnaireResponse { get; set; }
     public Questionnaire.ItemComponent? Item { get; private init; }
     public QuestionnaireResponse.ItemComponent? ResponseItem { get; private init; }
     public List<IQuestionnaireContext<BaseList>> Context { get; private init; } = new();
@@ -26,7 +26,7 @@ public class Scope : IClonable<Scope>
 
     public Scope(
         Questionnaire questionnaire,
-        QuestionnaireResponse? questionnaireResponse,
+        QuestionnaireResponse questionnaireResponse,
         INumericIdProvider idProvider
     )
     {
