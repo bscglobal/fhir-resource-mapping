@@ -37,7 +37,7 @@ public class DependencyResolver
     {
         _questionnaire = questionnaire;
         _questionnaireResponse = questionnaireResponse ?? new();
-        _scopeTree = new(questionnaire, questionnaireResponse, idProvider);
+        _scopeTree = new(questionnaire, _questionnaireResponse, idProvider);
         _resourceLoader = resourceLoader;
         _resolvingContext = resolvingContext;
         _idProvider = idProvider;

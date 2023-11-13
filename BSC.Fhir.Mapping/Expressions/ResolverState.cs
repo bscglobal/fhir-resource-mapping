@@ -14,7 +14,7 @@ public class ScopeTree
 
     public ScopeTree(
         Questionnaire questionnaire,
-        QuestionnaireResponse? questionnaireResponse,
+        QuestionnaireResponse questionnaireResponse,
         INumericIdProvider idProvider
     )
     {
