@@ -7,6 +7,8 @@ using BaseList = IReadOnlyCollection<Base>;
 
 public class FhirQueryExpression : QuestionnaireExpression<BaseList>
 {
+    public Type? ValueType { get; private set; }
+
     public FhirQueryExpression(
         int id,
         string? name,
@@ -20,16 +22,14 @@ public class FhirQueryExpression : QuestionnaireExpression<BaseList>
 
     public override void SetValue(BaseList? value)
     {
-        if (value is null)
-        {
-            var newResource = ConstructResourceFromExpression(Expression);
-            if (newResource is not null)
-            {
-                value = new[] { newResource };
-            }
-        }
-
+        ValueType = value?.GetType().NonParameterizedType();
         base.SetValue(value);
+    }
+
+    public void SetValue(Type type)
+    {
+        ValueType = type;
+        base.SetValue((BaseList)Array.CreateInstance(type, 0));
     }
 
     private static Resource? ConstructResourceFromExpression(string extensionValue)
