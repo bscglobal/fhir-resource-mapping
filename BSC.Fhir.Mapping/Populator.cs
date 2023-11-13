@@ -177,12 +177,7 @@ public class Populator : IPopulator
 
     private QuestionnaireResponse ConstructResponse(Scope rootScope)
     {
-        var response = rootScope.QuestionnaireResponse;
-
-        if (response is null)
-        {
-            throw new ArgumentException("rootScope.QuestionnaireResponse is null");
-        }
+        var response = new QuestionnaireResponse();
 
         response.Item = ConstructResponseItems(rootScope.Children);
 
@@ -199,8 +194,13 @@ public class Populator : IPopulator
 
             if (scope.ResponseItem is not null)
             {
-                list.Add(scope.ResponseItem);
-                scope.ResponseItem.Item.AddRange(childItems);
+                var responseItem = new QuestionnaireResponse.ItemComponent
+                {
+                    LinkId = scope.ResponseItem.LinkId,
+                    Answer = scope.ResponseItem.Answer
+                };
+                list.Add(responseItem);
+                responseItem.Item.AddRange(childItems);
             }
             else
             {
