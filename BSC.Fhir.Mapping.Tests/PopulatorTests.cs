@@ -3,7 +3,9 @@ using BSC.Fhir.Mapping.Core.Expressions;
 using BSC.Fhir.Mapping.Expressions;
 using BSC.Fhir.Mapping.Tests.Data;
 using BSC.Fhir.Mapping.Tests.Mocks;
+using FluentAssertions;
 using Hl7.Fhir.Model;
+using Hl7.Fhir.Serialization;
 using Moq;
 using Xunit.Abstractions;
 using Task = System.Threading.Tasks.Task;
@@ -19,85 +21,92 @@ public class PopulatorTests
         _output = output;
     }
 
-    [Fact]
-    public async Task Populate_GivesCorrectQuestionnaireResponseForDemo()
+    private static object[] DemographicsTestCase()
     {
-        var familyName = "Smith";
-        var demoQuestionnaire = Demographics.CreateQuestionnaire();
-        var patient = new Patient
+        var patientId = Guid.NewGuid().ToString();
+        var relativeIds = (Guid.NewGuid().ToString(), Guid.NewGuid().ToString(), Guid.NewGuid().ToString());
+        var resources = Demographics.ResourceLoaderResponse(patientId, relativeIds);
+        return new object[]
         {
-            Id = Guid.NewGuid().ToString(),
-            BirthDate = "2006-04-05",
-            Name =
+            Demographics.CreateQuestionnaire(),
+            resources,
+            new Dictionary<string, Resource>
             {
-                new() { Family = familyName, Given = new[] { "Jane", "Rebecca" } },
-                new() { Family = familyName, Given = new[] { "Elisabeth", "Charlotte" } }
-            }
+                { "patient", resources.Values.Select(value => value.First()).First(value => value is Patient) }
+            },
+            Demographics.PopulationResponse(patientId, relativeIds)
         };
+    }
 
-        var relative = new RelatedPerson
+    private static object[] ServiceRequestTestCase()
+    {
+        var serviceRequestId = Guid.NewGuid().ToString();
+        var patientId = Guid.NewGuid().ToString();
+        var resources = TestServiceRequest.ResourceLoaderResponse(serviceRequestId, patientId);
+        return new object[]
         {
-            Id = Guid.NewGuid().ToString(),
-            Patient = new ResourceReference($"Patient/{patient.Id}"),
-            Relationship =
+            TestServiceRequest.CreateQuestionnaire(),
+            resources,
+            new Dictionary<string, Resource>
             {
-                new CodeableConcept
                 {
-                    Coding =
-                    {
-                        new Coding
-                        {
-                            System = "http://hl7.org/fhir/ValueSet/relatedperson-relationshiptype",
-                            Code = "NOK",
-                            Display = "next of kin"
-                        }
-                    }
+                    "serviceRequest",
+                    resources.Values.Select(value => value.First()).First(value => value is ServiceRequest)
                 }
             },
-            Name =
-            {
-                new() { Family = familyName, Given = new[] { "John", "Mark" } },
-                new() { Family = familyName, Given = new[] { "Another", "Name" } }
-            }
+            TestServiceRequest.PopulationResponse(serviceRequestId, patientId)
         };
-        var relative2 = new RelatedPerson
+    }
+
+    private static object[] GeneralNoteTestCase()
+    {
+        var compositionId = Guid.NewGuid().ToString();
+        var patientId = Guid.NewGuid().ToString();
+        var userId = Guid.NewGuid().ToString();
+        var noteId = Guid.NewGuid().ToString();
+        var imageIds = new[] { Guid.NewGuid().ToString(), Guid.NewGuid().ToString(), Guid.NewGuid().ToString() };
+        var resources = GeneralNote.ResourceLoaderResponse(compositionId, patientId, userId, imageIds, noteId);
+        return new object[]
         {
-            Id = Guid.NewGuid().ToString(),
-            Patient = new ResourceReference($"Patient/{patient.Id}"),
-            Relationship =
+            GeneralNote.CreateQuestionnaire(),
+            resources,
+            new Dictionary<string, Resource>
             {
-                new CodeableConcept
+                { "composition", resources.Values.Select(value => value.First()).First(value => value is Composition) },
                 {
-                    Coding =
-                    {
-                        new Coding
-                        {
-                            System = "http://hl7.org/fhir/ValueSet/relatedperson-relationshiptype",
-                            Code = "NOK",
-                            Display = "next of kin"
-                        }
-                    }
+                    "patient",
+                    new Patient { Id = patientId }
+                },
+                {
+                    "user",
+                    new Practitioner { Id = userId }
                 }
             },
-            Name =
-            {
-                new() { Family = familyName, Given = new[] { "Elizabeth" } },
-            }
+            GeneralNote.PopulationResponse(compositionId, patientId, noteId, imageIds)
         };
+    }
 
+    public static IEnumerable<object[]> AllTestCases()
+    {
+        return new object[][] { DemographicsTestCase(), ServiceRequestTestCase(), GeneralNoteTestCase() };
+    }
+
+    [Theory]
+    [MemberData(nameof(AllTestCases))]
+    public async Task PopulateAsync_ReturnsCorrectQuestionnaireResponse(
+        Questionnaire questionnaire,
+        Dictionary<string, IReadOnlyCollection<Resource>> resourceLoaderResponse,
+        Dictionary<string, Resource> launchContext,
+        QuestionnaireResponse expectedResponse
+    )
+    {
         var resourceLoaderMock = new Mock<IResourceLoader>();
         resourceLoaderMock
             .Setup(
                 loader =>
                     loader.GetResourcesAsync(It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>())
             )
-            .ReturnsAsync(
-                new Dictionary<string, IReadOnlyCollection<Resource>>
-                {
-                    { $"Patient?_id={patient.Id}", new[] { patient } },
-                    { $"RelatedPerson?patient={patient.Id}", new[] { relative, relative2 } }
-                }
-            );
+            .ReturnsAsync(resourceLoaderResponse);
 
         var factoryMock = new Mock<IDependencyResolverFactory>();
         factoryMock
@@ -123,6 +132,7 @@ public class PopulatorTests
                         new TestLogger<DependencyResolver>(_output)
                     )
             );
+
         var populator = new Populator(
             new NumericIdProvider(),
             resourceLoaderMock.Object,
@@ -130,122 +140,23 @@ public class PopulatorTests
             factoryMock.Object
         );
 
-        var response = await populator.PopulateAsync(
-            demoQuestionnaire,
-            new Dictionary<string, Resource> { { "patient", patient } }
-        );
+        var actualResponse = await populator.PopulateAsync(questionnaire, launchContext);
 
-        var actualPatientIdAnswer = response.Item
-            .SingleOrDefault(item => item.LinkId == "patient.id")
-            ?.Answer.FirstOrDefault()
-            ?.Value.ToString();
-        Assert.Equal(patient.Id, actualPatientIdAnswer);
+        // _output.WriteLine(expectedResponse.ToJson(new() { Pretty = true }));
+        // _output.WriteLine(actualResponse.ToJson(new() { Pretty = true }));
+        CompareItems(actualResponse.Item, expectedResponse.Item);
+    }
 
-        var actualPatientBirthDateAnswer = response.Item
-            .SingleOrDefault(item => item.LinkId == "patient.birthDate")
-            ?.Answer.FirstOrDefault()
-            ?.Value.ToString();
-        Assert.Equal(patient.BirthDate, actualPatientBirthDateAnswer);
+    private static void CompareItems(
+        IEnumerable<QuestionnaireResponse.ItemComponent> items,
+        IEnumerable<QuestionnaireResponse.ItemComponent> expectedItems
+    )
+    {
+        foreach (var group in items.GroupBy(i => i.LinkId))
+        {
+            var expected = expectedItems.Where(i => i.LinkId == group.Key);
 
-        // TODO: fix tests for names (repeating groups)
-
-        // var actualPatientFamilyNameAnswer = response.Item
-        //     .SingleOrDefault(item => item.LinkId == "patient.name")
-        //     ?.Item.SingleOrDefault(item => item.LinkId == "patient.name.family")
-        //     ?.Answer.FirstOrDefault()
-        //     ?.Value.ToString();
-        // Assert.Equal(familyName, actualPatientFamilyNameAnswer);
-        //
-        // var actualPatientGivenNamesAnswer = response.Item
-        //     .SingleOrDefault(item => item.LinkId == "patient.name")
-        //     ?.Item.SingleOrDefault(item => item.LinkId == "patient.name.given")
-        //     ?.Answer.Select(answer => answer.Value.ToString());
-        // Assert.Equivalent(new[] { "Jane", "Rebecca" }, actualPatientGivenNamesAnswer);
-
-        var actualRelativeAnswers = response.Item.Where(item => item.LinkId == "relative").ToArray();
-        // Console.WriteLine(
-        //     JsonSerializer.Serialize(actualRelativeAnswers, new JsonSerializerOptions { WriteIndented = true })
-        // );
-
-        var actualRelative1IdAnswer = actualRelativeAnswers[0]?.Item
-            .SingleOrDefault(item => item.LinkId == "relative.id")
-            ?.Answer.FirstOrDefault()
-            ?.Value.ToString();
-
-        Assert.Equal(actualRelative1IdAnswer, relative.Id);
-
-        var actualRelative2IdAnswer = actualRelativeAnswers[1]?.Item
-            .SingleOrDefault(item => item.LinkId == "relative.id")
-            ?.Answer.FirstOrDefault()
-            ?.Value.ToString();
-
-        Assert.Equal(actualRelative2IdAnswer, relative2.Id);
-
-        var actualRelative1PatientAnswer = (
-            actualRelativeAnswers[0].Item
-                .SingleOrDefault(item => item.LinkId == "relative.patient")
-                ?.Answer.FirstOrDefault()
-                ?.Value as ResourceReference
-        )?.Reference;
-        Assert.Equal(actualRelative1PatientAnswer, $"Patient/{patient.Id}");
-
-        var actualRelative2PatientAnswer = (
-            actualRelativeAnswers[1]?.Item
-                .SingleOrDefault(item => item.LinkId == "relative.patient")
-                ?.Answer.FirstOrDefault()
-                ?.Value as ResourceReference
-        )?.Reference;
-        Assert.Equal(actualRelative2PatientAnswer, $"Patient/{patient.Id}");
-
-        var actualRelative1RelationshipAnswer =
-            actualRelativeAnswers[0].Item
-                .SingleOrDefault(item => item.LinkId == "relative.relationship")
-                ?.Answer.FirstOrDefault()
-                ?.Value as Coding;
-        Assert.Equivalent(relative.Relationship.First().Coding.First(), actualRelative1RelationshipAnswer);
-
-        var actualRelative2RelationshipAnswer =
-            actualRelativeAnswers[1].Item
-                .SingleOrDefault(item => item.LinkId == "relative.relationship")
-                ?.Answer.FirstOrDefault()
-                ?.Value as Coding;
-        Assert.Equivalent(relative2.Relationship.First().Coding.First(), actualRelative2RelationshipAnswer);
-
-        var actualRelative1FamilyNameAnswer = actualRelativeAnswers[0].Item
-            .FirstOrDefault(item => item.LinkId == "relative.name")
-            ?.Item.SingleOrDefault(item => item.LinkId == "relative.name.family")
-            ?.Answer.FirstOrDefault()
-            ?.Value.ToString();
-        Assert.Equal(familyName, actualRelative1FamilyNameAnswer);
-
-        var actualRelative1GivenNamesAnswer = actualRelativeAnswers[0].Item
-            .Where(item => item.LinkId == "relative.name")
-            .Select(
-                item =>
-                    item.Item
-                        .SingleOrDefault(item => item.LinkId == "relative.name.given")
-                        ?.Answer.Select(answer => answer.Value.ToString())
-            );
-        Assert.Equivalent(
-            new[] { new[] { "John", "Mark" }, new[] { "Another", "Name" } },
-            actualRelative1GivenNamesAnswer
-        );
-
-        var actualRelative2FamilyNameAnswer = actualRelativeAnswers[1].Item
-            .SingleOrDefault(item => item.LinkId == "relative.name")
-            ?.Item.SingleOrDefault(item => item.LinkId == "relative.name.family")
-            ?.Answer.FirstOrDefault()
-            ?.Value.ToString();
-        Assert.Equal(familyName, actualRelative2FamilyNameAnswer);
-
-        var actualRelative2GivenNamesAnswer = actualRelativeAnswers[1].Item
-            .Where(item => item.LinkId == "relative.name")
-            .Select(
-                item =>
-                    item.Item
-                        .SingleOrDefault(item => item.LinkId == "relative.name.given")
-                        ?.Answer.Select(answer => answer.Value.ToString())
-            );
-        Assert.Equivalent(new[] { new[] { "Elizabeth" } }, actualRelative2GivenNamesAnswer);
+            group.Should().BeEquivalentTo(expected);
+        }
     }
 }

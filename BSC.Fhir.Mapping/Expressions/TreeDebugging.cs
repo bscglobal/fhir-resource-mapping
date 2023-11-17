@@ -53,23 +53,23 @@ internal static class TreeDebugging
             }
         }
 
-        Console.WriteLine(prefix + "│");
-        Console.WriteLine(prefix + "├─ " + "ExtractionContext");
-        var childPrefix = prefix + "│     ";
-        Console.WriteLine(childPrefix + "│");
-        Console.WriteLine(
-            childPrefix
-                + "└─ "
-                + (
-                    scope.ExtractionContextValue() is ExtractionContext contextValue
-                        ? contextValue.Value.GetType()
-                        : "Nope"
-                )
-        );
+        // Console.WriteLine(prefix + "│");
+        // Console.WriteLine(prefix + "├─ " + "ExtractionContext");
+        // var childPrefix = prefix + "│     ";
+        // Console.WriteLine(childPrefix + "│");
+        // Console.WriteLine(
+        //     childPrefix
+        //         + "└─ "
+        //         + (
+        //             scope.ExtractionContextValue() is ExtractionContext contextValue
+        //                 ? contextValue.Value.GetType()
+        //                 : "Nope"
+        //         )
+        // );
 
         Console.WriteLine(prefix + "│");
         Console.WriteLine(prefix + (hasChildren ? "├─ " : "└─ ") + "ResponseItem Answer");
-        childPrefix = prefix + (hasChildren ? "│     " : "      ");
+        var childPrefix = prefix + (hasChildren ? "│     " : "      ");
         Console.WriteLine(childPrefix + "│");
         Console.WriteLine(
             childPrefix

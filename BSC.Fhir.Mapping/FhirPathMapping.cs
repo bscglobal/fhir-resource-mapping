@@ -13,7 +13,7 @@ namespace BSC.Fhir.Mapping;
 
 using BaseList = IReadOnlyCollection<Base>;
 
-public record EvaluationResult(Base[] Result, Base? SourceResource, string? Name);
+public record EvaluationResult(IReadOnlyCollection<Base> Result, Type? SourceResourceType, string? Name);
 
 public class FhirPathMapping
 {
@@ -22,10 +22,10 @@ public class FhirPathMapping
 
     private class EvaluationContext
     {
-        public Base? Resource { get; set; }
+        public IEnumerable<Base>? Resource { get; set; }
         public string Expression { get; set; }
 
-        public EvaluationContext(string expression, Base? resource = null)
+        public EvaluationContext(string expression, IReadOnlyCollection<Base>? resource = null)
         {
             Expression = expression;
             Resource = resource;
@@ -49,19 +49,29 @@ public class FhirPathMapping
 
         try
         {
-            var element = evaluationCtx.Resource?.ToTypedElement() ?? ElementNode.ForPrimitive(true);
-            var result = CACHE
-                .Select(
-                    element,
-                    evaluationCtx.Expression,
-                    evaluationCtx.Resource is not null
-                        ? new FhirEvaluationContext(ElementNodeExtensions.ToScopedNode(element))
-                        : null
-                )
-                .ToFhirValues()
-                .ToArray();
+            var totalResults = new List<Base>();
+            var elements =
+                evaluationCtx.Resource?.Select(r => r.ToTypedElement()) ?? new[] { ElementNode.ForPrimitive(true) };
+            foreach (var element in elements)
+            {
+                var result = CACHE
+                    .Select(
+                        element,
+                        evaluationCtx.Expression,
+                        evaluationCtx.Resource is not null
+                            ? new FhirEvaluationContext(ElementNodeExtensions.ToScopedNode(element))
+                            : null
+                    )
+                    .ToFhirValues();
 
-            return new EvaluationResult(result, evaluationCtx.Resource, expressionName);
+                totalResults.AddRange(result);
+            }
+
+            return new EvaluationResult(
+                totalResults,
+                evaluationCtx.Resource?.FirstOrDefault()?.GetType(),
+                expressionName
+            );
         }
         catch (Exception e)
         {
@@ -78,44 +88,6 @@ public class FhirPathMapping
             );
             return null;
         }
-    }
-
-    public Type? EvaluateTypeFromExpr(FhirPathExpression expr)
-    {
-        var evaluationCtx = GetEvaluationContext(expr);
-
-        if (evaluationCtx?.Resource is not null)
-        {
-            var evalResult = FhirPathExtensions.Select(
-                evaluationCtx.Resource,
-                evaluationCtx.Expression,
-                new FhirEvaluationContext { Resource = evaluationCtx.Resource.ToTypedElement() }
-            );
-
-            if (evalResult.Any())
-            {
-                return evalResult.First().GetType();
-            }
-            else
-            {
-                var currentContext = evaluationCtx.Resource.GetType();
-                foreach (var part in evaluationCtx.Expression.Split('.')[1..])
-                {
-                    var fieldName = part[0..1].ToUpper() + part[1..];
-                    var newContext = currentContext.GetProperty(fieldName)?.PropertyType.NonParameterizedType();
-                    if (newContext is null)
-                    {
-                        break;
-                    }
-
-                    currentContext = newContext;
-                }
-
-                return currentContext;
-            }
-        }
-
-        return null;
     }
 
     private EvaluationContext? GetEvaluationContext(FhirPathExpression expr)
@@ -136,11 +108,11 @@ public class FhirPathMapping
         }
         else if (expr.Scope.ExtractionContext() is IQuestionnaireContext<BaseList> context)
         {
-            evaluationCtx = new(expr.Expression, context.Value?.FirstOrDefault());
+            evaluationCtx = new(expr.Expression, context.Value is not null ? context.Value : null);
         }
         else
         {
-            _logger.LogError("Could not find evaluation context for expression {0}", expr);
+            _logger.LogError("Could not find evaluation context for expression {0}", expr.Expression);
             evaluationCtx = new(expr.Expression);
         }
 
@@ -149,7 +121,7 @@ public class FhirPathMapping
 
     private EvaluationContext ResourceEvaluationSource(string expr, Scope scope)
     {
-        return new(expr, scope.QuestionnaireResponse);
+        return new(expr, new[] { scope.QuestionnaireResponse });
     }
 
     private static EvaluationContext QuestionnaireEvaluationSource(string[] exprParts, Scope scope)
@@ -157,7 +129,7 @@ public class FhirPathMapping
         exprParts[0] = "%resource";
         var execExpr = string.Join('.', exprParts);
 
-        return new(execExpr, scope.Questionnaire);
+        return new(execExpr, new[] { scope.Questionnaire });
     }
 
     private static EvaluationContext ContextEvaluationSource(string[] exprParts, Scope scope)
@@ -167,7 +139,7 @@ public class FhirPathMapping
 
         Base? source = scope.ResponseItem as Base ?? scope.ResponseItem;
 
-        return new(execExpr, source);
+        return new(execExpr, source is not null ? new[] { source } : null);
     }
 
     private static EvaluationContext QItemEvaluationSource(string[] exprParts, Scope scope)
@@ -184,7 +156,7 @@ public class FhirPathMapping
             _ => scope.Item
         };
 
-        return new(execExpr, source);
+        return new(execExpr, new[] { source });
     }
 
     private EvaluationContext? VariableEvaluationSource(string[] exprParts, FhirPathExpression expression)
@@ -197,7 +169,7 @@ public class FhirPathMapping
         {
             exprParts[0] = "%resource";
             var execExpr = string.Join('.', exprParts);
-            evaluationCtx = new(execExpr, context.Value.First());
+            evaluationCtx = new(execExpr, context.Value);
         }
         else if (context?.Value?.Count == 0)
         {

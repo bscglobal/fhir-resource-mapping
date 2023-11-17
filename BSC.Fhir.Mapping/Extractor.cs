@@ -56,6 +56,8 @@ public class Extractor : IExtractor
             throw new InvalidOperationException("Could not extract resources");
         }
 
+        // TreeDebugging.PrintTree(rootScope);
+
         return await ExtractByDefinition(rootScope, cancellationToken);
     }
 
@@ -70,7 +72,6 @@ public class Extractor : IExtractor
         {
             extractedResources.Add(rootResource);
         }
-        TreeDebugging.PrintTree(scope);
 
         return new Bundle
         {
@@ -143,52 +144,6 @@ public class Extractor : IExtractor
         await ExtractByDefinition(scope.Children, extractionResult, cancellationToken);
 
         extractionResult.Add(context);
-    }
-
-    private Resource? GetContextResource(IReadOnlyCollection<Resource> resources, MappingContext ctx)
-    {
-        var keyExtension = ctx.QuestionnaireItem.GetExtension("extractionContextId");
-
-        if (keyExtension?.Value is not Expression idExpression)
-        {
-            _logger.LogWarning(
-                "could not find key on extractionContext for QuestionnaireItem {0}",
-                ctx.QuestionnaireItem.LinkId
-            );
-            return null;
-        }
-
-        // var result = FhirPathMapping.EvaluateExpr(idExpression.Expression_, ctx);
-        EvaluationResult? result = null;
-        if (result is null || result.Result.Length == 0)
-        {
-            _logger.LogWarning(
-                "could not resolve expression {0} on QuestionnaireItem {1}",
-                idExpression.Expression_,
-                ctx.QuestionnaireItem.LinkId
-            );
-            return null;
-        }
-
-        if (result.Result.Length > 1)
-        {
-            _logger.LogWarning(
-                "key expression {0} resolved to more than one value for {1}",
-                idExpression.Expression_,
-                ctx.QuestionnaireItem.LinkId
-            );
-            return null;
-        }
-
-        if (result.Result.First() is not FhirString str)
-        {
-            _logger.LogWarning("key does not resolve to string");
-            return null;
-        }
-
-        var resource = resources.FirstOrDefault(resource => resource.Id == str.Value);
-
-        return resource;
     }
 
     private async Task ExtractComplexTypeValueByDefinition(
@@ -280,17 +235,13 @@ public class Extractor : IExtractor
                 var val = fieldInfo.GetValue(extractionContext.Value) as IList;
 
                 _logger.LogDebug("Enumerable: {@Value}", val);
-                if (
-                    val is not null
-                    && scope.ResponseItem.HasAnswers()
-                    && !extractionContext.DirtyFields.Contains(fieldInfo)
-                )
+                if (val is not null && scope.HasAnswers() && !extractionContext.DirtyFields.Contains(fieldInfo))
                 {
                     _logger.LogDebug("Clearing list {Name}", fieldInfo.Name);
                     val.Clear();
                 }
 
-                if (scope.ResponseItem.HasAnswers())
+                if (scope.HasAnswers())
                 {
                     val?.Add(value);
                 }
@@ -327,7 +278,11 @@ public class Extractor : IExtractor
             throw new InvalidOperationException($"ExtractionContext at LinkId {scope.Item?.LinkId ?? "root"} is null");
         }
 
-        _logger.LogDebug("Extracting primitive value for Definition {Definition}", scope.Item.Definition);
+        _logger.LogDebug(
+            "Extracting primitive value for Definition {Definition} on Type {Type}",
+            scope.Item.Definition,
+            extractionContext.Value.GetType().Name
+        );
 
         var calculatedValue =
             scope.Context.FirstOrDefault(
@@ -373,9 +328,9 @@ public class Extractor : IExtractor
                 {
                     sourceType = ModelInfo.GetTypeForFhirType(referenceType.Value);
                 }
-                else if (calculatedValue?.SourceResource is not null)
+                else if (calculatedValue?.SourceResourceType is not null)
                 {
-                    sourceType = calculatedValue.SourceResource.GetType();
+                    sourceType = calculatedValue.SourceResourceType;
                 }
 
                 if (sourceType is not null)
@@ -484,10 +439,11 @@ public class Extractor : IExtractor
 
         if (
             scope.ResponseItem is not null
+            && extractionContext.Value is IExtendable extendable
             && IsExtensionSupportedByProfile(profileContext.Profile, extensionForType, fieldName)
         )
         {
-            AddDefinitionBasedCustomExtension(extractionContext.Value, item, scope.ResponseItem);
+            AddDefinitionBasedCustomExtension(extendable, item, scope.ResponseItem);
         }
         else
         {
@@ -665,6 +621,7 @@ public class Extractor : IExtractor
                 )
         };
 
+        _logger.LogDebug("Creating resource reference to {Type}", referenceType.Name);
         var referenceStr = idStr.Contains('/') ? idStr : $"{ModelInfo.GetFhirTypeNameForType(referenceType)}/{idStr}";
         return new ResourceReference(referenceStr);
     }
@@ -722,7 +679,7 @@ public class Extractor : IExtractor
             return;
         }
 
-        if (extractionContext.DirtyFields.Contains(fieldInfo) == true)
+        if (!extractionContext.DirtyFields.Contains(fieldInfo) == true && scope.HasAnswers())
         {
             field.Clear();
         }
@@ -839,18 +796,20 @@ public class Extractor : IExtractor
     }
 
     private void AddDefinitionBasedCustomExtension(
-        Base extractionContext,
+        IExtendable extractionContext,
         Questionnaire.ItemComponent item,
         QuestionnaireResponse.ItemComponent responseItem
     )
     {
-        if (extractionContext is DataType dataType)
+        var value = responseItem.Answer.First().Value;
+        var existing = extractionContext.GetExtension(item.Definition);
+        if (existing is not null)
         {
-            dataType.AddExtension(item.Definition, responseItem.Answer.First().Value);
+            existing.Value = value;
         }
-        else if (extractionContext is DomainResource domainResource)
+        else
         {
-            domainResource.AddExtension(item.Definition, responseItem.Answer.First().Value);
+            extractionContext.AddExtension(item.Definition, value);
         }
     }
 }

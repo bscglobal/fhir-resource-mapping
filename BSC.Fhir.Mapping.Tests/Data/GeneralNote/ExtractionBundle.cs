@@ -6,7 +6,7 @@ namespace BSC.Fhir.Mapping.Tests.Data;
 public partial class GeneralNote
 {
     public static Bundle ExtractionBundle(
-        string compositionId,
+        string? compositionId,
         string patientId,
         string userId,
         string noteId,

@@ -69,7 +69,7 @@ public class ExtractorTests
         };
     }
 
-    private static object[] GeneralNoteTestCase()
+    private static object[] NewGeneralNoteTestCase()
     {
         var patientId = Guid.NewGuid().ToString();
         var compositionId = Guid.NewGuid().ToString();
@@ -82,7 +82,38 @@ public class ExtractorTests
         {
             GeneralNote.CreateQuestionnaire(),
             GeneralNote.CreateQuestionnaireResponse(compositionId, noteId, imageIds),
-            GeneralNote.ResourceLoaderResponse(compositionId),
+            GeneralNote.EmptyResourceLoaderResponse(compositionId),
+            new Dictionary<string, StructureDefinition> { { "Composition", GeneralNote.CreateProfile() } },
+            new Dictionary<string, Resource>
+            {
+                {
+                    "user",
+                    new Practitioner { Id = userId }
+                },
+                {
+                    "patient",
+                    new Patient { Id = patientId }
+                }
+            },
+            GeneralNote.ExtractionBundle(compositionId, patientId, userId, noteId, imageIds)
+        };
+    }
+
+    private static object[] UpdatedGeneralNoteTestCase()
+    {
+        var patientId = Guid.NewGuid().ToString();
+        var compositionId = Guid.NewGuid().ToString();
+        var userId = Guid.NewGuid().ToString();
+        var originalImageIds = new string[4]
+            .Select(_ => Guid.NewGuid().ToString())
+            .ToArray();
+        var newImageIds = new[] { originalImageIds[0], originalImageIds[2], Guid.NewGuid().ToString() };
+        var noteId = Guid.NewGuid().ToString();
+        return new object[]
+        {
+            GeneralNote.CreateQuestionnaire(),
+            GeneralNote.CreateQuestionnaireResponse(compositionId, noteId, originalImageIds),
+            GeneralNote.ResourceLoaderResponse(compositionId, patientId, userId, newImageIds, noteId),
             new Dictionary<string, StructureDefinition> { { "Composition", GeneralNote.CreateProfile() } },
             new Dictionary<string, Resource>
             {
@@ -99,7 +130,7 @@ public class ExtractorTests
                     new Composition { Id = compositionId }
                 }
             },
-            GeneralNote.ExtractionBundle(compositionId, patientId, userId, noteId, imageIds)
+            GeneralNote.ExtractionBundle(compositionId, patientId, userId, noteId, originalImageIds)
         };
     }
 
@@ -107,9 +138,10 @@ public class ExtractorTests
     {
         return new[]
         {
-            DemographicsTestCase(), //
-            ServiceRequestTestCase(), //
-            GeneralNoteTestCase()
+            DemographicsTestCase(),
+            ServiceRequestTestCase(),
+            NewGeneralNoteTestCase(),
+            UpdatedGeneralNoteTestCase()
         };
     }
 
@@ -193,7 +225,17 @@ public class ExtractorTests
             actualResources.Select(a => a.Id).Should().Contain(expected.Id);
             var actual = actualResources.FirstOrDefault(r => r.Id == expected.Id);
             actual.Should().NotBeNull();
-            actual.Should().BeEquivalentTo(expected, equivalancyOptions);
+            // _output.WriteLine(expected.ToJson(new() { Pretty = true }));
+            // _output.WriteLine(actual.ToJson(new() { Pretty = true }));
+            actual
+                .Should()
+                .BeEquivalentTo(
+                    expected,
+                    equivalancyOptions,
+                    "because {0} should be the same as {1}",
+                    actual.ToJson(new() { Pretty = true }),
+                    expected.ToJson(new() { Pretty = true })
+                );
         }
     }
 }

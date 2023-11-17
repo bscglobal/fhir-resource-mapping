@@ -88,7 +88,7 @@ public class DependencyResolver
         }
 
         await ResolveDependenciesAsync(cancellationToken);
-        // TreeDebugging.PrintTree(_scopeTree.CurrentScope);
+        TreeDebugging.PrintTree(_scopeTree.CurrentScope);
 
         return _scopeTree.CurrentScope;
     }
@@ -189,7 +189,7 @@ public class DependencyResolver
                     new[] { Constants.FHIRPATH_MIME, Constants.FHIR_QUERY_MIME },
                     QuestionnaireContextType.VariableExpression
                 ),
-            Constants.CALCULATED_EXPRESSION
+            Constants.CALCULATED_EXPRESSION when _resolvingContext == ResolvingContext.Extraction
                 => ParseExpressionExtension(
                     extension,
                     new[] { Constants.FHIRPATH_MIME },
@@ -593,7 +593,7 @@ public class DependencyResolver
 
             var fhirpathResult = evalResult.Result;
 
-            if (fhirpathResult.Length == 0)
+            if (fhirpathResult.Count == 0)
             {
                 BaseList? value = null;
                 if (
@@ -613,10 +613,11 @@ public class DependencyResolver
                 continue;
             }
 
-            query.SetValue(fhirpathResult, evalResult.SourceResource);
+            _logger.LogDebug("Got {Count} results for FHIRPath {Expr}", fhirpathResult.Count, query.Expression);
+            query.SetValue(fhirpathResult, evalResult.SourceResourceType);
             if (query.Type == QuestionnaireContextType.Embedded)
             {
-                if (fhirpathResult.Length > 1)
+                if (fhirpathResult.Count > 1)
                 {
                     _logger.LogWarning("Embedded {0} has more than one result", query.Expression);
                     continue;
@@ -640,14 +641,15 @@ public class DependencyResolver
                 }
             }
             else if (
-                fhirpathResult.Length == 1 && fhirpathResult.First() is QuestionnaireResponse.ItemComponent responseItem
+                fhirpathResult.Count == 1 && fhirpathResult.First() is QuestionnaireResponse.ItemComponent responseItem
             )
             {
                 query.SetValue(responseItem.Answer.Select(a => a.Value).ToArray());
             }
-            else if (!fhirpathResult.First().GetType().IsSubclassOf(typeof(PrimitiveType)) && fhirpathResult.Length > 1)
+            else if (!fhirpathResult.First().GetType().IsSubclassOf(typeof(PrimitiveType)) && fhirpathResult.Count > 1)
             {
-                ExplodeExpression(fhirpathResult, new[] { query }, query.Scope, evalResult.SourceResource);
+                _logger.LogDebug("exploding {Expr}", query.Expression);
+                ExplodeExpression(fhirpathResult, new[] { query }, query.Scope, evalResult.SourceResourceType);
                 return true;
             }
         }
@@ -659,9 +661,10 @@ public class DependencyResolver
         IReadOnlyCollection<Base> results,
         IReadOnlyCollection<IQuestionnaireExpression<BaseList>> originalExprs,
         Scope scope,
-        Base? sourceResource = null
+        Type? sourceResourceType = null
     )
     {
+        _logger.LogDebug("Exploding expressions for result on scope {LinkId}", scope.Item?.LinkId ?? "root");
         if (scope.Item is null)
         {
             _logger.LogError("Cannot explode expression on root");
@@ -675,6 +678,11 @@ public class DependencyResolver
                 child => child.Item is not null && child.Item.LinkId == scope.Item.LinkId
             );
 
+            _logger.LogDebug(
+                "There are {Count} existing scopes with LinkId {LinkId}",
+                existingScopes.Count,
+                scope.Item.LinkId
+            );
             foreach (var existing in existingScopes)
             {
                 var linkId = existing.Item!.LinkId;
@@ -690,7 +698,7 @@ public class DependencyResolver
 
                 var extractionExpr =
                     existing.Context.FirstOrDefault(ctx => ctx.Type == QuestionnaireContextType.ExtractionContext)
-                    as FhirQueryExpression;
+                    as IQuestionnaireExpression<BaseList>;
 
                 if (extractionExpr is null)
                 {
@@ -700,7 +708,7 @@ public class DependencyResolver
 
                 var result = _fhirPathEvaluator.EvaluateExpr(extractionIdExpr);
                 Resource? resource = null;
-                if (result is null || result.Result.Length == 0)
+                if (result is null || result.Result.Count == 0)
                 {
                     _logger.LogWarning(
                         "Could not resolve expression {0} on QuestionnaireItem {1}",
@@ -710,7 +718,7 @@ public class DependencyResolver
                 }
                 else
                 {
-                    if (result.Result.Length > 1)
+                    if (result.Result.Count > 1)
                     {
                         _logger.LogWarning(
                             "Key expression {0} resolved to more than one value for {1}",
@@ -727,17 +735,38 @@ public class DependencyResolver
                     }
 
                     resource = resources.FirstOrDefault(resource => resource.Id == str.Value);
+                    if (resource is not null)
+                    {
+                        _logger.LogDebug("Found resource for value {Value}", str.Value);
+                    }
                 }
 
                 if (resource is null)
                 {
-                    var fhirTypeName = extractionExpr.Expression.Split('?').FirstOrDefault();
-                    if (
-                        !string.IsNullOrEmpty(fhirTypeName)
-                        && ModelInfo.GetTypeForFhirType(fhirTypeName) is Type fhirType
+                    _logger.LogDebug("Creating new resource during explosing for {Expr}", extractionExpr.Expression);
+                    string? query = null;
+                    if (extractionExpr is FhirQueryExpression)
+                    {
+                        query = extractionExpr.Expression;
+                    }
+                    else if (
+                        extractionExpr.Dependencies.FirstOrDefault(dep => dep is FhirQueryExpression)
+                        is FhirQueryExpression expr
                     )
                     {
-                        resource = Activator.CreateInstance(fhirType) as Resource;
+                        query = expr.Expression;
+                    }
+
+                    if (!string.IsNullOrEmpty(query))
+                    {
+                        var fhirTypeName = query.Split('?').FirstOrDefault();
+                        if (
+                            !string.IsNullOrEmpty(fhirTypeName)
+                            && ModelInfo.GetTypeForFhirType(fhirTypeName) is Type fhirType
+                        )
+                        {
+                            resource = Activator.CreateInstance(fhirType) as Resource;
+                        }
                     }
                 }
 
@@ -760,9 +789,9 @@ public class DependencyResolver
                     foreach (var expr in newExprs)
                     {
                         var value = new[] { result };
-                        if (expr is FhirPathExpression fhirpathExpr && sourceResource is not null)
+                        if (expr is FhirPathExpression fhirpathExpr && sourceResourceType is not null)
                         {
-                            fhirpathExpr.SetValue(value, sourceResource);
+                            fhirpathExpr.SetValue(value, sourceResourceType);
                         }
                         else
                         {
@@ -890,15 +919,16 @@ public class DependencyResolver
             var scopeExprs = exprs.GroupBy(expr => expr.Scope);
 
             var scope = scopeExprs.First();
-            ExplodeExpression(result.Value, scope.ToArray(), scope.Key);
-            return true;
-        }
-        else
-        {
-            foreach (var expr in exprs)
+            if (scope.Key.Item is not null)
             {
-                expr.SetValue(result.Value);
+                ExplodeExpression(result.Value, scope.ToArray(), scope.Key);
+                return true;
             }
+        }
+
+        foreach (var expr in exprs)
+        {
+            expr.SetValue(result.Value);
         }
 
         return false;

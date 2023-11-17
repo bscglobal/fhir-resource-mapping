@@ -7,7 +7,7 @@ using BaseList = IReadOnlyCollection<Base>;
 
 public class FhirPathExpression : QuestionnaireExpression<BaseList>
 {
-    public Base? SourceResource { get; private set; }
+    public Type? SourceResourceType { get; private set; }
 
     public FhirPathExpression(
         int id,
@@ -50,9 +50,9 @@ public class FhirPathExpression : QuestionnaireExpression<BaseList>
         };
     }
 
-    public void SetValue(BaseList value, Base? source)
+    public void SetValue(BaseList value, Type? sourceType)
     {
         SetValue(value);
-        SourceResource = source;
+        SourceResourceType = sourceType;
     }
 }
