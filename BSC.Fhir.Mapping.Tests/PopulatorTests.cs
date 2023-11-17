@@ -5,7 +5,6 @@ using BSC.Fhir.Mapping.Tests.Data;
 using BSC.Fhir.Mapping.Tests.Mocks;
 using FluentAssertions;
 using Hl7.Fhir.Model;
-using Hl7.Fhir.Serialization;
 using Moq;
 using Xunit.Abstractions;
 using Task = System.Threading.Tasks.Task;
@@ -108,20 +107,27 @@ public class PopulatorTests
             )
             .ReturnsAsync(resourceLoaderResponse);
 
-        var factoryMock = new Mock<IDependencyResolverFactory>();
-        factoryMock
+        var scopeTreeCreatorMock = new Mock<IScopeTreeCreator>();
+        scopeTreeCreatorMock
             .Setup(
                 factory =>
-                    factory.CreateDependencyResolver(
+                    factory.CreateScopeTreeAsync(
                         It.IsAny<Questionnaire>(),
                         It.IsAny<QuestionnaireResponse>(),
                         It.IsAny<Dictionary<string, Resource>>(),
-                        It.IsAny<ResolvingContext>()
+                        It.IsAny<ResolvingContext>(),
+                        It.IsAny<CancellationToken>()
                     )
             )
-            .Returns<Questionnaire, QuestionnaireResponse, Dictionary<string, Resource>, ResolvingContext>(
-                (questionnaire, questionnaireResponse, launchContext, resolvingContext) =>
-                    new DependencyResolver(
+            .Returns<
+                Questionnaire,
+                QuestionnaireResponse,
+                Dictionary<string, Resource>,
+                ResolvingContext,
+                CancellationToken
+            >(
+                (questionnaire, questionnaireResponse, launchContext, resolvingContext, cancellationToken) =>
+                    new QuestionnaireParser(
                         new NumericIdProvider(),
                         questionnaire,
                         questionnaireResponse,
@@ -129,15 +135,15 @@ public class PopulatorTests
                         resourceLoaderMock.Object,
                         resolvingContext,
                         new FhirPathMapping(new TestLogger<FhirPathMapping>(_output)),
-                        new TestLogger<DependencyResolver>(_output)
-                    )
+                        new TestLogger<QuestionnaireParser>(_output)
+                    ).ParseQuestionnaireAsync(cancellationToken)
             );
 
         var populator = new Populator(
             new NumericIdProvider(),
             resourceLoaderMock.Object,
             new TestLogger<Populator>(_output),
-            factoryMock.Object
+            scopeTreeCreatorMock.Object
         );
 
         var actualResponse = await populator.PopulateAsync(questionnaire, launchContext);

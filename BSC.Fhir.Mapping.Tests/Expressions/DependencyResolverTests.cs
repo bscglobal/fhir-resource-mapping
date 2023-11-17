@@ -91,7 +91,7 @@ public class DependencyResolverTests
         };
 
         var questionnaireResponse = new QuestionnaireResponse();
-        var resolver = new DependencyResolver(
+        var resolver = new QuestionnaireParser(
             idProvider,
             questionnaire,
             questionnaireResponse,
@@ -99,7 +99,7 @@ public class DependencyResolverTests
             resourceLoader.Object,
             ResolvingContext.Population,
             new FhirPathMapping(new TestLogger<FhirPathMapping>(_output)),
-            new TestLogger(_output)
+            new TestLogger<QuestionnaireParser>(_output)
         );
 
         await resolver.ParseQuestionnaireAsync();

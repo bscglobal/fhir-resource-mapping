@@ -22,7 +22,7 @@ public class ScopeTree
         _currentScope = new(questionnaire, questionnaireResponse, idProvider);
     }
 
-    public void PushScope(Questionnaire.ItemComponent item, QuestionnaireResponse.ItemComponent? responseItem = null)
+    public void PushScope(Questionnaire.ItemComponent item, QuestionnaireResponse.ItemComponent responseItem)
     {
         _currentScope = new(_currentScope, item, responseItem, _idProvider);
     }
