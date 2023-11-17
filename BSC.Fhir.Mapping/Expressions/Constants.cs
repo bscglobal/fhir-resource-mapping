@@ -30,5 +30,5 @@ public static class Constants
         QuestionnaireContextType.ExtractionContext,
         QuestionnaireContextType.ExtractionContextId
     };
-    public static readonly string[] POPULATION_DEPENDANT_CONTEXT = new[] { "%resource", "%context" };
+    public static readonly string[] RESPONSE_DEPENDANT_CONTEXT = new[] { "%resource", "%context" };
 }

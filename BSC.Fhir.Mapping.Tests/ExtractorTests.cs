@@ -180,20 +180,27 @@ public class ExtractorTests
                 (url, _) => Task.FromResult(profiles.TryGetValue(url.Value, out var profile) ? profile : null)
             );
 
-        var factoryMock = new Mock<IDependencyResolverFactory>();
-        factoryMock
+        var scopeTreeCreatorMock = new Mock<IScopeTreeCreator>();
+        scopeTreeCreatorMock
             .Setup(
                 factory =>
-                    factory.CreateDependencyResolver(
+                    factory.CreateScopeTreeAsync(
                         It.IsAny<Questionnaire>(),
                         It.IsAny<QuestionnaireResponse>(),
                         It.IsAny<Dictionary<string, Resource>>(),
-                        It.IsAny<ResolvingContext>()
+                        It.IsAny<ResolvingContext>(),
+                        It.IsAny<CancellationToken>()
                     )
             )
-            .Returns<Questionnaire, QuestionnaireResponse, Dictionary<string, Resource>, ResolvingContext>(
-                (questionnaire, questionnaireResponse, launchContext, resolvingContext) =>
-                    new DependencyResolver(
+            .Returns<
+                Questionnaire,
+                QuestionnaireResponse,
+                Dictionary<string, Resource>,
+                ResolvingContext,
+                CancellationToken
+            >(
+                (questionnaire, questionnaireResponse, launchContext, resolvingContext, cancellationToken) =>
+                    new QuestionnaireParser(
                         new NumericIdProvider(),
                         questionnaire,
                         questionnaireResponse,
@@ -201,8 +208,8 @@ public class ExtractorTests
                         resourceLoaderMock.Object,
                         resolvingContext,
                         new FhirPathMapping(new TestLogger<FhirPathMapping>(_output)),
-                        new TestLogger<DependencyResolver>(_output)
-                    )
+                        new TestLogger<QuestionnaireParser>(_output)
+                    ).ParseQuestionnaireAsync(cancellationToken)
             );
 
         var expectedResources = expectedBundle.Entry.Select(e => e.Resource);
@@ -211,8 +218,8 @@ public class ExtractorTests
         var extractor = new Extractor(
             resourceLoaderMock.Object,
             profileLoaderMock.Object,
-            factoryMock.Object,
-            new TestLogger<Extractor>(_output)
+            new TestLogger<Extractor>(_output),
+            scopeTreeCreatorMock.Object
         );
         var actualBundle = await extractor.ExtractAsync(questionnaire, response, launchContext);
 

@@ -1,7 +1,6 @@
 using BSC.Fhir.Mapping.Core;
 using BSC.Fhir.Mapping.Core.Expressions;
 using BSC.Fhir.Mapping.Expressions;
-using BSC.Fhir.Mapping.Logging;
 using Hl7.Fhir.Model;
 using Microsoft.Extensions.Logging;
 
@@ -11,20 +10,20 @@ public class Populator : IPopulator
 {
     private readonly INumericIdProvider _idProvider;
     private readonly IResourceLoader _resourceLoader;
-    private readonly ILogger _logger;
-    private readonly IDependencyResolverFactory _dependencyResolverFactory;
+    private readonly ILogger<Populator> _logger;
+    private readonly IScopeTreeCreator _scopeTreeCreator;
 
     public Populator(
         INumericIdProvider idProvider,
         IResourceLoader resourceLoader,
-        ILogger logger,
-        IDependencyResolverFactory dependencyResolverFactory
+        ILogger<Populator> logger,
+        IScopeTreeCreator scopeTreeCreator
     )
     {
         _idProvider = idProvider;
         _resourceLoader = resourceLoader;
-        _logger = logger ?? FhirMappingLogging.GetLogger();
-        _dependencyResolverFactory = dependencyResolverFactory;
+        _logger = logger;
+        _scopeTreeCreator = scopeTreeCreator;
     }
 
     public async Task<QuestionnaireResponse> PopulateAsync(
@@ -36,13 +35,13 @@ public class Populator : IPopulator
         _logger.LogDebug("Populating QuestionnaireResponse from Questionnaire ({Name})", questionnaire.Title);
         var response = new QuestionnaireResponse();
 
-        var resolver = _dependencyResolverFactory.CreateDependencyResolver(
+        var rootScope = await _scopeTreeCreator.CreateScopeTreeAsync(
             questionnaire,
             response,
             launchContext,
-            ResolvingContext.Population
+            ResolvingContext.Population,
+            cancellationToken
         );
-        var rootScope = await resolver.ParseQuestionnaireAsync(cancellationToken);
 
         if (rootScope is null)
         {

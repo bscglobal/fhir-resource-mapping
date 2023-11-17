@@ -1,17 +1,14 @@
-using System.Text.Json;
 using System.Text.RegularExpressions;
 using BSC.Fhir.Mapping.Core;
 using BSC.Fhir.Mapping.Core.Expressions;
-using BSC.Fhir.Mapping.Logging;
 using Hl7.Fhir.Model;
-using Hl7.Fhir.Serialization;
 using Microsoft.Extensions.Logging;
 
 namespace BSC.Fhir.Mapping.Expressions;
 
 using BaseList = IReadOnlyCollection<Base>;
 
-public class DependencyResolver
+public class QuestionnaireParser
 {
     private readonly INumericIdProvider _idProvider;
     private readonly ScopeTree _scopeTree;
@@ -21,10 +18,10 @@ public class DependencyResolver
     private readonly ResolvingContext _resolvingContext;
     private readonly QuestionnaireContextType[] _notAllowedContextTypes;
     private readonly Dictionary<string, IReadOnlyCollection<Resource>> _queryResults = new();
-    private readonly ILogger _logger;
+    private readonly ILogger<QuestionnaireParser> _logger;
     private readonly FhirPathMapping _fhirPathEvaluator;
 
-    public DependencyResolver(
+    public QuestionnaireParser(
         INumericIdProvider idProvider,
         Questionnaire questionnaire,
         QuestionnaireResponse? questionnaireResponse,
@@ -32,7 +29,7 @@ public class DependencyResolver
         IResourceLoader resourceLoader,
         ResolvingContext resolvingContext,
         FhirPathMapping fhirPathEvaluator,
-        ILogger? logger = null
+        ILogger<QuestionnaireParser> logger
     )
     {
         _questionnaire = questionnaire;
@@ -47,7 +44,7 @@ public class DependencyResolver
             ResolvingContext.Extraction => Constants.POPULATION_ONLY_CONTEXTS,
             _ => Array.Empty<QuestionnaireContextType>()
         };
-        _logger = logger ?? FhirMappingLogging.GetLogger();
+        _logger = logger;
 
         AddLaunchContextToScope(launchContext);
         _fhirPathEvaluator = fhirPathEvaluator;
@@ -62,7 +59,7 @@ public class DependencyResolver
         _scopeTree.CurrentScope.Context.AddRange(scopedLaunchContext);
     }
 
-    public async Task<Scope?> ParseQuestionnaireAsync(CancellationToken cancellationToken = default)
+    public async Task<Scope> ParseQuestionnaireAsync(CancellationToken cancellationToken = default)
     {
         var rootExtensions = _questionnaire.AllExtensions();
 
@@ -71,20 +68,16 @@ public class DependencyResolver
 
         if (_scopeTree.CurrentScope.Parent is not null)
         {
-            _logger.LogError("not in global scope");
-            return null;
+            throw new InvalidOperationException(
+                "Current Scope after parsing has a Parent, meaning it is not the root Scope."
+            );
         }
 
-        var graphResult = CreateDependencyGraph(_scopeTree.CurrentScope);
-        if (graphResult is not null)
-        {
-            return null;
-        }
+        CreateDependencyGraph(_scopeTree.CurrentScope);
 
         if (IsCircularGraph(_scopeTree.CurrentScope) is IQuestionnaireExpression<BaseList> faultyDep)
         {
-            _logger.LogError("detected circular dependency {0}", faultyDep.Expression);
-            return null;
+            throw new InvalidOperationException($"Detected circular dependency {faultyDep.Expression}");
         }
 
         await ResolveDependenciesAsync(cancellationToken);
@@ -257,7 +250,7 @@ public class DependencyResolver
         return query;
     }
 
-    private QuestionnaireExpression<BaseList>? CreateDependencyGraph(Scope scope)
+    private void CreateDependencyGraph(Scope scope)
     {
         for (var i = 0; i < scope.Context.Count; i++)
         {
@@ -267,37 +260,23 @@ public class DependencyResolver
                 continue;
             }
 
-            QuestionnaireExpression<BaseList>? result = null;
             if (query.ExpressionLanguage == Constants.FHIR_QUERY_MIME)
             {
-                result = CalculateFhirQueryDependencies(scope, query);
+                CalculateFhirQueryDependencies(scope, query);
             }
             else if (query is FhirPathExpression fhirpathExpr)
             {
-                result = CalculateFhirPathDependencies(scope, fhirpathExpr);
-            }
-
-            if (result is not null)
-            {
-                return result;
+                CalculateFhirPathDependencies(scope, fhirpathExpr);
             }
         }
 
         foreach (var child in scope.Children)
         {
-            if (CreateDependencyGraph(child) is QuestionnaireExpression<BaseList> expr)
-            {
-                return expr;
-            }
+            CreateDependencyGraph(child);
         }
-
-        return null;
     }
 
-    private QuestionnaireExpression<BaseList>? CalculateFhirQueryDependencies(
-        Scope scope,
-        QuestionnaireExpression<BaseList> query
-    )
+    private void CalculateFhirQueryDependencies(Scope scope, QuestionnaireExpression<BaseList> query)
     {
         var expression = query.Expression;
         var embeddedFhirpathRegex = @"\{\{(.*)\}\}";
@@ -325,12 +304,11 @@ public class DependencyResolver
 
             query.AddDependency(embeddedQuery);
         }
-
-        return null;
     }
 
-    private QuestionnaireExpression<BaseList>? CalculateFhirPathDependencies(Scope scope, FhirPathExpression query)
+    private void CalculateFhirPathDependencies(Scope scope, FhirPathExpression query)
     {
+        // Regex for splitting fhirpath into respective parts, split by a period and including functions
         var fhirpathRegex = @"([^.]+(\((.+\..+)+\)))?([^.]+)?";
         var expression = query.Expression;
 
@@ -339,7 +317,7 @@ public class DependencyResolver
 
         foreach (var variable in variables)
         {
-            if (Constants.POPULATION_DEPENDANT_CONTEXT.Contains(variable))
+            if (Constants.RESPONSE_DEPENDANT_CONTEXT.Contains(variable))
             {
                 query.MakeResponseDependant();
                 continue;
@@ -355,7 +333,7 @@ public class DependencyResolver
             else
             {
                 _logger.LogError(
-                    "Could not find dependency {0} in expression {1} for LinkId {2}",
+                    "Could not find dependency {VarName} in expression {Expression} for LinkId {LinkId}",
                     varName,
                     expression,
                     query.QuestionnaireItem?.LinkId ?? "root"
@@ -390,8 +368,6 @@ public class DependencyResolver
                 }
             }
         }
-
-        return null;
     }
 
     private IQuestionnaireExpression<BaseList>? IsCircularGraph(Scope scope)
@@ -743,7 +719,7 @@ public class DependencyResolver
 
                 if (resource is null)
                 {
-                    _logger.LogDebug("Creating new resource during explosing for {Expr}", extractionExpr.Expression);
+                    _logger.LogDebug("Creating new resource during explosijklng for {Expr}", extractionExpr.Expression);
                     string? query = null;
                     if (extractionExpr is FhirQueryExpression)
                     {
@@ -914,7 +890,7 @@ public class DependencyResolver
     {
         var exprs = unresolvedExpressions.Where(expr => expr.Expression == result.Key).ToArray();
 
-        if (result.Value.Count > 1)
+        if (result.Value.Count > 1 && exprs.Length > 0)
         {
             var scopeExprs = exprs.GroupBy(expr => expr.Scope);
 
