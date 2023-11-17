@@ -77,10 +77,20 @@ public partial class GeneralNote
                             {
                                 System = "http://hl7.org/fhir/uv/sdc/CodeSystem/launchContext",
                                 Code = "composition",
-                                Display = "User"
+                                Display = "Composition"
                             }
                         },
                         new() { Url = "type", Value = new FhirString("Composition") }
+                    }
+                },
+                new Extension
+                {
+                    Url = VARIABLE_EXTENSION_URL,
+                    Value = new Expression
+                    {
+                        Name = "compositionId",
+                        Language = "text/fhirpath",
+                        Expression_ = "%composition.id"
                     }
                 },
                 new Extension
@@ -89,7 +99,7 @@ public partial class GeneralNote
                     Value = new Expression
                     {
                         Language = "application/x-fhir-query",
-                        Expression_ = "Composition?_id={{%composition.id}}"
+                        Expression_ = "Composition?_id={{%compositionId}}"
                     }
                 },
                 new Extension

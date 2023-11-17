@@ -1,10 +1,8 @@
 using System.Collections;
 using System.Reflection;
-using System.Text.Json;
 using BSC.Fhir.Mapping.Core;
 using BSC.Fhir.Mapping.Core.Expressions;
 using BSC.Fhir.Mapping.Expressions;
-using BSC.Fhir.Mapping.Logging;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Validation;
 using Microsoft.Extensions.Logging;
@@ -17,22 +15,22 @@ public class Extractor : IExtractor
     private readonly INumericIdProvider _idProvider;
     private readonly IResourceLoader _resourceLoader;
     private readonly IProfileLoader _profileLoader;
-    private readonly ILogger _logger;
-    private readonly IDependencyResolverFactory _dependencyResolverFactory;
+    private readonly ILogger<Extractor> _logger;
+    private readonly IScopeTreeCreator _scopeTreeCreator;
 
     public Extractor(
         IResourceLoader resourceLoader,
         IProfileLoader profileLoader,
-        IDependencyResolverFactory dependencyResolverFactory,
-        ILogger logger,
+        ILogger<Extractor> logger,
+        IScopeTreeCreator scopeTreeCreator,
         INumericIdProvider? idProvider = null
     )
     {
         _idProvider = idProvider ?? new NumericIdProvider();
         _resourceLoader = resourceLoader;
         _profileLoader = new CachingProfileLoader(profileLoader);
-        _logger = logger ?? FhirMappingLogging.GetLogger();
-        _dependencyResolverFactory = dependencyResolverFactory;
+        _logger = logger;
+        _scopeTreeCreator = scopeTreeCreator;
     }
 
     public async Task<Bundle> ExtractAsync(
@@ -42,14 +40,13 @@ public class Extractor : IExtractor
         CancellationToken cancellationToken = default
     )
     {
-        var resolver = _dependencyResolverFactory.CreateDependencyResolver(
+        var rootScope = await _scopeTreeCreator.CreateScopeTreeAsync(
             questionnaire,
             questionnaireResponse,
             launchContext,
-            ResolvingContext.Extraction
+            ResolvingContext.Extraction,
+            cancellationToken
         );
-
-        var rootScope = await resolver.ParseQuestionnaireAsync(cancellationToken);
 
         if (rootScope is null)
         {

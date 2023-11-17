@@ -38,7 +38,7 @@ public class Scope : IClonable<Scope>
     public Scope(
         Scope parentScope,
         Questionnaire.ItemComponent item,
-        QuestionnaireResponse.ItemComponent? responseItem,
+        QuestionnaireResponse.ItemComponent responseItem,
         INumericIdProvider idProvider
     )
         : this(parentScope.Questionnaire, parentScope.QuestionnaireResponse, idProvider)
