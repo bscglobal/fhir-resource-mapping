@@ -88,7 +88,6 @@ public partial class GeneralNote
                     Url = ITEM_EXTRACTION_CONTEXT_EXTENSION_URL,
                     Value = new Expression
                     {
-                        Name = "extractionComposition",
                         Language = "application/x-fhir-query",
                         Expression_ = "Composition?_id={{%composition.id}}"
                     }
@@ -241,7 +240,6 @@ public partial class GeneralNote
                                             Url = Constants.INITIAL_EXPRESSION,
                                             Value = new Expression
                                             {
-                                                Name = "event",
                                                 Language = "text/fhirpath",
                                                 Expression_ = "%eventPeriod.end"
                                             }
@@ -251,7 +249,6 @@ public partial class GeneralNote
                                             Url = Constants.CALCULATED_EXPRESSION,
                                             Value = new Expression
                                             {
-                                                Name = "event",
                                                 Language = "text/fhirpath",
                                                 Expression_ = "%eventStart"
                                             }
@@ -280,7 +277,12 @@ public partial class GeneralNote
                                 Coding = new() { new() { Code = "dropdown-search-single" } }
                             }
                         },
-                        new() { Url = "answerSetCodeSearch", Value = new FhirString("ProcedureCode") }
+                        new() { Url = "answerSetCodeSearch", Value = new FhirString("ProcedureCode") },
+                        new()
+                        {
+                            Url = Constants.INITIAL_EXPRESSION,
+                            Value = new Expression { Language = "text/fhirpath", Expression_ = "%composition.type" }
+                        }
                     }
                 },
                 new()
@@ -349,7 +351,7 @@ public partial class GeneralNote
                 //                     {
                 //                         Language = "text/fhirpath",
                 //                         Expression_ =
-                //                             "%resource.item.where(linkId='image').select(item.where(linkId='image.id').first().answer.value)"
+                //                             "%resource.item.where(linkId='image').select(item.where(linkId='image.id').first())"
                 //                     }
                 //                 }
                 //             }
@@ -373,6 +375,16 @@ public partial class GeneralNote
                         {
                             Url = ITEM_EXTRACTION_CONTEXT_EXTENSION_URL,
                             Value = new Expression { Language = "text/fhirpath", Expression_ = "%note" }
+                        },
+                        new()
+                        {
+                            Url = Constants.POPULATION_CONTEXT,
+                            Value = new Expression
+                            {
+                                Name = "popNote",
+                                Language = "text/fhirpath",
+                                Expression_ = "%note"
+                            }
                         }
                     },
                     Item =
@@ -386,7 +398,12 @@ public partial class GeneralNote
                             ReadOnly = true,
                             Extension =
                             {
-                                new() { Url = QUESTIONNAIRE_HIDDEN_URL, Value = new FhirBoolean(true) }
+                                new() { Url = QUESTIONNAIRE_HIDDEN_URL, Value = new FhirBoolean(true) },
+                                new()
+                                {
+                                    Url = ITEM_INITIAL_EXPRESSION,
+                                    Value = new Expression { Language = "text/fhirpath", Expression_ = "%popNote.id" }
+                                },
                             }
                         },
                         new()
@@ -421,11 +438,6 @@ public partial class GeneralNote
                             {
                                 new()
                                 {
-                                    Url = ITEM_INITIAL_EXPRESSION,
-                                    Value = new Expression { Language = "text/fhirpath", Expression_ = "%patient.id" }
-                                },
-                                new()
-                                {
                                     Url = QUESTIONNAIRE_ITEM_CALCULATED_EXPRESSION,
                                     Value = new Expression { Language = "text/fhirpath", Expression_ = "%patient.id" }
                                 },
@@ -438,6 +450,19 @@ public partial class GeneralNote
                             Definition = "DocumentReference.content",
                             Type = Questionnaire.QuestionnaireItemType.Group,
                             Repeats = true,
+                            Extension =
+                            {
+                                new()
+                                {
+                                    Url = Constants.POPULATION_CONTEXT,
+                                    Value = new Expression
+                                    {
+                                        Name = "noteContent",
+                                        Language = "text/fhirpath",
+                                        Expression_ = "%popNote.content"
+                                    }
+                                }
+                            },
                             Item =
                             {
                                 new()
@@ -448,7 +473,16 @@ public partial class GeneralNote
                                     Type = Questionnaire.QuestionnaireItemType.Attachment,
                                     Extension =
                                     {
-                                        new() { Url = "attachment-type", Value = new FhirString("Text") }
+                                        new() { Url = "attachment-type", Value = new FhirString("Text") },
+                                        new()
+                                        {
+                                            Url = ITEM_INITIAL_EXPRESSION,
+                                            Value = new Expression
+                                            {
+                                                Language = "text/fhirpath",
+                                                Expression_ = "%noteContent.attachment"
+                                            }
+                                        },
                                     }
                                 },
                             }
@@ -485,6 +519,25 @@ public partial class GeneralNote
                         {
                             Url = ITEM_EXTRACTION_CONTEXT_EXTENSION_URL,
                             Value = new Expression { Language = "text/fhirpath", Expression_ = "%images" }
+                        },
+                        new()
+                        {
+                            Url = Constants.POPULATION_CONTEXT,
+                            Value = new Expression
+                            {
+                                Name = "image",
+                                Language = "text/fhirpath",
+                                Expression_ = "%images"
+                            }
+                        },
+                        new()
+                        {
+                            Url = Constants.EXTRACTION_CONTEXT_ID,
+                            Value = new Expression
+                            {
+                                Language = "text/fhirpath",
+                                Expression_ = "%context.item.where(linkId='image.id').answer.value"
+                            }
                         }
                     },
                     Item =
@@ -514,11 +567,6 @@ public partial class GeneralNote
                             {
                                 new()
                                 {
-                                    Url = ITEM_INITIAL_EXPRESSION,
-                                    Value = new Expression { Language = "text/fhirpath", Expression_ = "%image.author" }
-                                },
-                                new()
-                                {
                                     Url = QUESTIONNAIRE_ITEM_CALCULATED_EXPRESSION,
                                     Value = new Expression { Language = "text/fhirpath", Expression_ = "%user.id" }
                                 },
@@ -545,15 +593,6 @@ public partial class GeneralNote
                             },
                             Extension =
                             {
-                                new()
-                                {
-                                    Url = ITEM_INITIAL_EXPRESSION,
-                                    Value = new Expression
-                                    {
-                                        Language = "text/fhirpath",
-                                        Expression_ = "%image.category"
-                                    }
-                                },
                                 new() { Url = QUESTIONNAIRE_HIDDEN_URL, Value = new FhirBoolean(true) }
                             }
                         },
@@ -565,15 +604,6 @@ public partial class GeneralNote
                             Type = Questionnaire.QuestionnaireItemType.Reference,
                             Extension =
                             {
-                                new()
-                                {
-                                    Url = ITEM_INITIAL_EXPRESSION,
-                                    Value = new Expression
-                                    {
-                                        Language = "text/fhirpath",
-                                        Expression_ = "%image.subject"
-                                    }
-                                },
                                 new()
                                 {
                                     Url = QUESTIONNAIRE_ITEM_CALCULATED_EXPRESSION,

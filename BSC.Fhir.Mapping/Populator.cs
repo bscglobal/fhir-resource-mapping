@@ -97,7 +97,7 @@ public class Populator : IPopulator
         }
 
         var initialExpression =
-            scope.Context.FirstOrDefault(ctx => ctx.Type == Core.Expressions.QuestionnaireContextType.InitialExpression)
+            scope.Context.FirstOrDefault(ctx => ctx.Type == QuestionnaireContextType.InitialExpression)
             as FhirPathExpression;
         if (!(scope.Item.Initial.Count == 0 || initialExpression is null))
         {
@@ -127,9 +127,7 @@ public class Populator : IPopulator
                                 {
                                     Value = result.AsExpectedType(
                                         scope.Item.Type ?? Questionnaire.QuestionnaireItemType.Text,
-                                        initialExpression.SourceResource is Resource resource
-                                            ? resource.GetType()
-                                            : null
+                                        initialExpression.SourceResourceType
                                     )
                                 }
                         )
@@ -155,9 +153,7 @@ public class Populator : IPopulator
                                 {
                                     Value = x.AsExpectedType(
                                         scope.Item.Type ?? Questionnaire.QuestionnaireItemType.Text,
-                                        initialExpression.SourceResource is Resource resource
-                                            ? resource.GetType()
-                                            : null
+                                        initialExpression.SourceResourceType
                                     )
                                 }
                             }
@@ -167,6 +163,10 @@ public class Populator : IPopulator
         }
         else if (scope.Item.Initial.Count > 0)
         {
+            _logger.LogDebug(
+                "Setting QuestionnaireResponse Answer from initial field for LinkId {LinkId}",
+                scope.Item.LinkId
+            );
             return scope.Item.Initial
                 .Select(initial => new QuestionnaireResponse.AnswerComponent() { Value = initial.Value })
                 .ToList();

@@ -21,41 +21,6 @@ public static class MappingExtenstions
         return extension?.Value;
     }
 
-    public static ContextResult? GetContext(this Questionnaire questionnaire, MappingContext ctx)
-    {
-        return questionnaire.GetContext("root", ctx);
-    }
-
-    public static ContextResult? GetContext(this Questionnaire.ItemComponent item, MappingContext ctx)
-    {
-        return item.GetContext(item.LinkId, ctx);
-    }
-
-    private static ContextResult? GetContext(this IExtendable item, string linkId, MappingContext ctx)
-    {
-        var extensionValue = item.Extension.ItemExtractionContextExtractionValue();
-
-        if (extensionValue is not Expression expression)
-        {
-            return null;
-        }
-
-        var extractionContextName = $"extraction_{linkId}";
-        Resource[] values = Array.Empty<Resource>();
-        if (ctx.CurrentContext.TryGetValue(extractionContextName, out var contextValue))
-        {
-            Console.WriteLine("Debug: found existing context value for {0}", extractionContextName);
-
-            values = contextValue.Value.OfType<Resource>().ToArray();
-        }
-
-        return new()
-        {
-            Resources = values,
-            CreateNewResource = () => CreateResourceFromExtension(expression.Expression_)
-        };
-    }
-
     public static Resource? CreateResourceFromExtension(string extensionValue)
     {
         var resourceName = extensionValue.Split('?').First();

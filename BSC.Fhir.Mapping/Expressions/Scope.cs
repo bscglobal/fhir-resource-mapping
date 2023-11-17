@@ -124,6 +124,13 @@ public class Scope : IClonable<Scope>
         scope.Context.AddRange(clonedContext);
     }
 
+    public bool HasAnswers()
+    {
+        return ResponseItem?.Answer.Count > 0
+            || Context.Any(ctx => ctx.Type == QuestionnaireContextType.CalculatedExpression)
+            || Children.Any(child => child.HasAnswers());
+    }
+
     public IQuestionnaireContext<BaseList>? ExtractionContext()
     {
         return GetContext(expr => expr.Type == QuestionnaireContextType.ExtractionContext, this);
