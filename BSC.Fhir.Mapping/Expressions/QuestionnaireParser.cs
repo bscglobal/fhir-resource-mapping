@@ -571,24 +571,40 @@ public class QuestionnaireParser
 
             if (fhirpathResult.Count == 0)
             {
-                BaseList? value = null;
+                _logger.LogDebug("Result for {Expr} is empty", query.Expression);
+                Type? type = null;
                 if (
                     query.Type == QuestionnaireContextType.ExtractionContext
                     && query.Dependencies.OfType<FhirQueryExpression>().FirstOrDefault() is FhirQueryExpression dep
                     && dep.ValueType is not null
                 )
                 {
-                    var resourceName = dep.Expression.Split('?').First();
+                    type = dep.ValueType;
+                }
+                else if (
+                    query.Type == QuestionnaireContextType.Embedded
+                    && query.Dependants.OfType<FhirQueryExpression>().FirstOrDefault()
+                        is FhirQueryExpression extractionContextExpr
+                )
+                {
+                    var resourceName = extractionContextExpr.Expression.Split('?').First();
                     var fhirType = ModelInfo.GetTypeForFhirType(resourceName);
 
-                    if (fhirType is null)
+                    if (fhirType is not null)
+                    {
+                        type = fhirType;
+                    }
+                    else
                     {
                         _logger.LogError("Cannot find type of {ResourceName}", resourceName);
-                        continue;
                     }
+                }
 
-                    _logger.LogDebug("Creating resource {Type}", dep.ValueType);
-                    var resource = Activator.CreateInstance(fhirType) as Resource;
+                BaseList? value = null;
+                if (type is not null)
+                {
+                    _logger.LogDebug("Creating resource {Type}", type);
+                    var resource = Activator.CreateInstance(type) as Resource;
                     if (resource is not null)
                     {
                         value = new[] { resource };
