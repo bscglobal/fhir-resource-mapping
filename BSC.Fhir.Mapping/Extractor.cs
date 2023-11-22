@@ -715,35 +715,18 @@ public class Extractor : IExtractor
     private DataType WrapAnswerInFieldType(DataType answer, Type fieldType, string? system = null)
     {
         var type = fieldType.NonParameterizedType();
-        if (type == typeof(CodeableConcept) && answer is Coding coding)
+        return type switch
         {
-            return new CodeableConcept { Coding = { coding }, Text = coding.Display, };
-        }
-        else if (type == typeof(Id) && answer is FhirString idStr)
-        {
-            return new Id(idStr.Value);
-        }
-        else if (type == typeof(Code))
-        {
-            if (answer is Coding code)
-            {
-                return new Code(code.Code);
-            }
-            else if (answer is FhirString codeStr)
-            {
-                return new Code(codeStr.Value);
-            }
-        }
-        else if (type == typeof(FhirUri) && answer is FhirString uriStr)
-        {
-            return new FhirUri(uriStr.Value);
-        }
-        else if (type == typeof(FhirDecimal) && answer is Integer decInt)
-        {
-            return new FhirDecimal(decInt.Value);
-        }
-
-        return answer;
+            _ when type == typeof(CodeableConcept) && answer is Coding coding
+                => new CodeableConcept { Coding = { coding }, Text = coding.Display, },
+            _ when type == typeof(Id) && answer is FhirString idStr => new Id(idStr.Value),
+            _ when type == typeof(Code) && answer is Coding code => new Code(code.Code),
+            _ when type == typeof(Code) && answer is FhirString codeStr => new Code(codeStr.Value),
+            _ when type == typeof(FhirUri) && answer is FhirString uriStr => new FhirUri(uriStr.Value),
+            _ when type == typeof(FhirDecimal) && answer is Integer decInt => new FhirDecimal(decInt.Value),
+            _ when type == typeof(Markdown) && answer is FhirString str => new Markdown(str.Value),
+            _ => answer
+        };
     }
 
     private PropertyInfo? GetField(Base fieldOf, string definition)
