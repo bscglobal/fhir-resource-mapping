@@ -578,8 +578,17 @@ public class QuestionnaireParser
                     && dep.ValueType is not null
                 )
                 {
+                    var resourceName = dep.Expression.Split('?').First();
+                    var fhirType = ModelInfo.GetTypeForFhirType(resourceName);
+
+                    if (fhirType is null)
+                    {
+                        _logger.LogError("Cannot find type of {ResourceName}", resourceName);
+                        continue;
+                    }
+
                     _logger.LogDebug("Creating resource {Type}", dep.ValueType);
-                    var resource = Activator.CreateInstance(dep.ValueType) as Resource;
+                    var resource = Activator.CreateInstance(fhirType) as Resource;
                     if (resource is not null)
                     {
                         value = new[] { resource };
