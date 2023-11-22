@@ -59,10 +59,6 @@ public class ExtractorTests
                 {
                     "user",
                     new Practitioner { Id = Guid.NewGuid().ToString() }
-                },
-                {
-                    "serviceRequest",
-                    new ServiceRequest { Id = serviceRequestId }
                 }
             },
             TestServiceRequest.ExtractionBundle(serviceRequestId, patientId)

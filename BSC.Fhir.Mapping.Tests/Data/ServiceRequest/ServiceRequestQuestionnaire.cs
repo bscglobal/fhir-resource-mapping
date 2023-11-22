@@ -130,46 +130,6 @@ public partial class TestServiceRequest
                 },
                 new()
                 {
-                    LinkId = "servicerequest.occurrence",
-                    Definition = "ServiceRequest.occurrence",
-                    Type = Questionnaire.QuestionnaireItemType.Group,
-                    Extension =
-                    {
-                        new() { Url = "FhirType", Value = new FhirString("Period") },
-                        new()
-                        {
-                            Url = ITEM_POPULATION_CONTEXT,
-                            Value = new Expression
-                            {
-                                Language = "text/fhirpath",
-                                Expression_ = "%serviceRequest.occurrence"
-                            }
-                        }
-                    },
-                    Item =
-                    {
-                        new()
-                        {
-                            LinkId = "servicerequest.occurrence.start",
-                            Definition = "ServiceRequest.occurrence.start",
-                            Type = Questionnaire.QuestionnaireItemType.Date,
-                            Extension =
-                            {
-                                new()
-                                {
-                                    Url = ITEM_INITIAL_EXPRESSION,
-                                    Value = new Expression
-                                    {
-                                        Language = "text/fhirpath",
-                                        Expression_ = "%serviceRequest.occurrence.start"
-                                    }
-                                }
-                            }
-                        }
-                    }
-                },
-                new()
-                {
                     LinkId = "extensionTeam",
                     Type = Questionnaire.QuestionnaireItemType.Group,
                     Definition = "ServiceRequest#servicerequest.extension:team",
