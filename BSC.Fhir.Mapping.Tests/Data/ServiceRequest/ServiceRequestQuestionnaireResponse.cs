@@ -13,6 +13,18 @@ public partial class TestServiceRequest
             {
                 new()
                 {
+                    LinkId = "serviceRequest.note",
+                    Item =
+                    {
+                        new()
+                        {
+                            LinkId = "serviceRequest.note.text",
+                            Answer = { new() { Value = new FhirString("This is a very important note. Hi Mom!") } }
+                        }
+                    }
+                },
+                new()
+                {
                     LinkId = "extension",
                     Item =
                     {

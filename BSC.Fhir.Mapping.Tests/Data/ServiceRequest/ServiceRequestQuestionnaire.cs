@@ -95,6 +95,41 @@ public partial class TestServiceRequest
                 },
                 new()
                 {
+                    LinkId = "serviceRequest.note",
+                    Definition = "ServiceRequest.note",
+                    Type = Questionnaire.QuestionnaireItemType.Group,
+                    Extension =
+                    {
+                        new()
+                        {
+                            Url = ITEM_POPULATION_CONTEXT,
+                            Value = new Expression { Language = "text/fhirpath", Expression_ = "%serviceRequest.note" }
+                        }
+                    },
+                    Item =
+                    {
+                        new()
+                        {
+                            LinkId = "serviceRequest.note.text",
+                            Definition = "ServiceRequest.note.text",
+                            Type = Questionnaire.QuestionnaireItemType.Text,
+                            Extension =
+                            {
+                                new()
+                                {
+                                    Url = ITEM_INITIAL_EXPRESSION,
+                                    Value = new Expression
+                                    {
+                                        Language = "text/fhirpath",
+                                        Expression_ = "%serviceRequest.note.text"
+                                    }
+                                }
+                            },
+                        }
+                    }
+                },
+                new()
+                {
                     LinkId = "servicerequest.occurrence",
                     Definition = "ServiceRequest.occurrence",
                     Type = Questionnaire.QuestionnaireItemType.Group,

@@ -11,6 +11,7 @@ public partial class TestServiceRequest
             Item =
             {
                 new() { LinkId = "servicerequest.id", Answer = { new() { Value = new FhirString(serviceRequestId) } } },
+                new() { LinkId = "serviceRequest.note", Item = { new() { LinkId = "serviceRequest.note.text" } } },
                 new()
                 {
                     LinkId = "servicerequest.occurrence",
