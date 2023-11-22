@@ -18,6 +18,7 @@ public partial class TestServiceRequest
                         Id = serviceRequestId,
                         Subject = new ResourceReference($"Patient/{patientId}"),
                         Occurrence = new Period() { Start = "2023-03-29T11:04:55Z" },
+                        Note = { new() { Text = new("This is a very important note. Hi Mom!") } },
                         Extension =
                         {
                             new() { Url = "CareUnitExtension", Value = new FhirString("this is a care unit") },
