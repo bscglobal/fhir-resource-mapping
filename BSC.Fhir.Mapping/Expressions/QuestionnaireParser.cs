@@ -81,7 +81,7 @@ public class QuestionnaireParser
         }
 
         await ResolveDependenciesAsync(cancellationToken);
-        TreeDebugging.PrintTree(_scopeTree.CurrentScope);
+        // TreeDebugging.PrintTree(_scopeTree.CurrentScope);
 
         return _scopeTree.CurrentScope;
     }
