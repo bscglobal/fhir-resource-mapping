@@ -726,6 +726,7 @@ public class Extractor : IExtractor
             _ when type == typeof(FhirUri) && answer is FhirString uriStr => new FhirUri(uriStr.Value),
             _ when type == typeof(FhirDecimal) && answer is Integer decInt => new FhirDecimal(decInt.Value),
             _ when type == typeof(Markdown) && answer is FhirString str => new Markdown(str.Value),
+            _ when type == typeof(FhirDateTime) && answer is Date date => new FhirDateTime(date.Value),
             _
                 when allowedTypes is not null
                     && type == typeof(DataType)
