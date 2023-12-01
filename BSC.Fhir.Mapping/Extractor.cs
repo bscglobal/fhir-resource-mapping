@@ -379,13 +379,7 @@ public class Extractor : IExtractor
 
         var result = ExtractRootSourceAnswer(rootResource.NamedChildren, 1, splits);
 
-        if (result != null)
-        {
-            // TODO: return data type
-            var test = new List<DataType>() { result as DataType };
-            return test;
-        }
-        return null;
+        return result != null ? new List<DataType>() { result as DataType } : null;
     }
 
     private Base ExtractRootSourceAnswer(IEnumerable<ElementValue> children, int index, string[] splits)
