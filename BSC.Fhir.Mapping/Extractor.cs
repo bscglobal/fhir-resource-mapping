@@ -372,14 +372,14 @@ public class Extractor : IExtractor
     {
         var splits = scope?.Item?.Definition.Split(".");
 
-        if (splits?.Length < 2 || splits[0] != rootResource?.TypeName)
+        if (splits == null || splits?.Length < 2 || splits?[0] != rootResource?.TypeName)
         {
             return null;
         }
 
-        var result = ExtractRootSourceAnswer(rootResource.NamedChildren, 1, splits);
+        var result = ExtractRootSourceAnswer(rootResource?.NamedChildren, 1, splits);
 
-        return result != null ? new List<DataType>() { result as DataType } : null;
+        return result != null ? new List<DataType> { result as DataType } : null;
     }
 
     private Base? ExtractRootSourceAnswer(IEnumerable<ElementValue> children, int index, string[] splits)
