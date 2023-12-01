@@ -130,6 +130,45 @@ public class ExtractorTests
         };
     }
 
+    private static object[][] PartialUpdateTestCase()
+    {
+        var patientId = Guid.NewGuid().ToString();
+
+        return new object[][]
+        {
+            new object[]
+            {
+                PartialUpdate.CreateQuestionnaire(),
+                PartialUpdate.CreateQuestionnaireResponse(),
+                PartialUpdate.ResourceLoaderResponse(patientId),
+                new Dictionary<string, StructureDefinition>(),
+                new Dictionary<string, Resource>
+                {
+                    {
+                        "patient",
+                        new Patient { Id = patientId }
+                    }
+                },
+                PartialUpdate.ExtractionBundle(patientId)
+            },
+            new object[]
+            {
+                PartialUpdate.CreateQuestionnaire(),
+                PartialUpdate.CreateQuestionnaireResponseWithoutGiven(),
+                PartialUpdate.ResourceLoaderResponse(patientId),
+                new Dictionary<string, StructureDefinition>(),
+                new Dictionary<string, Resource>
+                {
+                    {
+                        "patient",
+                        new Patient { Id = patientId }
+                    }
+                },
+                PartialUpdate.ExtractionBundle(patientId)
+            }
+        };
+    }
+
     public static IEnumerable<object[]> AllQuestionnaireTestCases()
     {
         return new[]
@@ -137,8 +176,8 @@ public class ExtractorTests
             DemographicsTestCase(),
             ServiceRequestTestCase(),
             NewGeneralNoteTestCase(),
-            UpdatedGeneralNoteTestCase()
-        };
+            UpdatedGeneralNoteTestCase(),
+        }.Concat(PartialUpdateTestCase());
     }
 
     [Theory]
