@@ -63,7 +63,7 @@ public class Extractor : IExtractor
         var rootResource = scope.ExtractionContext()?.Value?.FirstOrDefault() as Resource;
         var extractedResources = new List<Resource>();
 
-        var rootResourceCopy = rootResource.DeepCopy() as Resource;
+        var rootResourceCopy = rootResource?.DeepCopy() as Resource;
         await ExtractByDefinition(scope.Children, extractedResources, rootResourceCopy, cancellationToken);
 
         if (rootResource is not null)
@@ -370,9 +370,9 @@ public class Extractor : IExtractor
 
     private IReadOnlyCollection<DataType>? GetRootSourceAnswer(Scope scope, Resource? rootResource)
     {
-        var splits = scope.Item.Definition.Split(".");
+        var splits = scope?.Item?.Definition.Split(".");
 
-        if (splits.Length < 2 || splits[0] != rootResource.TypeName)
+        if (splits?.Length < 2 || splits[0] != rootResource?.TypeName)
         {
             return null;
         }
