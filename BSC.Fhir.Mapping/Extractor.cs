@@ -368,7 +368,7 @@ public class Extractor : IExtractor
         await UseExtensionFromProfile(definition.Split('.').Last(), extractionContext, scope, cancellationToken);
     }
 
-    private IReadOnlyCollection<DataType> GetRootSourceAnswer(Scope scope, Resource? rootResource)
+    private IReadOnlyCollection<DataType>? GetRootSourceAnswer(Scope scope, Resource? rootResource)
     {
         var splits = scope.Item.Definition.Split(".");
 
@@ -382,7 +382,7 @@ public class Extractor : IExtractor
         return result != null ? new List<DataType>() { result as DataType } : null;
     }
 
-    private Base ExtractRootSourceAnswer(IEnumerable<ElementValue> children, int index, string[] splits)
+    private Base? ExtractRootSourceAnswer(IEnumerable<ElementValue> children, int index, string[] splits)
     {
         // TODO: update this - it won't necessarily work if there are multiple repeating fields where only one was updated
         foreach (var child in children)
