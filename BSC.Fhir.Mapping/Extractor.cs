@@ -384,6 +384,7 @@ public class Extractor : IExtractor
 
     private Base ExtractRootSourceAnswer(IEnumerable<ElementValue> children, int index, string[] splits)
     {
+        // TODO: update this - it won't necessarily work if there are multiple repeating fields where only one was updated
         foreach (var child in children)
         {
             var name = child.ElementName;
