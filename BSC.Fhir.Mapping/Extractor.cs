@@ -63,7 +63,8 @@ public class Extractor : IExtractor
         var rootResource = scope.ExtractionContext()?.Value?.FirstOrDefault() as Resource;
         var extractedResources = new List<Resource>();
 
-        await ExtractByDefinition(scope.Children, extractedResources, cancellationToken);
+        var rootResourceCopy = rootResource.DeepCopy() as Resource;
+        await ExtractByDefinition(scope.Children, extractedResources, rootResourceCopy, cancellationToken);
 
         if (rootResource is not null)
         {
@@ -77,21 +78,21 @@ public class Extractor : IExtractor
         };
     }
 
-    private async Task ExtractByDefinition(
-        IReadOnlyCollection<Scope> scopes,
+    private async Task ExtractByDefinition(IReadOnlyCollection<Scope> scopes,
         List<Resource> extractionResult,
-        CancellationToken cancellationToken = default
-    )
+        Resource? rootResource,
+        CancellationToken cancellationToken = default)
     {
         foreach (var scope in scopes)
         {
-            await ExtractByDefinition(scope, extractionResult, cancellationToken);
+            await ExtractByDefinition(scope, extractionResult, rootResource, cancellationToken);
         }
     }
 
     private async Task ExtractByDefinition(
         Scope scope,
         List<Resource> extractionResult,
+        Resource? rootResource,
         CancellationToken cancellationToken = default
     )
     {
@@ -104,20 +105,20 @@ public class Extractor : IExtractor
         {
             if (scope.Context.Any(ctx => ctx.Type == QuestionnaireContextType.ExtractionContext))
             {
-                await ExtractResourceByDefinition(scope, extractionResult, cancellationToken);
+                await ExtractResourceByDefinition(scope, extractionResult, rootResource, cancellationToken);
             }
             else if (scope.Item.Definition is not null)
             {
-                await ExtractComplexTypeValueByDefinition(scope, extractionResult, cancellationToken);
+                await ExtractComplexTypeValueByDefinition(scope, extractionResult, rootResource, cancellationToken);
             }
             else
             {
-                await ExtractByDefinition(scope.Children, extractionResult, cancellationToken);
+                await ExtractByDefinition(scope.Children, extractionResult, rootResource, cancellationToken);
             }
         }
         else if (scope.Item.Definition is not null)
         {
-            await ExtractPrimitiveTypeValueByDefinition(scope, cancellationToken);
+            await ExtractPrimitiveTypeValueByDefinition(scope, rootResource, cancellationToken);
         }
         else
         {
@@ -128,6 +129,7 @@ public class Extractor : IExtractor
     private async Task ExtractResourceByDefinition(
         Scope scope,
         List<Resource> extractionResult,
+        Resource? rootResource,
         CancellationToken cancellationToken = default
     )
     {
@@ -138,7 +140,7 @@ public class Extractor : IExtractor
             throw new InvalidOperationException("Unable to create a resource from questionnaire item");
         }
 
-        await ExtractByDefinition(scope.Children, extractionResult, cancellationToken);
+        await ExtractByDefinition(scope.Children, extractionResult, rootResource,  cancellationToken);
 
         extractionResult.Add(context);
     }
@@ -146,6 +148,7 @@ public class Extractor : IExtractor
     private async Task ExtractComplexTypeValueByDefinition(
         Scope scope,
         List<Resource> extractionResult,
+        Resource? rootResource,
         CancellationToken cancellationToken = default
     )
     {
@@ -254,11 +257,12 @@ public class Extractor : IExtractor
             scope.DefinitionResolution = value;
             extractionContext.DirtyFields.Add(fieldInfo);
 
-            await ExtractByDefinition(scope.Children, extractionResult, cancellationToken);
+            await ExtractByDefinition(scope.Children, extractionResult, rootResource, cancellationToken);
         }
     }
 
-    private async Task ExtractPrimitiveTypeValueByDefinition(Scope scope, CancellationToken cancellationToken = default)
+    private async Task ExtractPrimitiveTypeValueByDefinition(Scope scope, Resource? rootResource,
+        CancellationToken cancellationToken = default)
     {
         if (scope.Item is null)
         {
@@ -295,7 +299,17 @@ public class Extractor : IExtractor
             return;
         }
 
+        var definition = scope.Item.Definition;
+        var field = GetField(extractionContext.Value, definition);
+        
         IReadOnlyCollection<DataType> answers;
+        
+        // if an answer isn't passed through on the form, we want to set the answer to the value from the root source
+        // to prevent it from being removed. We only do this is we have a root source to refer to, and it isn't a calculated value
+        var rootSourceAnswers = rootResource != null & scope.ResponseItem.Answer.Count == 0 && calculatedValue?.Value is null
+            ? GetRootSourceAnswer(scope, rootResource)
+            : null;
+        
         if (scope.ResponseItem.Answer.Count > 0)
         {
             answers = scope.ResponseItem.Answer.Select(answer => answer.Value).ToArray();
@@ -304,15 +318,15 @@ public class Extractor : IExtractor
         {
             answers = calculatedValue.Value.OfType<DataType>().ToArray();
         }
+        else if (rootSourceAnswers != null)
+        {
+            answers = rootSourceAnswers;
+        }
         else
         {
             _logger.LogWarning("No answer or calculated value for {0}", scope.Item.LinkId);
             return;
         }
-
-        var definition = scope.Item.Definition;
-
-        var field = GetField(extractionContext.Value, definition);
 
         if (field is not null)
         {
@@ -352,6 +366,44 @@ public class Extractor : IExtractor
         }
 
         await UseExtensionFromProfile(definition.Split('.').Last(), extractionContext, scope, cancellationToken);
+    }
+
+    private IReadOnlyCollection<DataType> GetRootSourceAnswer(Scope scope, Resource? rootResource)
+    {
+        var splits = scope.Item.Definition.Split(".");
+
+        if (splits.Length < 2 || splits[0] != rootResource.TypeName)
+        {
+            return null;
+        }
+
+        var result = ExtractRootSourceAnswer(rootResource.NamedChildren, 1, splits);
+
+        if (result != null)
+        {
+            // TODO: return data type
+            var test = new List<DataType>() { result as DataType };
+            return test;
+        }
+        return null;
+    }
+
+    private Base ExtractRootSourceAnswer(IEnumerable<ElementValue> children, int index, string[] splits)
+    {
+        foreach (var child in children)
+        {
+            var name = child.ElementName;
+
+            if (splits[index] == name)
+            {
+                var namedChildren = child.Value.NamedChildren.ToList();
+
+                // if there are named children and index < splits.length, recurse
+                return namedChildren.Any() ? ExtractRootSourceAnswer(namedChildren, index+1, splits) : child.Value;
+            }
+        }
+
+        return null;
     }
 
     private async Task UseSliceFromProfile(
@@ -598,7 +650,7 @@ public class Extractor : IExtractor
         extractionContext.DirtyFields.Add(fieldInfo);
 
         scope.DefinitionResolution = value;
-        await ExtractByDefinition(scope.Children, extractionResult, cancellationToken);
+        await ExtractByDefinition(scope.Children, extractionResult, rootResource: null, cancellationToken);
     }
 
     private ResourceReference CreateResourceReference(Base from, Type referenceType)
