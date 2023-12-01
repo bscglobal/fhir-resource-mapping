@@ -637,7 +637,7 @@ public class Extractor : IExtractor
             _logger.LogDebug("Setting ID to {@Ids}", answers);
         }
 
-        var answersOfFieldType = answers.Select(ans => WrapAnswerInFieldType(ans, fieldType)).ToArray();
+        var answersOfFieldType = answers.Select(ans => WrapAnswerInFieldType(ans, field)).ToArray();
 
         if (field.IsParameterized() && fieldType.IsNonStringEnumerable())
         {
@@ -712,9 +712,10 @@ public class Extractor : IExtractor
         field.SetValue(baseResource, codeValue);
     }
 
-    private DataType WrapAnswerInFieldType(DataType answer, Type fieldType, string? system = null)
+    private DataType WrapAnswerInFieldType(DataType answer, PropertyInfo propInfo, string? system = null)
     {
-        var type = fieldType.NonParameterizedType();
+        var type = propInfo.PropertyType.NonParameterizedType();
+        var allowedTypes = propInfo.GetCustomAttribute<AllowedTypesAttribute>()?.Types.ToList();
         return type switch
         {
             _ when type == typeof(CodeableConcept) && answer is Coding coding
@@ -725,7 +726,13 @@ public class Extractor : IExtractor
             _ when type == typeof(FhirUri) && answer is FhirString uriStr => new FhirUri(uriStr.Value),
             _ when type == typeof(FhirDecimal) && answer is Integer decInt => new FhirDecimal(decInt.Value),
             _ when type == typeof(Markdown) && answer is FhirString str => new Markdown(str.Value),
-            _ when type == typeof(FhirDateTime) && answer is Date date => new FhirDateTime(date.Value),
+            _
+                when allowedTypes is not null
+                    && type == typeof(DataType)
+                    && answer is Date date
+                    && allowedTypes.Contains(typeof(FhirDateTime))
+                    && !allowedTypes.Contains(typeof(Date))
+                => new FhirDateTime(date.Value),
             _ => answer
         };
     }
