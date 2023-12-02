@@ -743,20 +743,40 @@ public class Extractor : IExtractor
     private void UpdateFieldWithEnum(Base baseResource, PropertyInfo field, Base value)
     {
         var fieldType = field.NonParameterizedType();
-        var stringValue = value switch
+        object enumValue;
+        if (
+            value.GetType() is Type t
+            && t.IsGenericType
+            && t.GetGenericTypeDefinition() == typeof(Code<>)
+            && ((dynamic)value).Value is Enum enumVal
+        )
         {
-            Coding coding => coding.Code,
-            _ => field.ToString()
-        };
-
-        if (string.IsNullOrEmpty(stringValue))
-        {
-            return;
+            enumValue = enumVal;
         }
+        else
+        {
+            var stringValue = value switch
+            {
+                Coding coding => coding.Code,
+                _ => field.ToString()
+            };
 
-        stringValue = stringValue[0..1].ToUpper() + stringValue[1..];
+            if (string.IsNullOrEmpty(stringValue))
+            {
+                return;
+            }
 
-        var enumValue = Enum.Parse(fieldType, stringValue);
+            stringValue = stringValue[0..1].ToUpper() + stringValue[1..];
+
+            _logger.LogDebug(
+                "Setting Enum field of type {FieldType} to {Value} from type {ValueType}",
+                fieldType.Name,
+                stringValue,
+                value.GetType().Name
+            );
+
+            enumValue = Enum.Parse(fieldType, stringValue);
+        }
 
         // Create a Code instance with the determined enum type
         Type codeType = typeof(Code<>).MakeGenericType(fieldType);
