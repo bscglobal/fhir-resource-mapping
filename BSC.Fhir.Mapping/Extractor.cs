@@ -309,6 +309,7 @@ public class Extractor : IExtractor
 
         IReadOnlyCollection<DataType> answers;
 
+        _logger.LogDebug("Extracting primitive value from: {LinkId}", scope.Item.LinkId);
         // if an answer isn't passed through on the form, we want to set the answer to the value from the root source
         // to prevent it from being removed. We only do this is we have a root source to refer to, and it isn't a calculated value
         var rootSourceAnswers =
@@ -399,8 +400,11 @@ public class Extractor : IExtractor
             {
                 var namedChildren = child.Value.NamedChildren.ToList();
 
+                var newIndex = index + 1;
                 // if there are named children and index < splits.length, recurse
-                return namedChildren.Any() ? ExtractRootSourceAnswer(namedChildren, index + 1, splits) : child.Value;
+                return namedChildren.Any() && newIndex < splits.Length
+                    ? ExtractRootSourceAnswer(namedChildren, newIndex, splits)
+                    : child.Value;
             }
         }
 
