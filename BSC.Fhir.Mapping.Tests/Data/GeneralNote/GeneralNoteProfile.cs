@@ -48,6 +48,30 @@ public partial class GeneralNote
                             }
                         }
                     },
+                    new()
+                    {
+                        Path = "composition.section",
+                        SliceName = "images",
+                        Min = 1,
+                        Max = "1"
+                    },
+                    new()
+                    {
+                        Path = "composition.section.code",
+                        Min = 1,
+                        Fixed = new CodeableConcept
+                        {
+                            Coding =
+                            {
+                                new()
+                                {
+                                    System = "https://1beat.care/fhir/coding-system",
+                                    Code = "54321",
+                                    Display = "Images"
+                                }
+                            }
+                        }
+                    },
                     new() { Path = "composition.extension", ElementId = ":extraField" }
                 }
             }

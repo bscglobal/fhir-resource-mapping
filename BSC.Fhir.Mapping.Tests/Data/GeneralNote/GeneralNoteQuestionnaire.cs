@@ -332,42 +332,43 @@ public partial class GeneralNote
                         }
                     },
                 },
-                // new()
-                // {
-                //     LinkId = "imageSection",
-                //     Type = Questionnaire.QuestionnaireItemType.Group,
-                //     Definition = "composition.section",
-                //     Item =
-                //     {
-                //         new()
-                //         {
-                //             LinkId = "imageSection.title",
-                //             Definition = "Composition.section.title",
-                //             Type = Questionnaire.QuestionnaireItemType.Text,
-                //             Initial = { new() { Value = new FhirString("Image") } }
-                //         },
-                //         new()
-                //         {
-                //             LinkId = "imageSection.entry",
-                //             Definition = "Composition.section.entry",
-                //             Type = Questionnaire.QuestionnaireItemType.Reference,
-                //             Extension =
-                //             {
-                //                 new() { Url = QUESTIONNAIRE_HIDDEN_URL, Value = new FhirBoolean(true) },
-                //                 new()
-                //                 {
-                //                     Url = QUESTIONNAIRE_ITEM_CALCULATED_EXPRESSION,
-                //                     Value = new Expression
-                //                     {
-                //                         Language = "text/fhirpath",
-                //                         Expression_ =
-                //                             "%resource.item.where(linkId='image').select(item.where(linkId='image.id').first())"
-                //                     }
-                //                 }
-                //             }
-                //         }
-                //     }
-                // },
+                new()
+                {
+                    LinkId = "imageSection",
+                    Type = Questionnaire.QuestionnaireItemType.Group,
+                    Definition = "Composition#composition.section:images",
+                    Item =
+                    {
+                        new()
+                        {
+                            LinkId = "imageSection.title",
+                            Definition = "Composition.section.title",
+                            Type = Questionnaire.QuestionnaireItemType.Text,
+                            Initial = { new() { Value = new FhirString("Images") } }
+                        },
+                        new()
+                        {
+                            LinkId = "imageSection.entry",
+                            Definition = "Composition.section.entry",
+                            Type = Questionnaire.QuestionnaireItemType.Reference,
+                            Extension =
+                            {
+                                new() { Url = QUESTIONNAIRE_HIDDEN_URL, Value = new FhirBoolean(true) },
+                                new()
+                                {
+                                    Url = QUESTIONNAIRE_ITEM_CALCULATED_EXPRESSION,
+                                    Value = new Expression
+                                    {
+                                        Language = "text/fhirpath",
+                                        Expression_ =
+                                            "%resource.item.where(linkId='image').item.where(linkId='image.id')"
+                                    }
+                                },
+                                new() { Url = "referenceType", Value = new FhirString("DocumentReference") }
+                            }
+                        }
+                    }
+                },
                 new()
                 {
                     LinkId = "composition.extension",
