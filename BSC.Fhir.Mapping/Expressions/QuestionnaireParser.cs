@@ -641,11 +641,15 @@ public class QuestionnaireParser
                     );
                 }
             }
-            else if (
-                fhirpathResult.Count == 1 && fhirpathResult.First() is QuestionnaireResponse.ItemComponent responseItem
-            )
+            else if (fhirpathResult.Count > 0 && fhirpathResult.First() is QuestionnaireResponse.ItemComponent)
             {
-                query.SetValue(responseItem.Answer.Select(a => a.Value).ToArray());
+                query.SetValue(
+                    fhirpathResult
+                        .OfType<QuestionnaireResponse.ItemComponent>()
+                        .SelectMany(r => r.Answer)
+                        .Select(a => a.Value)
+                        .ToArray()
+                );
             }
             else if (!fhirpathResult.First().GetType().IsSubclassOf(typeof(PrimitiveType)) && fhirpathResult.Count > 1)
             {
