@@ -67,7 +67,14 @@ public partial class PartialUpdate
                         },
                     }
                 },
-            }
+                new()
+                {
+                    LinkId = "gender",
+                    Definition = "Patient.gender",
+                    AnswerValueSet = "https://1beat.care/fhir/ValueSet/gender",
+                    Type = Questionnaire.QuestionnaireItemType.Choice
+                }
+            },
         };
     }
 }

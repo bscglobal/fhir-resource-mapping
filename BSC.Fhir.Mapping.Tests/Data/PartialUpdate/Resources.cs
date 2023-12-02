@@ -12,7 +12,8 @@ public partial class PartialUpdate
             Name =
             {
                 new() { Given = new[] { "John" }, Family = "Doe" }
-            }
+            },
+            Gender = AdministrativeGender.Male
         };
 
         return new() { { $"Patient?_id={patientId}", new[] { patient } } };

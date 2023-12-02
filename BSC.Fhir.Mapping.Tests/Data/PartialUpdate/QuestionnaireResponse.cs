@@ -38,7 +38,8 @@ public partial class PartialUpdate
                     {
                         new() { LinkId = "familyName", Answer = { new() { Value = new FhirString("Smith") } } }
                     }
-                }
+                },
+                new() { LinkId = "gender" }
             }
         };
     }

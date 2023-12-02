@@ -19,7 +19,8 @@ public partial class PartialUpdate
                         Name =
                         {
                             new() { Given = new[] { "John" }, Family = "Smith" }
-                        }
+                        },
+                        Gender = AdministrativeGender.Male
                     }
                 }
             }
