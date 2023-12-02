@@ -78,10 +78,12 @@ public class Extractor : IExtractor
         };
     }
 
-    private async Task ExtractByDefinition(IReadOnlyCollection<Scope> scopes,
+    private async Task ExtractByDefinition(
+        IReadOnlyCollection<Scope> scopes,
         List<Resource> extractionResult,
         Resource? rootResource,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default
+    )
     {
         foreach (var scope in scopes)
         {
@@ -140,7 +142,7 @@ public class Extractor : IExtractor
             throw new InvalidOperationException("Unable to create a resource from questionnaire item");
         }
 
-        await ExtractByDefinition(scope.Children, extractionResult, rootResource,  cancellationToken);
+        await ExtractByDefinition(scope.Children, extractionResult, rootResource, cancellationToken);
 
         extractionResult.Add(context);
     }
@@ -261,8 +263,11 @@ public class Extractor : IExtractor
         }
     }
 
-    private async Task ExtractPrimitiveTypeValueByDefinition(Scope scope, Resource? rootResource,
-        CancellationToken cancellationToken = default)
+    private async Task ExtractPrimitiveTypeValueByDefinition(
+        Scope scope,
+        Resource? rootResource,
+        CancellationToken cancellationToken = default
+    )
     {
         if (scope.Item is null)
         {
@@ -301,15 +306,16 @@ public class Extractor : IExtractor
 
         var definition = scope.Item.Definition;
         var field = GetField(extractionContext.Value, definition);
-        
+
         IReadOnlyCollection<DataType> answers;
-        
+
         // if an answer isn't passed through on the form, we want to set the answer to the value from the root source
         // to prevent it from being removed. We only do this is we have a root source to refer to, and it isn't a calculated value
-        var rootSourceAnswers = rootResource != null & scope.ResponseItem.Answer.Count == 0 && calculatedValue?.Value is null
-            ? GetRootSourceAnswer(scope, rootResource)
-            : null;
-        
+        var rootSourceAnswers =
+            rootResource != null & scope.ResponseItem.Answer.Count == 0 && calculatedValue?.Value is null
+                ? GetRootSourceAnswer(scope, rootResource)
+                : null;
+
         if (scope.ResponseItem.Answer.Count > 0)
         {
             answers = scope.ResponseItem.Answer.Select(answer => answer.Value).ToArray();
@@ -372,14 +378,14 @@ public class Extractor : IExtractor
     {
         var splits = scope?.Item?.Definition.Split(".");
 
-        if (splits == null || splits?.Length < 2 || splits?[0] != rootResource?.TypeName)
+        if (splits is null || rootResource is null || splits.Length < 2 || splits[0] != rootResource.TypeName)
         {
             return null;
         }
 
-        var result = ExtractRootSourceAnswer(rootResource?.NamedChildren, 1, splits);
+        var result = ExtractRootSourceAnswer(rootResource.NamedChildren, 1, splits);
 
-        return result != null ? new List<DataType> { result as DataType } : null;
+        return result is DataType resultData ? new List<DataType> { resultData } : null;
     }
 
     private Base? ExtractRootSourceAnswer(IEnumerable<ElementValue> children, int index, string[] splits)
@@ -394,7 +400,7 @@ public class Extractor : IExtractor
                 var namedChildren = child.Value.NamedChildren.ToList();
 
                 // if there are named children and index < splits.length, recurse
-                return namedChildren.Any() ? ExtractRootSourceAnswer(namedChildren, index+1, splits) : child.Value;
+                return namedChildren.Any() ? ExtractRootSourceAnswer(namedChildren, index + 1, splits) : child.Value;
             }
         }
 
