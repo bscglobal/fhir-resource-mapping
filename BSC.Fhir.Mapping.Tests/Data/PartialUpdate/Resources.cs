@@ -13,7 +13,28 @@ public partial class PartialUpdate
             {
                 new() { Given = new[] { "John" }, Family = "Doe" }
             },
-            Gender = AdministrativeGender.Male
+            Gender = AdministrativeGender.Male,
+            Contact =
+            {
+                new()
+                {
+                    Relationship =
+                    {
+                        new()
+                        {
+                            Text = "parent",
+                            Coding =
+                            {
+                                new()
+                                {
+                                    System = "http://terminology.hl7.org/3.1.0/CodeSystem-v3-RoleCode",
+                                    Code = "parent"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         };
 
         return new() { { $"Patient?_id={patientId}", new[] { patient } } };

@@ -18,8 +18,10 @@ public partial class PartialUpdate
                     {
                         new() { LinkId = "givenName" },
                         new() { LinkId = "familyName", Answer = { new() { Value = new FhirString("Smith") } } }
-                    }
-                }
+                    },
+                },
+                new() { LinkId = "gender" },
+                new() { LinkId = "contacts", Item = { new() { LinkId = "contactRelationship" } } }
             }
         };
     }
@@ -39,7 +41,6 @@ public partial class PartialUpdate
                         new() { LinkId = "familyName", Answer = { new() { Value = new FhirString("Smith") } } }
                     }
                 },
-                new() { LinkId = "gender" }
             }
         };
     }

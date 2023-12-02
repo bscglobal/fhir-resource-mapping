@@ -73,6 +73,22 @@ public partial class PartialUpdate
                     Definition = "Patient.gender",
                     AnswerValueSet = "https://1beat.care/fhir/ValueSet/gender",
                     Type = Questionnaire.QuestionnaireItemType.Choice
+                },
+                new()
+                {
+                    LinkId = "contacts",
+                    Definition = "Patient.contact",
+                    Type = Questionnaire.QuestionnaireItemType.Group,
+                    Item =
+                    {
+                        new()
+                        {
+                            LinkId = "contactRelationship",
+                            Definition = "Patient.contact.relationship",
+                            Type = Questionnaire.QuestionnaireItemType.Choice,
+                            AnswerValueSet = "https://1beat.care/fhir/ValueSet/contact-relationship"
+                        }
+                    }
                 }
             },
         };
