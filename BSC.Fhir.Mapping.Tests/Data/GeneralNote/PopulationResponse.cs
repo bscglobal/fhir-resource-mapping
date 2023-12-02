@@ -64,6 +64,19 @@ public partial class GeneralNote
                 },
                 new()
                 {
+                    LinkId = "imageSection",
+                    Item =
+                    {
+                        new()
+                        {
+                            LinkId = "imageSection.title",
+                            Answer = { new() { Value = new FhirString("Images") } }
+                        },
+                        new() { LinkId = "imageSection.entry" },
+                    }
+                },
+                new()
+                {
                     LinkId = "composition.extension",
                     Answer = { new() { Value = new FhirString("extension test") } }
                 },

@@ -54,7 +54,24 @@ public partial class GeneralNote
                                     }
                                 },
                                 Entry = { new($"DocumentReference/{noteId}") }
-                            }
+                            },
+                            new()
+                            {
+                                Title = "Images",
+                                Code = new()
+                                {
+                                    Coding =
+                                    {
+                                        new()
+                                        {
+                                            System = "https://1beat.care/fhir/coding-system",
+                                            Code = "54321",
+                                            Display = "Images"
+                                        }
+                                    }
+                                },
+                                Entry = imageIds.Select(id => new ResourceReference($"DocumentReference/{id}")).ToList()
+                            },
                         },
                         Extension =
                         {
