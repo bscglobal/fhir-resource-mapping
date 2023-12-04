@@ -1,9 +1,11 @@
 using System.Collections;
 using System.Reflection;
+using System.Text.Json;
 using BSC.Fhir.Mapping.Core;
 using BSC.Fhir.Mapping.Core.Expressions;
 using BSC.Fhir.Mapping.Expressions;
 using Hl7.Fhir.Model;
+using Hl7.Fhir.Serialization;
 using Hl7.Fhir.Validation;
 using Microsoft.Extensions.Logging;
 using Task = System.Threading.Tasks.Task;
@@ -708,6 +710,8 @@ public class Extractor : IExtractor
 
     private void SetFieldElementValue(Base baseResource, PropertyInfo field, DataType answerValue)
     {
+        _logger.LogDebug("Setting field {Name} to {Value}", field.Name, answerValue.ToJson());
+
         if (field.PropertyType.Name == "String" && answerValue is FhirString)
         {
             field.SetValue(baseResource, answerValue.ToString());
@@ -725,16 +729,23 @@ public class Extractor : IExtractor
         Scope scope
     )
     {
+        _logger.LogDebug(
+            "Adding answer {Value} to list field {Name}",
+            JsonSerializer.Serialize(answerValue),
+            fieldInfo.Name
+        );
         var propName = fieldInfo.Name;
         var field = fieldInfo.GetValue(extractionContext.Value) as IList;
 
         if (field is null)
         {
+            _logger.LogWarning("Field {Name} is null. Could not add answers.", fieldInfo.Name);
             return;
         }
 
         if (!extractionContext.DirtyFields.Contains(fieldInfo) == true && scope.HasAnswers())
         {
+            _logger.LogDebug("Clearing list {Name}", fieldInfo.Name);
             field.Clear();
         }
 
