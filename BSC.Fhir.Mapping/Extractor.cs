@@ -252,7 +252,12 @@ public class Extractor : IExtractor
             }
             else
             {
-                if (fieldInfo.GetValue(extractionContext.Value) is null)
+                var existingValue = fieldInfo.GetValue(extractionContext.Value);
+                if (existingValue is not null)
+                {
+                    value = existingValue as Base;
+                }
+                else
                 {
                     fieldInfo.SetValue(extractionContext.Value, value);
                 }
@@ -336,6 +341,8 @@ public class Extractor : IExtractor
             _logger.LogWarning("No answer or calculated value for {0}", scope.Item.LinkId);
             return;
         }
+
+        _logger.LogDebug("Answers: {Answers}", JsonSerializer.Serialize(answers));
 
         if (field is not null)
         {
@@ -710,7 +717,7 @@ public class Extractor : IExtractor
 
     private void SetFieldElementValue(Base baseResource, PropertyInfo field, DataType answerValue)
     {
-        _logger.LogDebug("Setting field {Name} to {Value}", field.Name, answerValue.ToJson());
+        _logger.LogDebug("Setting field {Name} to {Value}", field.Name, answerValue.ToString());
 
         if (field.PropertyType.Name == "String" && answerValue is FhirString)
         {
