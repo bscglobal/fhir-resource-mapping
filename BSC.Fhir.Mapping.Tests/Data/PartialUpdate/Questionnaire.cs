@@ -57,12 +57,14 @@ public partial class PartialUpdate
                         {
                             LinkId = "givenName",
                             Definition = "Patient.name.given",
+                            Required=  true,
                             Type = Questionnaire.QuestionnaireItemType.String,
                         },
                         new()
                         {
                             LinkId = "familyName",
                             Definition = "Patient.name.family",
+                            Required = true,
                             Type = Questionnaire.QuestionnaireItemType.String,
                         },
                     }
