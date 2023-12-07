@@ -124,6 +124,14 @@ public class Scope : IClonable<Scope>
         scope.Context.AddRange(clonedContext);
     }
 
+    public bool HasRequiredAnswers()
+    {
+        var hasCalculated = Context.Any(ctx => ctx.Type == QuestionnaireContextType.CalculatedExpression);
+        var hasAnswers = Item?.Required == true && (ResponseItem?.Answer.Count > 0 || hasCalculated);
+
+        return hasAnswers || Children.Any(child => child.HasRequiredAnswers());
+    }
+
     public bool HasAnswers()
     {
         return ResponseItem?.Answer.Count > 0
