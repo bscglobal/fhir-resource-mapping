@@ -130,6 +130,39 @@ public class ExtractorTests
         };
     }
 
+    private static object[] GeneralNoteWithNoImagesTestCase()
+    {
+        var patientId = Guid.NewGuid().ToString();
+        var compositionId = Guid.NewGuid().ToString();
+        var userId = Guid.NewGuid().ToString();
+        var originalImageIds = Array.Empty<string>();
+        var newImageIds = Array.Empty<string>();
+        var noteId = Guid.NewGuid().ToString();
+        return new object[]
+        {
+            GeneralNote.CreateQuestionnaire(),
+            GeneralNote.CreateQuestionnaireResponse(compositionId, noteId, originalImageIds),
+            GeneralNote.ResourceLoaderResponse(compositionId, patientId, userId, newImageIds, noteId),
+            new Dictionary<string, StructureDefinition> { { "Composition", GeneralNote.CreateProfile() } },
+            new Dictionary<string, Resource>
+            {
+                {
+                    "user",
+                    new Practitioner { Id = userId }
+                },
+                {
+                    "patient",
+                    new Patient { Id = patientId }
+                },
+                {
+                    "composition",
+                    new Composition { Id = compositionId }
+                }
+            },
+            GeneralNote.ExtractionBundle(compositionId, patientId, userId, noteId, originalImageIds)
+        };
+    }
+
     private static object[][] PartialUpdateTestCase()
     {
         var patientId = Guid.NewGuid().ToString();
@@ -177,6 +210,7 @@ public class ExtractorTests
             ServiceRequestTestCase(),
             NewGeneralNoteTestCase(),
             UpdatedGeneralNoteTestCase(),
+            GeneralNoteWithNoImagesTestCase()
         }.Concat(PartialUpdateTestCase());
     }
 
