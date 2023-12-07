@@ -248,7 +248,8 @@ public partial class Demographics
                       "definition": "RelatedPerson.id",
                       "text": "(internal use)",
                       "type": "string",
-                      "readOnly": true
+                      "readOnly": true,
+                      "required": true
                     },
                     {
                       "extension": [
