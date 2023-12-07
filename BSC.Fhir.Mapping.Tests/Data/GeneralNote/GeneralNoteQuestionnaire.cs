@@ -482,6 +482,7 @@ public partial class GeneralNote
                                     Definition = "DocumentReference.content.attachment",
                                     Text = "Note",
                                     Type = Questionnaire.QuestionnaireItemType.Attachment,
+                                    Required = true,
                                     Extension =
                                     {
                                         new() { Url = "attachment-type", Value = new FhirString("Text") },
@@ -559,6 +560,7 @@ public partial class GeneralNote
                             Definition = "DocumentReference.id",
                             Text = "ImageId",
                             Type = Questionnaire.QuestionnaireItemType.String,
+                            Required = true,
                             Extension =
                             {
                                 new() { Url = QUESTIONNAIRE_HIDDEN_URL, Value = new FhirBoolean(true) },
