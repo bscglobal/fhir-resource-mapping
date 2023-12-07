@@ -5,7 +5,6 @@ using BSC.Fhir.Mapping.Core;
 using BSC.Fhir.Mapping.Core.Expressions;
 using BSC.Fhir.Mapping.Expressions;
 using Hl7.Fhir.Model;
-using Hl7.Fhir.Serialization;
 using Hl7.Fhir.Validation;
 using Microsoft.Extensions.Logging;
 using Task = System.Threading.Tasks.Task;
@@ -55,7 +54,7 @@ public class Extractor : IExtractor
             throw new InvalidOperationException("Could not extract resources");
         }
 
-        // TreeDebugging.PrintTree(rootScope);
+        // _logger.LogDebug(TreeDebugging.PrintTree(rootScope));
 
         return await ExtractByDefinition(rootScope, cancellationToken);
     }
@@ -137,6 +136,11 @@ public class Extractor : IExtractor
         CancellationToken cancellationToken = default
     )
     {
+        if (!scope.HasRequiredAnswers())
+        {
+            return;
+        }
+
         var context = scope.ExtractionContextValue()?.Value as Resource;
 
         if (context is null)
