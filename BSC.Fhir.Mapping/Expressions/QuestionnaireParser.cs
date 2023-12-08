@@ -136,13 +136,6 @@ public class QuestionnaireParser
         var extensions = item.AllExtensions();
         ParseExtensions(extensions.ToArray(), item.LinkId);
 
-        if (responseItem.Answer.Count == 0 && item.Initial.Count > 0)
-        {
-            responseItem.Answer = item.Initial
-                .Select(initial => new QuestionnaireResponse.AnswerComponent { Value = initial.Value })
-                .ToList();
-        }
-
         ParseQuestionnaireItems(item.Item, responseItem.Item);
     }
 

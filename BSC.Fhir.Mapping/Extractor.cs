@@ -332,6 +332,10 @@ public class Extractor : IExtractor
         {
             answers = scope.ResponseItem.Answer.Select(answer => answer.Value).ToArray();
         }
+        else if (scope.Item.Initial.Count > 0)
+        {
+            answers = scope.Item.Initial.Select(initial => initial.Value).ToArray();
+        }
         else if (calculatedValue?.Value is not null)
         {
             answers = calculatedValue.Value.OfType<DataType>().ToArray();
@@ -889,7 +893,13 @@ public class Extractor : IExtractor
         QuestionnaireResponse.ItemComponent responseItem
     )
     {
-        var value = responseItem.Answer.First().Value;
+        var value = responseItem.Answer.FirstOrDefault()?.Value ?? item.Initial.FirstOrDefault()?.Value;
+
+        if (value is null)
+        {
+            return;
+        }
+
         var existing = extractionContext.GetExtension(item.Definition);
         if (existing is not null)
         {

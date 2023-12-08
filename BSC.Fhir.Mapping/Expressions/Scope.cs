@@ -136,6 +136,7 @@ public class Scope : IClonable<Scope>
     public bool HasAnswers()
     {
         return ResponseItem?.Answer.Count > 0
+            || Item?.Initial.Count > 0
             || Context.Any(ctx => ctx.Type == QuestionnaireContextType.CalculatedExpression)
             || Children.Any(child => child.HasAnswers());
     }
