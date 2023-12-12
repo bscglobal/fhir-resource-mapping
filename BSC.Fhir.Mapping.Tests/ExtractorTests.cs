@@ -91,7 +91,7 @@ public class ExtractorTests
                     new Patient { Id = patientId }
                 }
             },
-            GeneralNote.ExtractionBundle(compositionId, patientId, userId, noteId, imageIds)
+            GeneralNote.ExtractionBundle(compositionId, patientId, userId, noteId, null, imageIds)
         };
     }
 
@@ -126,7 +126,14 @@ public class ExtractorTests
                     new Composition { Id = compositionId }
                 }
             },
-            GeneralNote.ExtractionBundle(compositionId, patientId, userId, noteId, originalImageIds)
+            GeneralNote.ExtractionBundle(
+                compositionId,
+                patientId,
+                userId,
+                noteId,
+                "This is text that should not be overwritten",
+                originalImageIds
+            )
         };
     }
 
@@ -159,7 +166,14 @@ public class ExtractorTests
                     new Composition { Id = compositionId }
                 }
             },
-            GeneralNote.ExtractionBundle(compositionId, patientId, userId, noteId, originalImageIds)
+            GeneralNote.ExtractionBundle(
+                compositionId,
+                patientId,
+                userId,
+                noteId,
+                "This is text that should not be overwritten",
+                originalImageIds
+            )
         };
     }
 
