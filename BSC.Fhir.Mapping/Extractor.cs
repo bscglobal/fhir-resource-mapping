@@ -203,6 +203,7 @@ public class Extractor : IExtractor
                 scope.Item,
                 extractionResult,
                 scope,
+                rootResource,
                 cancellationToken
             );
         }
@@ -434,6 +435,7 @@ public class Extractor : IExtractor
         Questionnaire.ItemComponent item,
         List<Resource> extractionResult,
         Scope scope,
+        Resource? rootResource = null,
         CancellationToken cancellationToken = default
     )
     {
@@ -642,31 +644,52 @@ public class Extractor : IExtractor
             return;
         }
 
-        var value = Activator.CreateInstance(type) as Base;
+        var existingValue = fieldInfo.GetValue(extractionContext.Value);
 
-        if (value is null)
+        if (existingValue is null || !existingValue.IsNonStringEnumerable())
         {
-            _logger.LogError("could not construct type [{0}]", type);
+            _logger.LogError("Could not find existing value for slice");
             return;
         }
 
+        var existingValueEnumerable = (IEnumerable<Element>)existingValue;
+
         foreach (var fixedVal in slice.Fixed)
         {
-            SetFieldElementValue(value, fixedVal.PropertyInfo, fixedVal.Value);
+            existingValueEnumerable = existingValueEnumerable.Where(
+                existing => (fixedVal.PropertyInfo.GetValue(existing) as Element)?.IsExactly(fixedVal.Value) == true
+            );
         }
 
-        if (fieldInfo.IsNonStringEnumerable())
+        var matchingResult = existingValueEnumerable.ToArray();
+
+        Base? value = null;
+
+        if (matchingResult.Length > 0)
         {
-            var val = fieldInfo.GetValue(extractionContext.Value) as IList;
-            if (val is not null && !extractionContext.DirtyFields.Contains(fieldInfo))
-            {
-                val.Clear();
-            }
-            val?.Add(value);
+            _logger.LogDebug("Found existing instance of {Type} for slice {SliceName}", type.Name, sliceName);
+            value = matchingResult.First();
+            // We don't need to set the slice discriminator values if we find an existing instance (we filtered by these fields)
         }
         else
         {
-            fieldInfo.SetValue(extractionContext.Value, value);
+            _logger.LogDebug("Creating new instance of {Type} for slice {SliceName}", type.Name, sliceName);
+            value = Activator.CreateInstance(type) as Base;
+
+            if (value is null)
+            {
+                _logger.LogError("Could not construct type [{0}]", type);
+                return;
+            }
+
+            // We only need to set the slice discriminator values if we create a new instance
+            foreach (var fixedVal in slice.Fixed)
+            {
+                SetFieldElementValue(value, fixedVal.PropertyInfo, fixedVal.Value);
+            }
+
+            var val = fieldInfo.GetValue(extractionContext.Value) as IList;
+            val?.Add(value);
         }
 
         extractionContext.DirtyFields.Add(fieldInfo);
@@ -723,13 +746,13 @@ public class Extractor : IExtractor
         }
     }
 
-    private void SetFieldElementValue(Base baseResource, PropertyInfo field, DataType answerValue)
+    private void SetFieldElementValue(Base baseResource, PropertyInfo field, Element answerValue)
     {
         _logger.LogDebug("Setting field {Name} to {Value}", field.Name, answerValue.ToString());
 
-        if (field.PropertyType.Name == "String" && answerValue is FhirString)
+        if (field.PropertyType == typeof(string) && answerValue is FhirString str)
         {
-            field.SetValue(baseResource, answerValue.ToString());
+            field.SetValue(baseResource, str.Value);
         }
         else
         {
