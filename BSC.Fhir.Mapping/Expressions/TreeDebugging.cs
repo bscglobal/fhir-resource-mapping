@@ -54,19 +54,6 @@ internal static class TreeDebugging
             }
         }
 
-        // str.AppendLine(prefix + "│");
-        // str.AppendLine(prefix + "├─ " + "ExtractionContext");
-        // var childPrefix = prefix + "│     ";
-        // str.AppendLine(childPrefix + "│");
-        // str.AppendLine(
-        //     childPrefix
-        //         + "└─ "
-        //         + (
-        //             scope.ExtractionContextValue() is ExtractionContext contextValue
-        //                 ? contextValue.Value.GetType()
-        //                 : "Nope"
-        //         )
-        // );
         str.AppendLine(prefix + "│");
         str.AppendLine(prefix + "├─ " + "HasRequiredAnswers");
         var childPrefix = prefix + "│     ";
