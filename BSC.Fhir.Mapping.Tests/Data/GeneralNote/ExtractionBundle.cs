@@ -10,6 +10,7 @@ public partial class GeneralNote
         string patientId,
         string userId,
         string noteId,
+        string? noteText,
         IReadOnlyCollection<string> imageIds
     )
     {
@@ -53,7 +54,8 @@ public partial class GeneralNote
                                         }
                                     }
                                 },
-                                Entry = { new($"DocumentReference/{noteId}") }
+                                Entry = { new($"DocumentReference/{noteId}") },
+                                Text = string.IsNullOrEmpty(noteText) ? null : new(noteText)
                             },
                             new()
                             {

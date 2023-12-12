@@ -60,6 +60,7 @@ public partial class GeneralNote
                     {
                         new() { LinkId = "noteSection.title", Answer = { new() { Value = new FhirString("Note") } } },
                         new() { LinkId = "noteSection.entry" },
+                        new() { LinkId = "noteSection.text" },
                     }
                 },
                 new()
