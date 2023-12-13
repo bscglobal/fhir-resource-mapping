@@ -2,6 +2,7 @@ using BSC.Fhir.Mapping.Core;
 using BSC.Fhir.Mapping.Core.Expressions;
 using BSC.Fhir.Mapping.Expressions;
 using BSC.Fhir.Mapping.Tests.Data;
+using BSC.Fhir.Mapping.Tests.Data.ExtractorTestCases;
 using BSC.Fhir.Mapping.Tests.Mocks;
 using FluentAssertions;
 using FluentAssertions.Equivalency;
@@ -22,6 +23,19 @@ public class ExtractorTests
         _output = output;
     }
 
+    [Fact]
+    public async Task Extractor_SimpleResource()
+    {
+        var testCase = new SimpleResourceCreate();
+        await TestExtractor(
+            testCase.Questionnaire,
+            testCase.QuestionnaireResponse,
+            testCase.ResourceLoaderResponse,
+            testCase.Profiles,
+            testCase.LaunchContext,
+            testCase.ExpectedBundle
+        );
+    }
 
     [Fact]
     public async Task Extractor_DemographicsTestCase()
