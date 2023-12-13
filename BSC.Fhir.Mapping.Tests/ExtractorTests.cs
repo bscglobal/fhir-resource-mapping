@@ -7,7 +7,6 @@ using FluentAssertions;
 using FluentAssertions.Equivalency;
 using FluentAssertions.Extensions;
 using Hl7.Fhir.Model;
-using Hl7.Fhir.Serialization;
 using Moq;
 using Xunit.Abstractions;
 using Task = System.Threading.Tasks.Task;
@@ -23,12 +22,14 @@ public class ExtractorTests
         _output = output;
     }
 
-    private static object[] DemographicsTestCase()
+
+    [Fact]
+    public async Task Extractor_DemographicsTestCase()
     {
         var patientId = Guid.NewGuid().ToString();
         var relativeIds = (Guid.NewGuid().ToString(), Guid.NewGuid().ToString(), Guid.NewGuid().ToString());
-        return new object[]
-        {
+
+        await TestExtractor(
             Demographics.CreateQuestionnaire(),
             Demographics.CreateQuestionnaireResponse(patientId, relativeIds),
             Demographics.ResourceLoaderResponse(patientId, relativeIds),
@@ -41,15 +42,16 @@ public class ExtractorTests
                 }
             },
             Demographics.ExtractionBundle(patientId, relativeIds)
-        };
+        );
     }
 
-    private static object[] ServiceRequestTestCase()
+    [Fact]
+    public async Task ServiceRequestTestCase()
     {
         var patientId = Guid.NewGuid().ToString();
         var serviceRequestId = Guid.NewGuid().ToString();
-        return new object[]
-        {
+
+        await TestExtractor(
             TestServiceRequest.CreateQuestionnaire(),
             TestServiceRequest.CreateQuestionnaireResponse(patientId, serviceRequestId),
             TestServiceRequest.ResourceLoaderResponse(serviceRequestId, patientId),
@@ -62,10 +64,11 @@ public class ExtractorTests
                 }
             },
             TestServiceRequest.ExtractionBundle(serviceRequestId, patientId)
-        };
+        );
     }
 
-    private static object[] NewGeneralNoteTestCase()
+    [Fact]
+    public async Task NewGeneralNoteTestCase()
     {
         var patientId = Guid.NewGuid().ToString();
         var compositionId = Guid.NewGuid().ToString();
@@ -74,8 +77,8 @@ public class ExtractorTests
             .Select(_ => Guid.NewGuid().ToString())
             .ToArray();
         var noteId = Guid.NewGuid().ToString();
-        return new object[]
-        {
+
+        await TestExtractor(
             GeneralNote.CreateQuestionnaire(),
             GeneralNote.CreateQuestionnaireResponse(compositionId, noteId, imageIds),
             GeneralNote.EmptyResourceLoaderResponse(compositionId),
@@ -92,10 +95,11 @@ public class ExtractorTests
                 }
             },
             GeneralNote.ExtractionBundle(compositionId, patientId, userId, noteId, null, imageIds)
-        };
+        );
     }
 
-    private static object[] UpdatedGeneralNoteTestCase()
+    [Fact]
+    public async Task Extractor_UpdatedGeneralNoteTestCase()
     {
         var patientId = Guid.NewGuid().ToString();
         var compositionId = Guid.NewGuid().ToString();
@@ -105,8 +109,8 @@ public class ExtractorTests
             .ToArray();
         var newImageIds = new[] { originalImageIds[0], originalImageIds[2], Guid.NewGuid().ToString() };
         var noteId = Guid.NewGuid().ToString();
-        return new object[]
-        {
+
+        await TestExtractor(
             GeneralNote.CreateQuestionnaire(),
             GeneralNote.CreateQuestionnaireResponse(compositionId, noteId, originalImageIds),
             GeneralNote.ResourceLoaderResponse(compositionId, patientId, userId, newImageIds, noteId),
@@ -134,10 +138,11 @@ public class ExtractorTests
                 "This is text that should not be overwritten",
                 originalImageIds
             )
-        };
+        );
     }
 
-    private static object[] GeneralNoteWithNoImagesTestCase()
+    [Fact]
+    public async Task Extractor_GeneralNoteWithNoImagesTestCase()
     {
         var patientId = Guid.NewGuid().ToString();
         var compositionId = Guid.NewGuid().ToString();
@@ -145,8 +150,8 @@ public class ExtractorTests
         var originalImageIds = Array.Empty<string>();
         var newImageIds = Array.Empty<string>();
         var noteId = Guid.NewGuid().ToString();
-        return new object[]
-        {
+
+        await TestExtractor(
             GeneralNote.CreateQuestionnaire(),
             GeneralNote.CreateQuestionnaireResponse(compositionId, noteId, originalImageIds),
             GeneralNote.ResourceLoaderResponse(compositionId, patientId, userId, newImageIds, noteId),
@@ -174,63 +179,52 @@ public class ExtractorTests
                 "This is text that should not be overwritten",
                 originalImageIds
             )
-        };
+        );
     }
 
-    private static object[][] PartialUpdateTestCase()
+    [Fact]
+    public async Task ExtractAsync_PartialUpdateTestCase_WithEmptyItemsInQuestionnaireResponse()
     {
         var patientId = Guid.NewGuid().ToString();
 
-        return new object[][]
-        {
-            new object[]
+        await TestExtractor(
+            PartialUpdate.CreateQuestionnaire(),
+            PartialUpdate.CreateQuestionnaireResponse(),
+            PartialUpdate.ResourceLoaderResponse(patientId),
+            new Dictionary<string, StructureDefinition>(),
+            new Dictionary<string, Resource>
             {
-                PartialUpdate.CreateQuestionnaire(),
-                PartialUpdate.CreateQuestionnaireResponse(),
-                PartialUpdate.ResourceLoaderResponse(patientId),
-                new Dictionary<string, StructureDefinition>(),
-                new Dictionary<string, Resource>
                 {
-                    {
-                        "patient",
-                        new Patient { Id = patientId }
-                    }
-                },
-                PartialUpdate.ExtractionBundle(patientId)
+                    "patient",
+                    new Patient { Id = patientId }
+                }
             },
-            new object[]
-            {
-                PartialUpdate.CreateQuestionnaire(),
-                PartialUpdate.CreateQuestionnaireResponseWithoutGiven(),
-                PartialUpdate.ResourceLoaderResponse(patientId),
-                new Dictionary<string, StructureDefinition>(),
-                new Dictionary<string, Resource>
-                {
-                    {
-                        "patient",
-                        new Patient { Id = patientId }
-                    }
-                },
-                PartialUpdate.ExtractionBundle(patientId)
-            }
-        };
+            PartialUpdate.ExtractionBundle(patientId)
+        );
     }
 
-    public static IEnumerable<object[]> AllQuestionnaireTestCases()
+    [Fact]
+    public async Task ExtractAsync_PartialUpdateTestCase_WithNoItemsInQuestionnaireResponse()
     {
-        return new[]
-        {
-            DemographicsTestCase(),
-            ServiceRequestTestCase(),
-            NewGeneralNoteTestCase(),
-            UpdatedGeneralNoteTestCase(),
-            GeneralNoteWithNoImagesTestCase()
-        }.Concat(PartialUpdateTestCase());
+        var patientId = Guid.NewGuid().ToString();
+
+        await TestExtractor(
+            PartialUpdate.CreateQuestionnaire(),
+            PartialUpdate.CreateQuestionnaireResponseWithoutGiven(),
+            PartialUpdate.ResourceLoaderResponse(patientId),
+            new Dictionary<string, StructureDefinition>(),
+            new Dictionary<string, Resource>
+            {
+                {
+                    "patient",
+                    new Patient { Id = patientId }
+                }
+            },
+            PartialUpdate.ExtractionBundle(patientId)
+        );
     }
 
-    [Theory]
-    [MemberData(nameof(AllQuestionnaireTestCases))]
-    public async Task ExtractAsync_ReturnsCorrectBundle(
+    private async Task TestExtractor(
         Questionnaire questionnaire,
         QuestionnaireResponse response,
         Dictionary<string, IReadOnlyCollection<Resource>> resourceLoaderResponse,
@@ -317,15 +311,7 @@ public class ExtractorTests
             actual.Should().NotBeNull();
             // _output.WriteLine(expected.ToJson(new() { Pretty = true }));
             // _output.WriteLine(actual.ToJson(new() { Pretty = true }));
-            actual
-                .Should()
-                .BeEquivalentTo(
-                    expected,
-                    equivalancyOptions,
-                    "because {0} should be the same as {1}",
-                    actual.ToJson(new() { Pretty = true }),
-                    expected.ToJson(new() { Pretty = true })
-                );
+            actual.Should().BeEquivalentTo(expected, equivalancyOptions);
         }
     }
 }
