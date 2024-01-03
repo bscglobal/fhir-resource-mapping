@@ -53,7 +53,14 @@ public class QuestionnaireParser
     private void AddLaunchContextToScope(IDictionary<string, Resource> launchContext)
     {
         var scopedLaunchContext = launchContext.Select(
-            kv => new LaunchContext(_idProvider.GetId(), kv.Key, kv.Value, _scopeTree.CurrentScope)
+            kv =>
+                new QuestionnaireContext(
+                    _idProvider.GetId(),
+                    kv.Key,
+                    kv.Value,
+                    _scopeTree.CurrentScope,
+                    QuestionnaireContextType.LaunchContext
+                )
         );
 
         _scopeTree.CurrentScope.Context.AddRange(scopedLaunchContext);
@@ -81,7 +88,6 @@ public class QuestionnaireParser
         }
 
         await ResolveDependenciesAsync(cancellationToken);
-        // TreeDebugging.PrintTree(_scopeTree.CurrentScope);
 
         return _scopeTree.CurrentScope;
     }
@@ -143,11 +149,11 @@ public class QuestionnaireParser
     {
         var queries = extensions
             .Select(extension => ParseExtension(extension))
-            .OfType<QuestionnaireExpression<BaseList>>();
+            .OfType<IQuestionnaireContext<BaseList>>();
         _scopeTree.CurrentScope.Context.AddRange(queries);
     }
 
-    private IQuestionnaireExpression<BaseList>? ParseExtension(Extension extension)
+    private IQuestionnaireContext<BaseList>? ParseExtension(Extension extension)
     {
         return extension.Url switch
         {
@@ -158,11 +164,17 @@ public class QuestionnaireParser
                     QuestionnaireContextType.PopulationContext
                 ),
             Constants.EXTRACTION_CONTEXT when _resolvingContext == ResolvingContext.Extraction
-                => ParseExpressionExtension(
-                    extension,
-                    new[] { Constants.FHIRPATH_MIME, Constants.FHIR_QUERY_MIME },
-                    QuestionnaireContextType.ExtractionContext
-                ),
+                => extension.Value switch
+                {
+                    Expression
+                        => ParseExpressionExtension(
+                            extension,
+                            new[] { Constants.FHIRPATH_MIME, Constants.FHIR_QUERY_MIME },
+                            QuestionnaireContextType.ExtractionContext
+                        ),
+                    Code code => ResourceTypeExtractionContext(code),
+                    _ => ParseExtensionError(extension, "Unexpected type for ExtractionContext")
+                },
             Constants.INITIAL_EXPRESSION when _resolvingContext == ResolvingContext.Population
                 => ParseExpressionExtension(
                     extension,
@@ -209,14 +221,12 @@ public class QuestionnaireParser
 
         if (!supportedLanguages.Contains(expression.Language))
         {
-            _logger.LogWarning(errorMessage($"Unsupported expression language {expression.Language}"));
-            return null;
+            return ParseExtensionError(extension, errorMessage($"Unsupported language {expression.Language}"));
         }
 
         if (string.IsNullOrEmpty(expression.Expression_))
         {
-            _logger.LogWarning(errorMessage("Empty expression"));
-            return null;
+            return ParseExtensionError(extension, errorMessage("Expression is empty"));
         }
 
         IQuestionnaireExpression<BaseList> query;
@@ -241,6 +251,39 @@ public class QuestionnaireParser
         expression.AddExtension("ExpressionId", new Id { Value = query.Id.ToString() });
 
         return query;
+    }
+
+    private IQuestionnaireExpression<BaseList>? ParseExtensionError(Extension extension, string message)
+    {
+        _logger.LogError(
+            "{Message} for {ExtensionUrl} in Questionnaire.Item {LinkId}. Skipping resolution for this extension...",
+            message,
+            extension.Url,
+            _scopeTree.CurrentItem?.LinkId ?? "root"
+        );
+        return null;
+    }
+
+    private IQuestionnaireContext<BaseList>? ResourceTypeExtractionContext(Code code)
+    {
+        var resourceType = ModelInfo.GetTypeForFhirType(code.Value);
+        var resource = Activator.CreateInstance(resourceType) as Resource;
+
+        if (resource is null)
+        {
+            _logger.LogError("Could not create resource for type {Type}", resourceType);
+            return null;
+        }
+
+        var extractionContext = new QuestionnaireContext(
+            _idProvider.GetId(),
+            null,
+            resource,
+            _scopeTree.CurrentScope,
+            QuestionnaireContextType.ExtractionContext
+        );
+
+        return extractionContext;
     }
 
     private void CreateDependencyGraph(Scope scope)
