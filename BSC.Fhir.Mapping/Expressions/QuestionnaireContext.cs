@@ -1,4 +1,3 @@
-using BSC.Fhir.Mapping.Core;
 using BSC.Fhir.Mapping.Core.Expressions;
 using Hl7.Fhir.Model;
 
@@ -6,25 +5,26 @@ namespace BSC.Fhir.Mapping.Expressions;
 
 using BaseList = IReadOnlyCollection<Base>;
 
-public class LaunchContext : IQuestionnaireContext<BaseList>
+public class QuestionnaireContext : IQuestionnaireContext<BaseList>
 {
     private readonly HashSet<IQuestionnaireExpression<BaseList>> _dependants =
         new(QuestionnaireContextComparer<BaseList>.Default);
 
-    public string Name { get; }
+    public string? Name { get; }
     public BaseList Value { get; }
     public int Id { get; }
     public Scope Scope { get; }
-    public QuestionnaireContextType Type => QuestionnaireContextType.LaunchContext;
+    public QuestionnaireContextType Type { get; }
 
     public IEnumerable<IQuestionnaireExpression<BaseList>> Dependants => _dependants.AsEnumerable();
 
-    public LaunchContext(int id, string name, Resource value, Scope scope)
+    public QuestionnaireContext(int id, string? name, Resource value, Scope scope, QuestionnaireContextType type)
     {
         Id = id;
         Name = name;
         Value = new[] { value };
         Scope = scope;
+        Type = type;
     }
 
     public bool Resolved()
