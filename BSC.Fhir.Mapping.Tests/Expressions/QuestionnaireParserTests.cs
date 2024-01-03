@@ -145,6 +145,10 @@ public class QuestionnaireParserTests
 
         scope.Should().NotBeNull();
         scope.Context.Should().HaveCount(1);
+
+        var context = scope.Context.First();
+        context.Should().BeOfType<QuestionnaireContext>();
+        context.Value.Should().BeEquivalentTo(new[] { new Patient() });
     }
 
     private Mock<IResourceLoader> ResourceLoaderMock(Dictionary<string, IReadOnlyCollection<Resource>> results)
