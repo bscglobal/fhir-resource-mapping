@@ -1,5 +1,4 @@
 using BSC.Fhir.Mapping.Core;
-using BSC.Fhir.Mapping.Core.Expressions;
 using BSC.Fhir.Mapping.Expressions;
 using BSC.Fhir.Mapping.Tests.Data;
 using BSC.Fhir.Mapping.Tests.Mocks;
@@ -11,11 +10,11 @@ using Task = System.Threading.Tasks.Task;
 
 namespace BSC.Fhir.Mapping.Tests.Expressions;
 
-public class DependencyResolverTests
+public class QuestionnaireParserTests
 {
     private readonly ITestOutputHelper _output;
 
-    public DependencyResolverTests(ITestOutputHelper output)
+    public QuestionnaireParserTests(ITestOutputHelper output)
     {
         _output = output;
     }
@@ -91,7 +90,7 @@ public class DependencyResolverTests
         };
 
         var questionnaireResponse = new QuestionnaireResponse();
-        var resolver = new QuestionnaireParser(
+        var parser = new QuestionnaireParser(
             idProvider,
             questionnaire,
             questionnaireResponse,
@@ -102,7 +101,52 @@ public class DependencyResolverTests
             new TestLogger<QuestionnaireParser>(_output)
         );
 
-        await resolver.ParseQuestionnaireAsync();
+        await parser.ParseQuestionnaireAsync();
+    }
+
+    [Fact]
+    public async Task ParseQuestionnaireAsync_CreatesCorrectScope_ForResourceTypeExtractionContext()
+    {
+        var questionnaire = new Questionnaire
+        {
+            Extension =
+            {
+                new()
+                {
+                    Url = Constants.EXTRACTION_CONTEXT,
+                    Value = new Code { Value = "Patient" }
+                }
+            },
+            Item =
+            {
+                new()
+                {
+                    LinkId = "1",
+                    Definition = "Patient.birthDate",
+                    Initial = { new() { Value = new Date { Value = "2006-04-05" } } }
+                }
+            }
+        };
+
+        var idProvider = new NumericIdProvider();
+        var resourceLoaderMock = new Mock<IResourceLoader>();
+        var parser = new QuestionnaireParser(
+            idProvider,
+            questionnaire,
+            new QuestionnaireResponse(),
+            new Dictionary<string, Resource>(),
+            resourceLoaderMock.Object,
+            ResolvingContext.Extraction,
+            new FhirPathMapping(new TestLogger<FhirPathMapping>(_output)),
+            new TestLogger<QuestionnaireParser>(_output)
+        );
+
+        var scope = await parser.ParseQuestionnaireAsync();
+
+        _output.WriteLine(TreeDebugging.PrintTree(scope));
+
+        scope.Should().NotBeNull();
+        scope.Context.Should().HaveCount(1);
     }
 
     private Mock<IResourceLoader> ResourceLoaderMock(Dictionary<string, IReadOnlyCollection<Resource>> results)
