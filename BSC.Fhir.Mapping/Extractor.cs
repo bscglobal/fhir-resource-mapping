@@ -850,6 +850,7 @@ public class Extractor : IExtractor
             _ when type == typeof(Code) && answer is Coding code => new Code(code.Code),
             _ when type == typeof(Code) && answer is FhirString codeStr => new Code(codeStr.Value),
             _ when type == typeof(FhirUri) && answer is FhirString uriStr => new FhirUri(uriStr.Value),
+            _ when type == typeof(FhirUrl) && answer is FhirString urlStr => new FhirUrl(urlStr.Value),
             _ when type == typeof(FhirDecimal) && answer is Integer decInt => new FhirDecimal(decInt.Value),
             _ when type == typeof(Markdown) && answer is FhirString str => new Markdown(str.Value),
             _ when type == typeof(FhirDateTime) && answer is Date date => new FhirDateTime(date.Value),
