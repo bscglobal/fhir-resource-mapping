@@ -143,8 +143,6 @@ public class QuestionnaireParserTests
 
         var scope = await parser.ParseQuestionnaireAsync();
 
-        _output.WriteLine(TreeDebugging.PrintTree(scope));
-
         scope.Should().NotBeNull();
         scope.Context.Should().HaveCount(1);
     }
