@@ -329,6 +329,16 @@ public partial class GeneralNote
                                 },
                                 new() { Url = "referenceType", Value = new FhirString("DocumentReference") }
                             }
+                        },
+                        new()
+                        {
+                            Definition = "Composition.section.text",
+                            LinkId = "noteSection.text",
+                            Type = Questionnaire.QuestionnaireItemType.Text,
+                            Extension =
+                            {
+                                new() { Url = QUESTIONNAIRE_HIDDEN_URL, Value = new FhirBoolean(true) },
+                            }
                         }
                     },
                 },

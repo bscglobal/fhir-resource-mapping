@@ -8,7 +8,7 @@ public class SliceDefinition
     public class SliceFilter
     {
         public PropertyInfo PropertyInfo { get; set; }
-        public DataType Value { get; set; }
+        public Element Value { get; set; }
 
         public SliceFilter(PropertyInfo propertyInfo, DataType value)
         {

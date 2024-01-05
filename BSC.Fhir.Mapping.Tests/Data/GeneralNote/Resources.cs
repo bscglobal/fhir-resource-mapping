@@ -86,11 +86,24 @@ public partial class GeneralNote
                                 }
                             }
                         },
-                        Entry = { new($"DocumentReference/{noteId}") }
+                        Entry = { new($"DocumentReference/{noteId}") },
+                        Text = new("This is text that should not be overwritten")
                     },
                     new()
                     {
                         Title = "Image",
+                        Code = new()
+                        {
+                            Coding =
+                            {
+                                new()
+                                {
+                                    System = "https://1beat.care/fhir/coding-system",
+                                    Code = "54321",
+                                    Display = "Images"
+                                }
+                            }
+                        },
                         Entry = existingImageIds.Select(id => new ResourceReference($"DocumentReference/{id}")).ToList()
                     },
                 },
