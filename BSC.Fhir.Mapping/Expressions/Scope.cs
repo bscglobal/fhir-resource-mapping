@@ -128,7 +128,9 @@ public class Scope : IClonable<Scope>
     {
         var hasCalculated =
             Item?.Required == true && Context.Any(ctx => ctx.Type == QuestionnaireContextType.CalculatedExpression);
-        var hasAnswers = ResponseItem?.Answer.Count > 0 || hasCalculated;
+        var hasInitial = Item?.Required == true && Item?.Initial.Count > 0;
+
+        var hasAnswers = ResponseItem?.Answer.Count > 0 || hasCalculated || hasInitial;
 
         return hasAnswers || Children.Any(child => child.HasRequiredAnswers());
     }
