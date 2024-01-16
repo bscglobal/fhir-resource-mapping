@@ -2,11 +2,14 @@ using BSC.Fhir.Mapping.Core;
 using BSC.Fhir.Mapping.Core.Expressions;
 using BSC.Fhir.Mapping.Expressions;
 using BSC.Fhir.Mapping.Tests.Data;
+using BSC.Fhir.Mapping.Tests.Data.Common;
 using BSC.Fhir.Mapping.Tests.Mocks;
 using FluentAssertions;
 using Hl7.Fhir.Model;
+using Hl7.Fhir.Serialization;
 using Moq;
 using Xunit.Abstractions;
+using FhirPathExpression = BSC.Fhir.Mapping.Tests.Data.Common.FhirPathExpression;
 using Task = System.Threading.Tasks.Task;
 
 namespace BSC.Fhir.Mapping.Tests;
@@ -147,6 +150,159 @@ public class PopulatorTests
         var actualResponse = await populator.PopulateAsync(questionnaire, launchContext);
 
         // _output.WriteLine(expectedResponse.ToJson(new() { Pretty = true }));
+        // _output.WriteLine(actualResponse.ToJson(new() { Pretty = true }));
+        CompareItems(actualResponse.Item, expectedResponse.Item);
+    }
+
+    [Fact]
+    public async Task PopulateAsync_MapsCodeableConceptFieldToList()
+    {
+        var questionnaire = QuestionnaireCreator.Create(
+            new[] { new LaunchContext("observation", "Observation", "Observation") },
+            null,
+            null,
+            Array.Empty<FhirExpression>(),
+            new[]
+            {
+                QuestionnaireItemCreator.Create(
+                    "1",
+                    "Observation.component",
+                    Questionnaire.QuestionnaireItemType.Group,
+                    populationContext: new FhirPathExpression("%observation.component", "component"),
+                    items: new[]
+                    {
+                        QuestionnaireItemCreator.Create(
+                            "1.1",
+                            "Observation.component.value",
+                            Questionnaire.QuestionnaireItemType.Group,
+                            populationContext: new FhirPathExpression("%component.value", "value"),
+                            items: new[]
+                            {
+                                QuestionnaireItemCreator.Create(
+                                    "1.1.1",
+                                    "Observation.component.value.coding",
+                                    Questionnaire.QuestionnaireItemType.Choice,
+                                    repeats: true,
+                                    initialExpression: new FhirPathExpression("%value.coding"),
+                                    answerValueSet: "http://example.org/ValueSet"
+                                )
+                            }
+                        )
+                    }
+                )
+            }
+        );
+
+        var expectedResponse = new QuestionnaireResponse
+        {
+            Item = new List<QuestionnaireResponse.ItemComponent>
+            {
+                new()
+                {
+                    LinkId = "1",
+                    Item = new List<QuestionnaireResponse.ItemComponent>
+                    {
+                        new()
+                        {
+                            LinkId = "1.1",
+                            Item = new List<QuestionnaireResponse.ItemComponent>
+                            {
+                                new()
+                                {
+                                    LinkId = "1.1.1",
+                                    Answer = new List<QuestionnaireResponse.AnswerComponent>
+                                    {
+                                        new()
+                                        {
+                                            Value = new Coding
+                                            {
+                                                Code = "code1",
+                                                System = "http://example.org/ValueSet"
+                                            },
+                                        },
+                                        new()
+                                        {
+                                            Value = new Coding
+                                            {
+                                                Code = "code2",
+                                                System = "http://example.org/ValueSet"
+                                            },
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        };
+
+        var observationId = Guid.NewGuid().ToString();
+        var observation = new Observation
+        {
+            Id = observationId,
+            Component = new List<Observation.ComponentComponent>
+            {
+                new()
+                {
+                    Value = new CodeableConcept
+                    {
+                        Coding = new List<Coding>
+                        {
+                            new() { Code = "code1", System = "http://example.org/ValueSet" },
+                            new() { Code = "code2", System = "http://example.org/ValueSet" }
+                        }
+                    }
+                }
+            }
+        };
+        var resourceLoaderMock = new Mock<IResourceLoader>();
+
+        var idProvider = new NumericIdProvider();
+        var logger = new TestLogger<Populator>(_output);
+        var scopeTreeCreatorMock = new Mock<IScopeTreeCreator>();
+        scopeTreeCreatorMock
+            .Setup(factory =>
+                factory.CreateScopeTreeAsync(
+                    It.IsAny<Questionnaire>(),
+                    It.IsAny<QuestionnaireResponse>(),
+                    It.IsAny<Dictionary<string, Resource>>(),
+                    It.IsAny<ResolvingContext>(),
+                    It.IsAny<CancellationToken>()
+                )
+            )
+            .Returns<
+                Questionnaire,
+                QuestionnaireResponse,
+                Dictionary<string, Resource>,
+                ResolvingContext,
+                CancellationToken
+            >(
+                (questionnaire, questionnaireResponse, launchContext, resolvingContext, cancellationToken) =>
+                    new QuestionnaireParser(
+                        new NumericIdProvider(),
+                        questionnaire,
+                        new(),
+                        launchContext,
+                        resourceLoaderMock.Object,
+                        resolvingContext,
+                        new FhirPathMapping(new TestLogger<FhirPathMapping>(_output)),
+                        new TestLogger<QuestionnaireParser>(_output)
+                    ).ParseQuestionnaireAsync(cancellationToken)
+            );
+
+        var populator = new Populator(
+            new NumericIdProvider(),
+            resourceLoaderMock.Object,
+            new TestLogger<Populator>(_output),
+            scopeTreeCreatorMock.Object
+        );
+
+        var actualResponse = await populator.PopulateAsync(
+            questionnaire,
+            new Dictionary<string, Resource> { { "observation", observation } }
+        );
+
         // _output.WriteLine(actualResponse.ToJson(new() { Pretty = true }));
         CompareItems(actualResponse.Item, expectedResponse.Item);
     }
