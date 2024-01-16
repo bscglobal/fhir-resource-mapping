@@ -249,18 +249,16 @@ public class ExtractorTests
     {
         EquivalencyAssertionOptions<T> equivalancyOptions<T>(EquivalencyAssertionOptions<T> options) =>
             options
-                .Using<FhirDateTime>(
-                    ctx =>
-                        ctx.Subject
-                            .ToDateTimeOffset(2.Hours())
-                            .Should()
-                            .BeCloseTo(ctx.Expectation.ToDateTimeOffset(2.Hours()), 1.Seconds())
+                .Using<FhirDateTime>(ctx =>
+                    ctx.Subject.ToDateTimeOffset(2.Hours())
+                        .Should()
+                        .BeCloseTo(ctx.Expectation.ToDateTimeOffset(2.Hours()), 1.Seconds())
                 )
                 .WhenTypeIs<FhirDateTime>();
         var resourceLoaderMock = new Mock<IResourceLoader>();
         resourceLoaderMock
-            .Setup(
-                mock => mock.GetResourcesAsync(It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>())
+            .Setup(mock =>
+                mock.GetResourcesAsync(It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>())
             )
             .ReturnsAsync(resourceLoaderResponse);
 
@@ -273,15 +271,14 @@ public class ExtractorTests
 
         var scopeTreeCreatorMock = new Mock<IScopeTreeCreator>();
         scopeTreeCreatorMock
-            .Setup(
-                factory =>
-                    factory.CreateScopeTreeAsync(
-                        It.IsAny<Questionnaire>(),
-                        It.IsAny<QuestionnaireResponse>(),
-                        It.IsAny<Dictionary<string, Resource>>(),
-                        It.IsAny<ResolvingContext>(),
-                        It.IsAny<CancellationToken>()
-                    )
+            .Setup(factory =>
+                factory.CreateScopeTreeAsync(
+                    It.IsAny<Questionnaire>(),
+                    It.IsAny<QuestionnaireResponse>(),
+                    It.IsAny<Dictionary<string, Resource>>(),
+                    It.IsAny<ResolvingContext>(),
+                    It.IsAny<CancellationToken>()
+                )
             )
             .Returns<
                 Questionnaire,

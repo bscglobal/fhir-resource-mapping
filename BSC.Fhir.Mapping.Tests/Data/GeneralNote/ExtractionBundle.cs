@@ -108,32 +108,29 @@ public partial class GeneralNote
             };
 
         entries.AddRange(
-            imageIds.Select(
-                id =>
-                    new Bundle.EntryComponent
+            imageIds.Select(id => new Bundle.EntryComponent
+            {
+                Resource = new DocumentReference
+                {
+                    Id = id,
+                    Author = { new ResourceReference($"Practitioner/{userId}") },
+                    Category =
                     {
-                        Resource = new DocumentReference
+                        new()
                         {
-                            Id = id,
-                            Author = { new ResourceReference($"Practitioner/{userId}") },
-                            Category =
+                            Coding =
                             {
                                 new()
                                 {
-                                    Coding =
-                                    {
-                                        new()
-                                        {
-                                            System = "http://bscglobal.com/CodeSystem/free-text-type",
-                                            Code = "general-note-image"
-                                        }
-                                    }
+                                    System = "http://bscglobal.com/CodeSystem/free-text-type",
+                                    Code = "general-note-image"
                                 }
-                            },
-                            Subject = new ResourceReference($"Patient/{patientId}")
+                            }
                         }
-                    }
-            )
+                    },
+                    Subject = new ResourceReference($"Patient/{patientId}")
+                }
+            })
         );
 
         return new() { Type = Bundle.BundleType.Collection, Entry = entries };

@@ -73,8 +73,8 @@ public class QuestionnaireExpression<T> : IQuestionnaireExpression<T>
 
     public bool HasDependency(Func<IQuestionnaireContext<T>, bool> predicate)
     {
-        return Dependencies.Any(
-            dep => predicate(dep) || (dep is IQuestionnaireExpression<T> expr && expr.HasDependency(predicate))
+        return Dependencies.Any(dep =>
+            predicate(dep) || (dep is IQuestionnaireExpression<T> expr && expr.HasDependency(predicate))
         );
     }
 

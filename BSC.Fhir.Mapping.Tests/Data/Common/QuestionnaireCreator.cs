@@ -16,27 +16,24 @@ public static class QuestionnaireCreator
         var questionnaire = new Questionnaire
         {
             Extension = launchContext
-                .Select(
-                    lc =>
-                        new Extension
+                .Select(lc => new Extension
+                {
+                    Url = Constants.LAUNCH_CONTEXT,
+                    Extension =
+                    {
+                        new()
                         {
-                            Url = Constants.LAUNCH_CONTEXT,
-                            Extension =
+                            Url = "name",
+                            Value = new Coding
                             {
-                                new()
-                                {
-                                    Url = "name",
-                                    Value = new Coding
-                                    {
-                                        System = "http://hl7.org/fhir/uv/sdc/CodeSystem/launchContext",
-                                        Code = lc.Name,
-                                        Display = lc.Display
-                                    }
-                                },
-                                new() { Url = "type", Value = new Code(lc.Type) }
+                                System = "http://hl7.org/fhir/uv/sdc/CodeSystem/launchContext",
+                                Code = lc.Name,
+                                Display = lc.Display
                             }
-                        }
-                )
+                        },
+                        new() { Url = "type", Value = new Code(lc.Type) }
+                    }
+                })
                 .ToList(),
             Item = items.ToList()
         };
@@ -74,19 +71,16 @@ public static class QuestionnaireCreator
         }
 
         questionnaire.Extension.AddRange(
-            variables.Select(
-                v =>
-                    new Extension
-                    {
-                        Url = Constants.VARIABLE_EXPRESSION,
-                        Value = new Expression
-                        {
-                            Language = v.Language,
-                            Expression_ = v.Expression,
-                            Name = v.Name
-                        }
-                    }
-            )
+            variables.Select(v => new Extension
+            {
+                Url = Constants.VARIABLE_EXPRESSION,
+                Value = new Expression
+                {
+                    Language = v.Language,
+                    Expression_ = v.Expression,
+                    Name = v.Name
+                }
+            })
         );
 
         return questionnaire;

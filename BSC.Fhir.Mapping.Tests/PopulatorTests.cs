@@ -101,23 +101,21 @@ public class PopulatorTests
     {
         var resourceLoaderMock = new Mock<IResourceLoader>();
         resourceLoaderMock
-            .Setup(
-                loader =>
-                    loader.GetResourcesAsync(It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>())
+            .Setup(loader =>
+                loader.GetResourcesAsync(It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>())
             )
             .ReturnsAsync(resourceLoaderResponse);
 
         var scopeTreeCreatorMock = new Mock<IScopeTreeCreator>();
         scopeTreeCreatorMock
-            .Setup(
-                factory =>
-                    factory.CreateScopeTreeAsync(
-                        It.IsAny<Questionnaire>(),
-                        It.IsAny<QuestionnaireResponse>(),
-                        It.IsAny<Dictionary<string, Resource>>(),
-                        It.IsAny<ResolvingContext>(),
-                        It.IsAny<CancellationToken>()
-                    )
+            .Setup(factory =>
+                factory.CreateScopeTreeAsync(
+                    It.IsAny<Questionnaire>(),
+                    It.IsAny<QuestionnaireResponse>(),
+                    It.IsAny<Dictionary<string, Resource>>(),
+                    It.IsAny<ResolvingContext>(),
+                    It.IsAny<CancellationToken>()
+                )
             )
             .Returns<
                 Questionnaire,

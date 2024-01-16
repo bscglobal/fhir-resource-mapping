@@ -78,19 +78,16 @@ public static class QuestionnaireItemCreator
         }
 
         item.Extension.AddRange(
-            variables.Select(
-                v =>
-                    new Extension
-                    {
-                        Url = Constants.VARIABLE_EXPRESSION,
-                        Value = new Expression
-                        {
-                            Language = v.Language,
-                            Expression_ = v.Expression,
-                            Name = v.Name
-                        }
-                    }
-            )
+            variables.Select(v => new Extension
+            {
+                Url = Constants.VARIABLE_EXPRESSION,
+                Value = new Expression
+                {
+                    Language = v.Language,
+                    Expression_ = v.Expression,
+                    Name = v.Name
+                }
+            })
         );
 
         return item;

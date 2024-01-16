@@ -27,8 +27,8 @@ public static class MappingExtenstions
 
         var className = $"Hl7.Fhir.Model.{resourceName[0..1].ToUpper() + resourceName[1..]}";
 
-        var asm = AppDomain.CurrentDomain
-            .GetAssemblies()
+        var asm = AppDomain
+            .CurrentDomain.GetAssemblies()
             .FirstOrDefault(asm => asm.GetName().Name == "Hl7.Fhir.R4.Core");
 
         var type = asm?.GetType(className);
@@ -96,8 +96,8 @@ public static class MappingExtenstions
 
     public static Expression? InitialExpression(this Questionnaire.ItemComponent questionnaireItem)
     {
-        return questionnaireItem.Extension
-                .FirstOrDefault(extension => extension.Url == Constants.INITIAL_EXPRESSION)
+        return questionnaireItem
+                .Extension.FirstOrDefault(extension => extension.Url == Constants.INITIAL_EXPRESSION)
                 ?.Value as Expression;
     }
 
@@ -190,12 +190,12 @@ public static class MappingExtenstions
     )
     {
         var expression =
-            questionnaireItem.Extension
-                .FirstOrDefault(extension => extension.Url == Constants.POPULATION_CONTEXT)
+            questionnaireItem
+                .Extension.FirstOrDefault(extension => extension.Url == Constants.POPULATION_CONTEXT)
                 ?.Value as Expression;
 
-        var nestedExpessions = questionnaireItem.Item
-            .SelectMany(item => item.GetPopulationContextExpressions())
+        var nestedExpessions = questionnaireItem
+            .Item.SelectMany(item => item.GetPopulationContextExpressions())
             .ToArray();
 
         if (expression is null)
