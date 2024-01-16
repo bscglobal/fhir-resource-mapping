@@ -52,16 +52,13 @@ public class QuestionnaireParser
 
     private void AddLaunchContextToScope(IDictionary<string, Resource> launchContext)
     {
-        var scopedLaunchContext = launchContext.Select(
-            kv =>
-                new QuestionnaireContext(
-                    _idProvider.GetId(),
-                    kv.Key,
-                    kv.Value,
-                    _scopeTree.CurrentScope,
-                    QuestionnaireContextType.LaunchContext
-                )
-        );
+        var scopedLaunchContext = launchContext.Select(kv => new QuestionnaireContext(
+            _idProvider.GetId(),
+            kv.Key,
+            kv.Value,
+            _scopeTree.CurrentScope,
+            QuestionnaireContextType.LaunchContext
+        ));
 
         _scopeTree.CurrentScope.Context.AddRange(scopedLaunchContext);
     }
@@ -455,14 +452,13 @@ public class QuestionnaireParser
         var oldLength = 0;
         while (true)
         {
-            var expressions = _scopeTree.CurrentScope
-                .AllContextInSubtree()
+            var expressions = _scopeTree
+                .CurrentScope.AllContextInSubtree()
                 .OfType<IQuestionnaireExpression<BaseList>>()
-                .Where(
-                    expr =>
-                        !expr.Resolved()
-                        && !_notAllowedContextTypes.Contains(expr.Type)
-                        && !expr.HasDependency(ctx => _notAllowedContextTypes.Contains(ctx.Type))
+                .Where(expr =>
+                    !expr.Resolved()
+                    && !_notAllowedContextTypes.Contains(expr.Type)
+                    && !expr.HasDependency(ctx => _notAllowedContextTypes.Contains(ctx.Type))
                 )
                 .ToArray();
 
@@ -484,24 +480,22 @@ public class QuestionnaireParser
 
             var resolvedFhirPaths = resolvableFhirpaths.Where(expr => expr.Resolved()).ToArray();
 
-            expressions = _scopeTree.CurrentScope
-                .AllContextInSubtree()
+            expressions = _scopeTree
+                .CurrentScope.AllContextInSubtree()
                 .OfType<IQuestionnaireExpression<BaseList>>()
-                .Where(
-                    expr =>
-                        !expr.Resolved()
-                        && !_notAllowedContextTypes.Contains(expr.Type)
-                        && !expr.HasDependency(ctx => _notAllowedContextTypes.Contains(ctx.Type))
+                .Where(expr =>
+                    !expr.Resolved()
+                    && !_notAllowedContextTypes.Contains(expr.Type)
+                    && !expr.HasDependency(ctx => _notAllowedContextTypes.Contains(ctx.Type))
                 )
                 .ToArray();
 
             var resolvableFhirQueries = expressions
                 .OfType<FhirQueryExpression>()
-                .Where(
-                    expr =>
-                        expr.ExpressionLanguage == Constants.FHIR_QUERY_MIME
-                        && !expr.Resolved()
-                        && expr.DependenciesResolved()
+                .Where(expr =>
+                    expr.ExpressionLanguage == Constants.FHIR_QUERY_MIME
+                    && !expr.Resolved()
+                    && expr.DependenciesResolved()
                 )
                 .ToArray();
 
@@ -661,8 +655,8 @@ public class QuestionnaireParser
                 }
                 query.SetValue(fhirpathResult);
 
-                var fhirqueryDependants = query.Dependants
-                    .Where(dep => dep.ExpressionLanguage == Constants.FHIR_QUERY_MIME)
+                var fhirqueryDependants = query
+                    .Dependants.Where(dep => dep.ExpressionLanguage == Constants.FHIR_QUERY_MIME)
                     .ToArray();
 
                 var escapedQuery = Regex.Escape(query.Expression);
@@ -715,8 +709,8 @@ public class QuestionnaireParser
         if (scope.Context.Any(ctx => ctx.Type == QuestionnaireContextType.ExtractionContextId))
         {
             var resources = results.OfType<Resource>();
-            var existingScopes = _scopeTree.CurrentScope.GetChildScope(
-                child => child.Item is not null && child.Item.LinkId == scope.Item.LinkId
+            var existingScopes = _scopeTree.CurrentScope.GetChildScope(child =>
+                child.Item is not null && child.Item.LinkId == scope.Item.LinkId
             );
 
             _logger.LogDebug(
@@ -824,8 +818,8 @@ public class QuestionnaireParser
                 {
                     var newScope = scope.Clone();
 
-                    var newExprs = newScope.Context
-                        .OfType<QuestionnaireExpression<BaseList>>()
+                    var newExprs = newScope
+                        .Context.OfType<QuestionnaireExpression<BaseList>>()
                         .Where(ctx => originalExprs.Contains(ctx.ClonedFrom));
                     foreach (var expr in newExprs)
                     {
@@ -875,8 +869,8 @@ public class QuestionnaireParser
         foreach (var dependant in originalExpr.Dependants)
         {
             if (
-                allContext.FirstOrDefault(
-                    ctx => ctx is IClonable<IQuestionnaireExpression<BaseList>> cloned && cloned.ClonedFrom == dependant
+                allContext.FirstOrDefault(ctx =>
+                    ctx is IClonable<IQuestionnaireExpression<BaseList>> cloned && cloned.ClonedFrom == dependant
                 )
                 is IQuestionnaireExpression<BaseList> newDep
             )

@@ -303,8 +303,8 @@ public class Extractor : IExtractor
         );
 
         var calculatedValue =
-            scope.Context.FirstOrDefault(
-                ctx => ctx.Type == Core.Expressions.QuestionnaireContextType.CalculatedExpression
+            scope.Context.FirstOrDefault(ctx =>
+                ctx.Type == Core.Expressions.QuestionnaireContextType.CalculatedExpression
             ) as FhirPathExpression;
         if (calculatedValue is not null && scope.ResponseItem.Answer.Count > 0)
         {
@@ -656,8 +656,8 @@ public class Extractor : IExtractor
 
         foreach (var fixedVal in slice.Fixed)
         {
-            existingValueEnumerable = existingValueEnumerable.Where(
-                existing => (fixedVal.PropertyInfo.GetValue(existing) as Element)?.IsExactly(fixedVal.Value) == true
+            existingValueEnumerable = existingValueEnumerable.Where(existing =>
+                (fixedVal.PropertyInfo.GetValue(existing) as Element)?.IsExactly(fixedVal.Value) == true
             );
         }
 
@@ -897,15 +897,15 @@ public class Extractor : IExtractor
 
     private bool IsExtensionSupportedByProfile(StructureDefinition profile, string extensionForType, string fieldName)
     {
-        return profile.Snapshot.Element
-            .Where(element => element.Path == $"{extensionForType}.extension")
+        return profile
+            .Snapshot.Element.Where(element => element.Path == $"{extensionForType}.extension")
             .Any(element => element.ElementId[(element.ElementId.LastIndexOf(':') + 1)..] == fieldName);
     }
 
     private bool IsSliceSupportedByProfile(StructureDefinition profile, string typeToCheck, string sliceName)
     {
-        var val = profile.Snapshot.Element
-            .Where(element => element.Path == typeToCheck)
+        var val = profile
+            .Snapshot.Element.Where(element => element.Path == typeToCheck)
             .Any(element => element.SliceName == sliceName);
 
         return val;

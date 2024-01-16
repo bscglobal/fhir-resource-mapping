@@ -57,7 +57,7 @@ public partial class PartialUpdate
                         {
                             LinkId = "givenName",
                             Definition = "Patient.name.given",
-                            Required=  true,
+                            Required = true,
                             Type = Questionnaire.QuestionnaireItemType.String,
                         },
                         new()

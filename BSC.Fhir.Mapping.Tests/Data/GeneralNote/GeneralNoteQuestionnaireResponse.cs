@@ -53,17 +53,14 @@ public static partial class GeneralNote
     )
     {
         response.Item.AddRange(
-            imageIds.Select(
-                id =>
-                    new QuestionnaireResponse.ItemComponent
-                    {
-                        LinkId = "image",
-                        Item =
-                        {
-                            new() { LinkId = "image.id", Answer = { new() { Value = new FhirString(id) } } }
-                        }
-                    }
-            )
+            imageIds.Select(id => new QuestionnaireResponse.ItemComponent
+            {
+                LinkId = "image",
+                Item =
+                {
+                    new() { LinkId = "image.id", Answer = { new() { Value = new FhirString(id) } } }
+                }
+            })
         );
 
         return response;

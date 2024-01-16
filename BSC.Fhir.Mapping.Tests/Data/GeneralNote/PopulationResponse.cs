@@ -131,34 +131,31 @@ public partial class GeneralNote
         };
 
         response.Item.AddRange(
-            imageIds.Select(
-                id =>
-                    new QuestionnaireResponse.ItemComponent
+            imageIds.Select(id => new QuestionnaireResponse.ItemComponent
+            {
+                LinkId = "image",
+                Item =
+                {
+                    new() { LinkId = "image.id", Answer = { new() { Value = new FhirString(id) } } },
+                    new() { LinkId = "image.author" },
+                    new()
                     {
-                        LinkId = "image",
-                        Item =
+                        LinkId = "image.category",
+                        Answer =
                         {
-                            new() { LinkId = "image.id", Answer = { new() { Value = new FhirString(id) } } },
-                            new() { LinkId = "image.author" },
                             new()
                             {
-                                LinkId = "image.category",
-                                Answer =
+                                Value = new Coding
                                 {
-                                    new()
-                                    {
-                                        Value = new Coding
-                                        {
-                                            System = "http://bscglobal.com/CodeSystem/free-text-type",
-                                            Code = "general-note-image"
-                                        }
-                                    }
+                                    System = "http://bscglobal.com/CodeSystem/free-text-type",
+                                    Code = "general-note-image"
                                 }
-                            },
-                            new() { LinkId = "image.subject" },
+                            }
                         }
-                    }
-            )
+                    },
+                    new() { LinkId = "image.subject" },
+                }
+            })
         );
 
         return response;

@@ -119,17 +119,14 @@ public class Populator : IPopulator
                 );
                 if (scope.Item.Repeats ?? false)
                 {
-                    return initialExpression.Value
-                        .Select(
-                            result =>
-                                new QuestionnaireResponse.AnswerComponent()
-                                {
-                                    Value = result.AsExpectedType(
-                                        scope.Item.Type ?? Questionnaire.QuestionnaireItemType.Text,
-                                        initialExpression.SourceResourceType
-                                    )
-                                }
-                        )
+                    return initialExpression
+                        .Value.Select(result => new QuestionnaireResponse.AnswerComponent()
+                        {
+                            Value = result.AsExpectedType(
+                                scope.Item.Type ?? Questionnaire.QuestionnaireItemType.Text,
+                                initialExpression.SourceResourceType
+                            )
+                        })
                         .ToList();
                 }
                 else if (initialExpression.Value.Count > 1)
@@ -166,8 +163,8 @@ public class Populator : IPopulator
                 "Setting QuestionnaireResponse Answer from initial field for LinkId {LinkId}",
                 scope.Item.LinkId
             );
-            return scope.Item.Initial
-                .Select(initial => new QuestionnaireResponse.AnswerComponent() { Value = initial.Value })
+            return scope
+                .Item.Initial.Select(initial => new QuestionnaireResponse.AnswerComponent() { Value = initial.Value })
                 .ToList();
         }
 

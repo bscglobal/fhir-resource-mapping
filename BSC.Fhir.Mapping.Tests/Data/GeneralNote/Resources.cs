@@ -145,29 +145,26 @@ public partial class GeneralNote
     private static IReadOnlyCollection<Resource> ImageReferences(string[] imageIds, string patientId, string userId)
     {
         return imageIds
-            .Select(
-                id =>
-                    new DocumentReference
+            .Select(id => new DocumentReference
+            {
+                Id = id,
+                Category =
+                {
+                    new()
                     {
-                        Id = id,
-                        Category =
+                        Coding =
                         {
                             new()
                             {
-                                Coding =
-                                {
-                                    new()
-                                    {
-                                        System = "http://bscglobal.com/CodeSystem/free-text-type",
-                                        Code = "general-note-image"
-                                    }
-                                }
+                                System = "http://bscglobal.com/CodeSystem/free-text-type",
+                                Code = "general-note-image"
                             }
-                        },
-                        Subject = new($"Patient/{patientId}"),
-                        Author = { new($"Practitioner/{userId}") }
+                        }
                     }
-            )
+                },
+                Subject = new($"Patient/{patientId}"),
+                Author = { new($"Practitioner/{userId}") }
+            })
             .ToArray();
     }
 }

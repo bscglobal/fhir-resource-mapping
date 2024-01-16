@@ -155,9 +155,8 @@ public class QuestionnaireParserTests
     {
         var mock = new Mock<IResourceLoader>();
 
-        mock.Setup(
-                loader =>
-                    loader.GetResourcesAsync(It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>())
+        mock.Setup(loader =>
+                loader.GetResourcesAsync(It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>())
             )
             .Returns<IReadOnlyCollection<string>, CancellationToken>(
                 (urls, _) =>

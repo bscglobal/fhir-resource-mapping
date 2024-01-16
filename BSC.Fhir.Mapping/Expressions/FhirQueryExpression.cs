@@ -38,8 +38,8 @@ public class FhirQueryExpression : QuestionnaireExpression<BaseList>
 
         var className = $"Hl7.Fhir.Model.{resourceName[0..1].ToUpper() + resourceName[1..]}";
 
-        var asm = AppDomain.CurrentDomain
-            .GetAssemblies()
+        var asm = AppDomain
+            .CurrentDomain.GetAssemblies()
             .FirstOrDefault(asm => asm.GetName().Name == "Hl7.Fhir.R4.Core");
 
         var type = asm?.GetType(className);
