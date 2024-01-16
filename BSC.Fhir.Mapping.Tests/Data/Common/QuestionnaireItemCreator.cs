@@ -8,15 +8,17 @@ public static class QuestionnaireItemCreator
     public static Questionnaire.ItemComponent Create(
         string linkId,
         string definition,
-        bool required,
-        bool readOnly,
-        bool hidden,
         Questionnaire.QuestionnaireItemType type,
-        FhirExpression? extractionContext,
-        FhirExpression? populationContext,
-        FhirExpression? initialExpression,
-        IEnumerable<FhirExpression> variables,
-        IEnumerable<Questionnaire.ItemComponent> items
+        bool required = false,
+        bool readOnly = false,
+        bool hidden = false,
+        bool repeats = false,
+        FhirExpression? extractionContext = null,
+        FhirExpression? populationContext = null,
+        FhirExpression? initialExpression = null,
+        IEnumerable<FhirExpression>? variables = null,
+        IEnumerable<Questionnaire.ItemComponent>? items = null,
+        string? answerValueSet = null
     )
     {
         var item = new Questionnaire.ItemComponent
@@ -25,8 +27,9 @@ public static class QuestionnaireItemCreator
             Definition = definition,
             Required = required,
             ReadOnly = readOnly,
+            Repeats = repeats,
             Type = type,
-            Item = items.ToList()
+            Item = items?.ToList() ?? new List<Questionnaire.ItemComponent>(),
         };
 
         if (extractionContext is not null)
@@ -77,18 +80,26 @@ public static class QuestionnaireItemCreator
             );
         }
 
-        item.Extension.AddRange(
-            variables.Select(v => new Extension
-            {
-                Url = Constants.VARIABLE_EXPRESSION,
-                Value = new Expression
+        if (variables is not null)
+        {
+            item.Extension.AddRange(
+                variables.Select(v => new Extension
                 {
-                    Language = v.Language,
-                    Expression_ = v.Expression,
-                    Name = v.Name
-                }
-            })
-        );
+                    Url = Constants.VARIABLE_EXPRESSION,
+                    Value = new Expression
+                    {
+                        Language = v.Language,
+                        Expression_ = v.Expression,
+                        Name = v.Name
+                    }
+                })
+            );
+        }
+
+        if (answerValueSet is not null)
+        {
+            item.AnswerValueSet = answerValueSet;
+        }
 
         return item;
     }

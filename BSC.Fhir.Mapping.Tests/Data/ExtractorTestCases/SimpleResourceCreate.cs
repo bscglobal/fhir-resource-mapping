@@ -25,15 +25,8 @@ public record SimpleResourceCreate()
                 QuestionnaireItemCreator.Create(
                     "patientBirthDate",
                     "Patient.birthDate",
-                    true,
-                    false,
-                    false,
                     Questionnaire.QuestionnaireItemType.Date,
-                    null,
-                    null,
-                    null,
-                    Array.Empty<FhirExpression>(),
-                    Array.Empty<Questionnaire.ItemComponent>()
+                    true
                 ),
             }
         );
