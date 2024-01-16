@@ -681,7 +681,14 @@ public class QuestionnaireParser
                         .ToArray()
                 );
             }
-            else if (!fhirpathResult.First().GetType().IsSubclassOf(typeof(PrimitiveType)) && fhirpathResult.Count > 1)
+            else if (
+                fhirpathResult.First().GetType() is Type type
+                && !(
+                    type.IsSubclassOf(typeof(PrimitiveType))
+                    || (type.IsAssignableTo(typeof(Coding)) && query.QuestionnaireItem?.Item.Count == 0)
+                )
+                && fhirpathResult.Count > 1
+            )
             {
                 _logger.LogDebug("exploding {Expr}", query.Expression);
                 ExplodeExpression(fhirpathResult, new[] { query }, query.Scope, evalResult.SourceResourceType);

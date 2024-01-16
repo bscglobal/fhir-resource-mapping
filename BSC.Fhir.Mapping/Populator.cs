@@ -43,6 +43,8 @@ public class Populator : IPopulator
             cancellationToken
         );
 
+        // _logger.LogDebug(TreeDebugging.PrintTree(rootScope));
+
         if (rootScope is null)
         {
             throw new InvalidOperationException("Could not populate QuestionnaireResponse");
