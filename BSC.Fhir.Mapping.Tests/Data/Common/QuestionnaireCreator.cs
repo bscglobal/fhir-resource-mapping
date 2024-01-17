@@ -7,10 +7,10 @@ public static class QuestionnaireCreator
 {
     public static Questionnaire Create(
         IEnumerable<LaunchContext> launchContext,
-        FhirExpression? extractionContext,
-        FhirExpression? populationContext,
-        IEnumerable<FhirExpression> variables,
-        IEnumerable<Questionnaire.ItemComponent> items
+        FhirExpression? extractionContext = null,
+        FhirExpression? populationContext = null,
+        IEnumerable<FhirExpression>? variables = null,
+        IEnumerable<Questionnaire.ItemComponent>? items = null
     )
     {
         var questionnaire = new Questionnaire
@@ -35,7 +35,7 @@ public static class QuestionnaireCreator
                     }
                 })
                 .ToList(),
-            Item = items.ToList()
+            Item = items?.ToList() ?? new()
         };
 
         if (extractionContext is not null)
@@ -59,7 +59,7 @@ public static class QuestionnaireCreator
             questionnaire.Extension.Add(
                 new Extension
                 {
-                    Url = Constants.EXTRACTION_CONTEXT,
+                    Url = Constants.POPULATION_CONTEXT,
                     Value = new Expression
                     {
                         Language = populationContext.Language,
@@ -70,18 +70,21 @@ public static class QuestionnaireCreator
             );
         }
 
-        questionnaire.Extension.AddRange(
-            variables.Select(v => new Extension
-            {
-                Url = Constants.VARIABLE_EXPRESSION,
-                Value = new Expression
+        if (variables is not null)
+        {
+            questionnaire.Extension.AddRange(
+                variables.Select(v => new Extension
                 {
-                    Language = v.Language,
-                    Expression_ = v.Expression,
-                    Name = v.Name
-                }
-            })
-        );
+                    Url = Constants.VARIABLE_EXPRESSION,
+                    Value = new Expression
+                    {
+                        Language = v.Language,
+                        Expression_ = v.Expression,
+                        Name = v.Name
+                    }
+                })
+            );
+        }
 
         return questionnaire;
     }
