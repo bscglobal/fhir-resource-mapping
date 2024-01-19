@@ -7,5 +7,4 @@ public record FhirExpression(string Expression, string? Name, string? Language);
 public record FhirPathExpression(string Expression, string? Name = null)
     : FhirExpression(Expression, Name, "text/fhirpath");
 
-public record FhirQueryExpression(string Expression, string? Name = null)
-    : FhirExpression(Expression, Name, "application/x-fhir-query");
+public record FhirQuery(string Query, string? Name = null) : FhirExpression(Query, Name, "application/x-fhir-query");

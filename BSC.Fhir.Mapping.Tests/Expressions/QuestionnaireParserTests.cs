@@ -8,7 +8,6 @@ using Hl7.Fhir.Model;
 using Moq;
 using Xunit.Abstractions;
 using FhirPathExpression = BSC.Fhir.Mapping.Tests.Data.Common.FhirPathExpression;
-using FhirQueryExpression = BSC.Fhir.Mapping.Tests.Data.Common.FhirQueryExpression;
 using Task = System.Threading.Tasks.Task;
 
 namespace BSC.Fhir.Mapping.Tests.Expressions;
@@ -160,7 +159,7 @@ public class QuestionnaireParserTests
         var questionnaire = QuestionnaireCreator.Create(
             new[] { new LaunchContext("patient", "Patient", "Patient") },
             variables: new[] { new FhirPathExpression("%patient.id", "patientId") },
-            extractionContext: new FhirQueryExpression("Patient?_id={{patientId}}")
+            extractionContext: new FhirQuery("Patient?_id={{patientId}}")
         );
 
         var launchPatient = new Patient { Id = "123" };
@@ -206,11 +205,22 @@ public class QuestionnaireParserTests
     {
         var questionnaire = QuestionnaireCreator.Create(
             new[] { new LaunchContext("patient", "Patient", "Patient") },
-            variables: new[] { new FhirPathExpression("%patient.id", "patientId") },
-            populationContext: new FhirQueryExpression("Patient?_id={{patientId}}")
+            variables: new[]
+            {
+                new FhirPathExpression("%patient.name", "patientName"),
+                new FhirPathExpression("%patientName.family", "familyName")
+            },
+            populationContext: new FhirQuery("Patient?name={{%familyName}}")
         );
 
-        var launchPatient = new Patient { Id = "123" };
+        var launchPatient = new Patient
+        {
+            Id = "123",
+            Name =
+            {
+                new() { Given = new[] { "Emily" }, Family = "Dickinson" }
+            }
+        };
 
         var idProvider = new NumericIdProvider();
         var resourceLoaderMock = new Mock<IResourceLoader>();
@@ -221,7 +231,7 @@ public class QuestionnaireParserTests
             .ReturnsAsync(
                 new Dictionary<string, IReadOnlyCollection<Resource>>
                 {
-                    { "Patient?_id=123", new[] { new Patient { Id = "123" } } }
+                    { "Patient?name=Dickinson", new[] { (Patient)launchPatient.DeepCopy() } }
                 }
             );
 
@@ -239,13 +249,84 @@ public class QuestionnaireParserTests
         var scope = await parser.ParseQuestionnaireAsync();
 
         scope.Should().NotBeNull();
+        scope.Context.Should().HaveCount(5);
+
+        scope.Context.Should().ContainSingle(ctx => ctx.Name == "patientName");
+        var patientNameContext = scope.Context.First(ctx => ctx.Name == "patientName");
+        patientNameContext.Value.Should().NotBeNull();
+        patientNameContext
+            .Value.Should()
+            .BeEquivalentTo(
+                new[]
+                {
+                    new HumanName { Given = new[] { "Emily" }, Family = "Dickinson" }
+                }
+            );
+
+        scope.Context.Should().ContainSingle(ctx => ctx.Name == "familyName");
+        var familyNameContext = scope.Context.First(ctx => ctx.Name == "familyName");
+        familyNameContext.Value.Should().NotBeNull();
+        familyNameContext.Value.Should().BeEquivalentTo(new[] { new FhirString("Dickinson") });
+    }
+
+    [Fact]
+    public async Task ParseQuestionnaireAsync_DoesCorrectFhirQuery_WhenUsingResourceReference()
+    {
+        var questionnaire = QuestionnaireCreator.Create(
+            launchContext: new[] { new LaunchContext("composition", "Composition", "Composition") },
+            variables: new FhirExpression[]
+            {
+                new FhirPathExpression(
+                    "%composition.section[0].entry[0].reference.replaceMatches('.*\\/', '')",
+                    "patientId"
+                ),
+                new FhirQuery("Patient?_id={{%patientId}}", "newPatient")
+            }
+        );
+
+        var launchComposition = new Composition
+        {
+            Id = "123",
+            Section = { new Composition.SectionComponent { Entry = { new ResourceReference("Patient/456") } } }
+        };
+
+        var idProvider = new NumericIdProvider();
+        var resourceLoaderMock = new Mock<IResourceLoader>();
+        resourceLoaderMock
+            .Setup(loader =>
+                loader.GetResourcesAsync(It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>())
+            )
+            .ReturnsAsync(
+                new Dictionary<string, IReadOnlyCollection<Resource>>
+                {
+                    { "Patient?_id=456", new[] { new Patient { Id = "456" } } }
+                }
+            );
+        var parser = new QuestionnaireParser(
+            idProvider,
+            questionnaire,
+            new QuestionnaireResponse(),
+            new Dictionary<string, Resource> { { "composition", launchComposition } },
+            resourceLoaderMock.Object,
+            ResolvingContext.Extraction,
+            new FhirPathMapping(new TestLogger<FhirPathMapping>(_output)),
+            new TestLogger<QuestionnaireParser>(_output)
+        );
+
+        var scope = await parser.ParseQuestionnaireAsync();
+
+        scope.Should().NotBeNull();
         scope.Context.Should().HaveCount(4);
 
         scope.Context.Should().ContainSingle(ctx => ctx.Name == "patientId");
-
         var patientIdContext = scope.Context.First(ctx => ctx.Name == "patientId");
         patientIdContext.Value.Should().NotBeNull();
-        patientIdContext.Value.Should().BeEquivalentTo(new[] { new Id("123") });
+        patientIdContext.Value.Should().BeEquivalentTo(new[] { new FhirString("456") });
+
+        scope.Context.Should().ContainSingle(ctx => ctx.Name == "newPatient");
+        var newPatientContext = scope.Context.First(ctx => ctx.Name == "newPatient");
+        newPatientContext.Should().BeOfType<FhirQueryExpression>();
+        ((FhirQueryExpression)newPatientContext).Expression.Should().Be("Patient?_id=456");
     }
 
     private Mock<IResourceLoader> ResourceLoaderMock(Dictionary<string, IReadOnlyCollection<Resource>> results)

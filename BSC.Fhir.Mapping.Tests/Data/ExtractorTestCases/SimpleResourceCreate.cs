@@ -17,7 +17,7 @@ public record SimpleResourceCreate()
     {
         return QuestionnaireCreator.Create(
             new[] { new LaunchContext("patient", "Patient", "Patient") },
-            new FhirQueryExpression("Patient?_id={{%patient.id}}"),
+            new FhirQuery("Patient?_id={{%patient.id}}"),
             null,
             Array.Empty<FhirExpression>(),
             new[]
