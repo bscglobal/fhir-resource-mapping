@@ -8,6 +8,7 @@ using BaseList = IReadOnlyCollection<Base>;
 
 public class Scope : IClonable<Scope>
 {
+    public int Id { get; private set; }
     public int Level { get; }
     public Questionnaire Questionnaire { get; private init; }
     public QuestionnaireResponse QuestionnaireResponse { get; set; }
@@ -33,6 +34,7 @@ public class Scope : IClonable<Scope>
         Questionnaire = questionnaire;
         QuestionnaireResponse = questionnaireResponse;
         _idProvider = idProvider;
+        Id = _idProvider.GetId();
     }
 
     public Scope(
@@ -198,12 +200,23 @@ public class Scope : IClonable<Scope>
     {
         var context = GetContext(expr => expr.Resolved() && expr.Name == name, this);
 
-        if (name == "patientName")
+        return context is not null ? new(context) : null;
+    }
+
+    public IEnumerable<Scope> Path()
+    {
+        var path = new List<Scope> { this };
+        var parent = Parent;
+
+        while (parent is not null)
         {
-            Console.WriteLine("Debug: scope level - {0}", Level);
+            path.Add(parent);
+            parent = parent.Parent;
         }
 
-        return context is not null ? new(context) : null;
+        path.Reverse();
+
+        return path;
     }
 
     private static IQuestionnaireContext<BaseList>? GetContext(

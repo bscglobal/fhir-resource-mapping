@@ -31,7 +31,8 @@ public class ScopeTreeCreator : IScopeTreeCreator
             _serviceProvider.GetRequiredService<IResourceLoader>(),
             context,
             _serviceProvider.GetRequiredService<FhirPathMapping>(),
-            _serviceProvider.GetRequiredService<ILogger<QuestionnaireParser>>()
+            _serviceProvider.GetRequiredService<ILogger<QuestionnaireParser>>(),
+            _serviceProvider.GetRequiredService<IDependencyGraphGenerator>()
         );
 
         return await parser.ParseQuestionnaireAsync(cancellationToken);

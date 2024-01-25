@@ -4,7 +4,6 @@ using BSC.Fhir.Mapping.Expressions;
 using Hl7.Fhir.ElementModel;
 using Hl7.Fhir.FhirPath;
 using Hl7.Fhir.Model;
-using Hl7.Fhir.Serialization;
 using Hl7.FhirPath;
 using Hl7.FhirPath.Expressions;
 using Microsoft.Extensions.Logging;
@@ -124,7 +123,7 @@ public class FhirPathMapping
         return new(expr, new[] { scope.QuestionnaireResponse });
     }
 
-    private static EvaluationContext QuestionnaireEvaluationSource(string[] exprParts, Scope scope)
+    private EvaluationContext QuestionnaireEvaluationSource(string[] exprParts, Scope scope)
     {
         exprParts[0] = "%resource";
         var execExpr = string.Join('.', exprParts);

@@ -118,6 +118,11 @@ internal static class TreeDebugging
         prefix = prefix + (addBar ? "│" : " ") + (addIndent ? "     " : "");
 
         str.AppendLine(prefix + "│");
+        str.AppendLine(prefix + "├─ Type");
+        str.AppendLine(prefix + "│     │");
+        str.AppendLine(prefix + "│     └─ " + context.Type.ToString());
+
+        str.AppendLine(prefix + "│");
         str.AppendLine(prefix + "├─ Resolved");
         str.AppendLine(prefix + "│     │");
         str.AppendLine(
