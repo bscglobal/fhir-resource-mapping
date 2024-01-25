@@ -1,7 +1,9 @@
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using BSC.Fhir.Mapping.Core;
 using BSC.Fhir.Mapping.Core.Expressions;
 using Hl7.Fhir.Model;
+using Hl7.Fhir.Serialization;
 using Microsoft.Extensions.Logging;
 
 namespace BSC.Fhir.Mapping.Expressions;
@@ -17,9 +19,11 @@ public class QuestionnaireParser
     private readonly IResourceLoader _resourceLoader;
     private readonly ResolvingContext _resolvingContext;
     private readonly QuestionnaireContextType[] _notAllowedContextTypes;
-    private readonly Dictionary<string, IReadOnlyCollection<Resource>> _queryResults = new();
     private readonly ILogger<QuestionnaireParser> _logger;
     private readonly FhirPathMapping _fhirPathEvaluator;
+    private readonly IDependencyGraphGenerator _dependencyGraphGenerator;
+
+    private readonly Dictionary<string, IReadOnlyCollection<Resource>> _queryResults = new();
 
     public QuestionnaireParser(
         INumericIdProvider idProvider,
@@ -29,7 +33,8 @@ public class QuestionnaireParser
         IResourceLoader resourceLoader,
         ResolvingContext resolvingContext,
         FhirPathMapping fhirPathEvaluator,
-        ILogger<QuestionnaireParser> logger
+        ILogger<QuestionnaireParser> logger,
+        IDependencyGraphGenerator dependencyGraphGenerator
     )
     {
         _questionnaire = questionnaire;
@@ -48,6 +53,7 @@ public class QuestionnaireParser
 
         AddLaunchContextToScope(launchContext);
         _fhirPathEvaluator = fhirPathEvaluator;
+        _dependencyGraphGenerator = dependencyGraphGenerator;
     }
 
     private void AddLaunchContextToScope(IDictionary<string, Resource> launchContext)
@@ -77,14 +83,12 @@ public class QuestionnaireParser
             );
         }
 
-        CreateDependencyGraph(_scopeTree.CurrentScope);
+        _dependencyGraphGenerator.Generate(_scopeTree.CurrentScope);
 
-        if (IsCircularGraph(_scopeTree.CurrentScope) is IQuestionnaireExpression<BaseList> faultyDep)
+        if (!(await ResolveDependenciesAsync(cancellationToken)))
         {
-            throw new InvalidOperationException($"Detected circular dependency {faultyDep.Expression}");
+            throw new InvalidOperationException("Could not resolve all dependencies");
         }
-
-        await ResolveDependenciesAsync(cancellationToken);
 
         return _scopeTree.CurrentScope;
     }
@@ -283,173 +287,24 @@ public class QuestionnaireParser
         return extractionContext;
     }
 
-    private void CreateDependencyGraph(Scope scope)
-    {
-        for (var i = 0; i < scope.Context.Count; i++)
-        {
-            var context = scope.Context[i];
-            if (context is not QuestionnaireExpression<BaseList> query)
-            {
-                continue;
-            }
-
-            if (query.ExpressionLanguage == Constants.FHIR_QUERY_MIME)
-            {
-                CalculateFhirQueryDependencies(scope, query);
-            }
-            else if (query is FhirPathExpression fhirpathExpr)
-            {
-                CalculateFhirPathDependencies(scope, fhirpathExpr);
-            }
-        }
-
-        foreach (var child in scope.Children)
-        {
-            CreateDependencyGraph(child);
-        }
-    }
-
-    private void CalculateFhirQueryDependencies(Scope scope, QuestionnaireExpression<BaseList> query)
-    {
-        var expression = query.Expression;
-        var embeddedFhirpathRegex = @"\{\{(.*)\}\}";
-        var matches = Regex.Matches(expression, embeddedFhirpathRegex);
-
-        foreach (Match match in matches)
-        {
-            var fhirpathExpression = match.Groups.Values.FirstOrDefault()?.Value;
-            if (string.IsNullOrEmpty(fhirpathExpression))
-            {
-                _logger.LogWarning("Invalid embedded query {0}", match.Value);
-                continue;
-            }
-
-            fhirpathExpression = Regex.Replace(fhirpathExpression, "[{}]", "");
-
-            var embeddedQuery = CreateFhirPathExpression(
-                null,
-                fhirpathExpression,
-                QuestionnaireContextType.Embedded,
-                scope,
-                query
-            );
-            scope.Context.Add(embeddedQuery);
-
-            query.AddDependency(embeddedQuery);
-        }
-    }
-
-    private void CalculateFhirPathDependencies(Scope scope, FhirPathExpression query)
-    {
-        // Regex for splitting fhirpath into respective parts, split by a period and including functions
-        var fhirpathRegex = @"([^.]+(\((.+\..+)+\)))?([^.]+)?";
-        var expression = query.Expression;
-
-        var parts = Regex.Matches(expression, fhirpathRegex).Select(match => match.Value);
-        var variables = parts.Where(part => part.StartsWith('%'));
-
-        foreach (var variable in variables)
-        {
-            if (Constants.RESPONSE_DEPENDANT_CONTEXT.Contains(variable))
-            {
-                query.MakeResponseDependant();
-                continue;
-            }
-
-            var varName = variable[1..];
-            var dep = scope.GetContext(varName);
-
-            if (dep is not null)
-            {
-                query.AddDependency(dep);
-            }
-            else
-            {
-                _logger.LogError(
-                    "Could not find dependency {VarName} in expression {Expression} for LinkId {LinkId}",
-                    varName,
-                    expression,
-                    query.QuestionnaireItem?.LinkId ?? "root"
-                );
-            }
-        }
-
-        if (query.ResponseDependant)
-        {
-            var qItemExpr = Regex.Replace(expression, "%resource", "%questionnaire");
-            qItemExpr = Regex.Replace(qItemExpr, "%context", "%qitem");
-            var qitemExpr = (FhirPathExpression)query.Clone(new { Id = _idProvider.GetId(), Scope = scope });
-            var result = _fhirPathEvaluator.EvaluateExpr(qitemExpr);
-
-            if (result is null || result.Result.FirstOrDefault() is not Questionnaire.ItemComponent qItem)
-            {
-                _logger.LogWarning(
-                    "Response Dependant FHIRPath expression does not resolve to QuestionnaireItem: {Expr}",
-                    qItemExpr
-                );
-            }
-            else
-            {
-                var targetScope = ScopeTree.GetScope(qItem.LinkId, scope);
-                var initial =
-                    targetScope?.Context.FirstOrDefault(ctx => ctx.Type == QuestionnaireContextType.InitialExpression)
-                    as IQuestionnaireExpression<BaseList>;
-
-                if (initial is not null)
-                {
-                    query.AddDependency(initial);
-                }
-            }
-        }
-    }
-
-    private IQuestionnaireExpression<BaseList>? IsCircularGraph(Scope scope)
-    {
-        var checkedExprs = new HashSet<IQuestionnaireContext<BaseList>>();
-
-        foreach (var ctx in scope.Context.OfType<IQuestionnaireExpression<BaseList>>())
-        {
-            if (IsCircularGraph(ctx.Id, ctx) is IQuestionnaireExpression<BaseList> faultyDep)
-            {
-                return faultyDep;
-            }
-        }
-
-        foreach (var child in scope.Children)
-        {
-            if (IsCircularGraph(child) is IQuestionnaireExpression<BaseList> faultyDep)
-            {
-                return faultyDep;
-            }
-        }
-
-        return null;
-    }
-
-    private IQuestionnaireExpression<BaseList>? IsCircularGraph(
-        int originalId,
-        IQuestionnaireExpression<BaseList> expression
-    )
-    {
-        foreach (var dep in expression.Dependencies.OfType<IQuestionnaireExpression<BaseList>>())
-        {
-            if (originalId == dep.Id)
-            {
-                return expression;
-            }
-
-            if (IsCircularGraph(originalId, dep) is IQuestionnaireExpression<BaseList> faultyDep)
-            {
-                return faultyDep;
-            }
-        }
-
-        return null;
-    }
-
     private async Task<bool> ResolveDependenciesAsync(CancellationToken cancellationToken = default)
     {
-        var oldLength = 0;
+        var allExpressions = _scopeTree
+            .CurrentScope.AllContextInSubtree()
+            .OfType<IQuestionnaireExpression<BaseList>>()
+            .Where(expr =>
+                !expr.Resolved()
+                && !_notAllowedContextTypes.Contains(expr.Type)
+                && !expr.HasDependency(ctx => _notAllowedContextTypes.Contains(ctx.Type))
+            )
+            .ToArray();
+
+        var fhirPathExpressions = allExpressions.OfType<FhirPathExpression>().Select(expr => expr.Expression).ToArray();
+        var fhirQueryExpressions = allExpressions
+            .OfType<FhirQueryExpression>()
+            .Select(expr => expr.Expression)
+            .ToArray();
+
         while (true)
         {
             var expressions = _scopeTree
@@ -471,7 +326,10 @@ public class QuestionnaireParser
                 .Where(expr => !expr.Resolved() && expr.DependenciesResolved())
                 .ToArray();
 
-            oldLength = resolvableFhirpaths.Length;
+            _logger.LogDebug(
+                "Resolving FHIRPath expressions: [\n\t{Expressions}\n]",
+                string.Join(",\n\t", resolvableFhirpaths.Select(expr => expr.Expression))
+            );
 
             if (ResolveFhirPathExpression(resolvableFhirpaths))
             {
@@ -479,6 +337,17 @@ public class QuestionnaireParser
             }
 
             var resolvedFhirPaths = resolvableFhirpaths.Where(expr => expr.Resolved()).ToArray();
+
+            if (resolvedFhirPaths.Length != resolvableFhirpaths.Length)
+            {
+                _logger.LogDebug(
+                    "Unresolved FHIRPath expressions: [{Expressions}]",
+                    string.Join(
+                        ", ",
+                        resolvableFhirpaths.Where(expr => !expr.Resolved()).Select(expr => expr.Expression)
+                    )
+                );
+            }
 
             expressions = _scopeTree
                 .CurrentScope.AllContextInSubtree()
@@ -509,7 +378,18 @@ public class QuestionnaireParser
 
             var resolvedFhirQueries = resolvableFhirQueries.Where(expr => expr.Resolved()).ToArray();
 
-            if (resolvedFhirPaths.Length + resolvableFhirQueries.Length == 0)
+            if (resolvedFhirQueries.Length != resolvableFhirQueries.Length)
+            {
+                _logger.LogDebug(
+                    "Unresolved FHIR queries: [{Queries}]",
+                    string.Join(
+                        ", ",
+                        resolvableFhirQueries.Where(expr => !expr.Resolved()).Select(expr => expr.Expression)
+                    )
+                );
+            }
+
+            if (resolvedFhirPaths.Length + resolvedFhirQueries.Length == 0)
             {
                 _logger.LogError("could not resolve all dependencies");
                 return false;
@@ -671,15 +551,32 @@ public class QuestionnaireParser
                     );
                 }
             }
-            else if (fhirpathResult.Count > 0 && fhirpathResult.First() is QuestionnaireResponse.ItemComponent)
+            else if (
+                fhirpathResult.Count > 0
+                && fhirpathResult.First() is QuestionnaireResponse.ItemComponent itemComponent
+            )
             {
-                query.SetValue(
-                    fhirpathResult
-                        .OfType<QuestionnaireResponse.ItemComponent>()
-                        .SelectMany(r => r.Answer)
-                        .Select(a => a.Value)
-                        .ToArray()
+                var answers = fhirpathResult
+                    .SelectMany(result =>
+                        result is QuestionnaireResponse.ItemComponent item
+                            ? item.Answer.ToArray()
+                            : Array.Empty<QuestionnaireResponse.AnswerComponent>()
+                    )
+                    .Select(a => a.Value);
+
+                var deps = query.Dependencies.Where(dep => dep.Scope.Item?.LinkId == itemComponent.LinkId);
+
+                var resolved = deps.Where(dep =>
+                    dep.Resolved()
+                    && (
+                        dep.Type == QuestionnaireContextType.InitialExpression
+                        || dep.Type == QuestionnaireContextType.CalculatedExpression
+                    )
                 );
+
+                var value = deps.SelectMany(dep => dep.Value!).Concat(answers).ToArray();
+
+                query.SetValue(value);
             }
             else if (
                 fhirpathResult.First().GetType() is Type type
@@ -690,7 +587,7 @@ public class QuestionnaireParser
                 && fhirpathResult.Count > 1
             )
             {
-                _logger.LogDebug("exploding {Expr}", query.Expression);
+                _logger.LogDebug("Exploding {Expr}", query.Expression);
                 ExplodeExpression(fhirpathResult, new[] { query }, query.Scope, evalResult.SourceResourceType);
                 return true;
             }
@@ -777,15 +674,11 @@ public class QuestionnaireParser
                     }
 
                     resource = resources.FirstOrDefault(resource => resource.Id == str.Value);
-                    if (resource is not null)
-                    {
-                        _logger.LogDebug("Found resource for value {Value}", str.Value);
-                    }
                 }
 
                 if (resource is null)
                 {
-                    _logger.LogDebug("Creating new resource during explosijklng for {Expr}", extractionExpr.Expression);
+                    _logger.LogDebug("Creating new resource during exploding for {Expr}", extractionExpr.Expression);
                     string? query = null;
                     if (extractionExpr is FhirQueryExpression)
                     {
@@ -901,8 +794,9 @@ public class QuestionnaireParser
             .Where(url => !_queryResults.ContainsKey(url))
             .ToArray();
 
+        _logger.LogDebug("Resolving FHIR Queries: [{Queries}]", string.Join(",\n", urls));
+
         var resourceResult = await _resourceLoader.GetResourcesAsync(urls, cancellationToken);
-        _logger.LogDebug("Got {Count} results for Fhir Query", resourceResult.Count);
 
         foreach (var result in _queryResults)
         {
