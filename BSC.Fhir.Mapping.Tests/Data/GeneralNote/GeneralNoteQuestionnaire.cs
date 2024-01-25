@@ -18,7 +18,7 @@ public partial class GeneralNote
     private const string LAUNCH_CONTEXT_EXTENSION_URL =
         "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-launchContext";
 
-    public static Questionnaire CreateQuestionnaire()
+    public static Questionnaire CreateQuestionnaire(string? noteId = null)
     {
         var questionnaire = new Questionnaire
         {
@@ -417,7 +417,7 @@ public partial class GeneralNote
                             Text = "Note",
                             Type = Questionnaire.QuestionnaireItemType.String,
                             ReadOnly = true,
-                            Extension =
+                            Extension = new Extension[]
                             {
                                 new() { Url = QUESTIONNAIRE_HIDDEN_URL, Value = new FhirBoolean(true) },
                                 new()
@@ -426,6 +426,23 @@ public partial class GeneralNote
                                     Value = new Expression { Language = "text/fhirpath", Expression_ = "%popNote.id" }
                                 },
                             }
+                                .Concat(
+                                    noteId != null
+                                        ? new Extension[]
+                                        {
+                                            new()
+                                            {
+                                                Url = Constants.CALCULATED_EXPRESSION,
+                                                Value = new Expression
+                                                {
+                                                    Language = "text/fhirpath",
+                                                    Expression_ = $"'{noteId}'"
+                                                }
+                                            }
+                                        }
+                                        : Array.Empty<Extension>()
+                                )
+                                .ToList()
                         },
                         new()
                         {
