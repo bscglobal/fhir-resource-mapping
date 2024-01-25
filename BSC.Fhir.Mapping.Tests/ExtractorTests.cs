@@ -1,15 +1,21 @@
+using System.Text;
+using System.Text.Json;
 using BSC.Fhir.Mapping.Core;
 using BSC.Fhir.Mapping.Core.Expressions;
 using BSC.Fhir.Mapping.Expressions;
 using BSC.Fhir.Mapping.Tests.Data;
+using BSC.Fhir.Mapping.Tests.Data.Common;
 using BSC.Fhir.Mapping.Tests.Data.ExtractorTestCases;
 using BSC.Fhir.Mapping.Tests.Mocks;
 using FluentAssertions;
 using FluentAssertions.Equivalency;
 using FluentAssertions.Extensions;
 using Hl7.Fhir.Model;
+using Hl7.Fhir.Serialization;
+using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit.Abstractions;
+using FhirPathExpression = BSC.Fhir.Mapping.Tests.Data.Common.FhirPathExpression;
 using Task = System.Threading.Tasks.Task;
 
 namespace BSC.Fhir.Mapping.Tests;
@@ -82,7 +88,7 @@ public class ExtractorTests
     }
 
     [Fact]
-    public async Task NewGeneralNoteTestCase()
+    public async Task Extractor_NewGeneralNoteTestCase()
     {
         var patientId = Guid.NewGuid().ToString();
         var compositionId = Guid.NewGuid().ToString();
@@ -93,8 +99,8 @@ public class ExtractorTests
         var noteId = Guid.NewGuid().ToString();
 
         await TestExtractor(
-            GeneralNote.CreateQuestionnaire(),
-            GeneralNote.CreateQuestionnaireResponse(compositionId, noteId, imageIds),
+            GeneralNote.CreateQuestionnaire(noteId),
+            GeneralNote.CreateQuestionnaireResponse(compositionId, null, imageIds),
             GeneralNote.EmptyResourceLoaderResponse(compositionId),
             new Dictionary<string, StructureDefinition> { { "Composition", GeneralNote.CreateProfile() } },
             new Dictionary<string, Resource>
@@ -166,8 +172,8 @@ public class ExtractorTests
         var noteId = Guid.NewGuid().ToString();
 
         await TestExtractor(
-            GeneralNote.CreateQuestionnaire(),
-            GeneralNote.CreateQuestionnaireResponse(compositionId, noteId, originalImageIds),
+            GeneralNote.CreateQuestionnaire(noteId),
+            GeneralNote.CreateQuestionnaireResponse(compositionId, null, originalImageIds),
             GeneralNote.ResourceLoaderResponse(compositionId, patientId, userId, newImageIds, noteId),
             new Dictionary<string, StructureDefinition> { { "Composition", GeneralNote.CreateProfile() } },
             new Dictionary<string, Resource>
@@ -238,6 +244,180 @@ public class ExtractorTests
         );
     }
 
+    [Fact]
+    public async Task ExtractAsync_EmptyAnswer()
+    {
+        var questionnaire = QuestionnaireCreator.Create(
+            new[]
+            {
+                new LaunchContext("composition", "Composition", "Composition"),
+                new LaunchContext("user", "Practitioner", "Practitioner")
+            },
+            new FhirQuery("Composition?_id={{%composition.id}}"),
+            items: new[]
+            {
+                QuestionnaireItemCreator.Create(
+                    "compositionAuthor",
+                    Questionnaire.QuestionnaireItemType.Reference,
+                    "Composition.Author",
+                    required: true,
+                    calculatedExpression: new FhirPathExpression("%user.id")
+                ),
+                QuestionnaireItemCreator.Create(
+                    "compositionSection",
+                    Questionnaire.QuestionnaireItemType.Group,
+                    "Composition.section",
+                    items: new[]
+                    {
+                        QuestionnaireItemCreator.Create(
+                            "compositionSectionTitle",
+                            Questionnaire.QuestionnaireItemType.Text,
+                            "Composition.section.title",
+                            initial: new[] { new FhirString("Section Title") }
+                        ),
+                        QuestionnaireItemCreator.Create(
+                            "compositionSectionEntry",
+                            Questionnaire.QuestionnaireItemType.Reference,
+                            "Composition.section.entry",
+                            required: true,
+                            calculatedExpression: new FhirPathExpression(
+                                "%resource.item.where(linkId='note').item.where(linkId='noteId')"
+                            ),
+                            extensions: new[]
+                            {
+                                new Extension { Url = "referenceType", Value = new FhirString("DocumentReference") }
+                            }
+                        )
+                    }
+                ),
+                QuestionnaireItemCreator.Create(
+                    "note",
+                    Questionnaire.QuestionnaireItemType.Group,
+                    extractionContext: new FhirQuery(
+                        "DocumentReference?_has:Composition:entry:_id={{%composition.id}}&category=http://bscglobal.com/CodeSystem/free-text-type|note"
+                    ),
+                    items: new[]
+                    {
+                        QuestionnaireItemCreator.Create(
+                            "noteId",
+                            Questionnaire.QuestionnaireItemType.Text,
+                            "DocumentReference.id",
+                            calculatedExpression: new FhirPathExpression("'123456'")
+                        ),
+                        QuestionnaireItemCreator.Create(
+                            "noteContent",
+                            Questionnaire.QuestionnaireItemType.Group,
+                            "DocumentReference.content",
+                            items: new[]
+                            {
+                                QuestionnaireItemCreator.Create(
+                                    "noteContentAttachment",
+                                    Questionnaire.QuestionnaireItemType.Attachment,
+                                    "DocumentReference.content.attachment",
+                                    extensions: new[]
+                                    {
+                                        new Extension { Url = "attachment-type", Value = new FhirString("Text") }
+                                    }
+                                )
+                            }
+                        ),
+                        QuestionnaireItemCreator.Create(
+                            "noteAuthor",
+                            Questionnaire.QuestionnaireItemType.Reference,
+                            "DocumentReference.author",
+                            calculatedExpression: new FhirPathExpression("%user.id")
+                        ),
+                        QuestionnaireItemCreator.Create(
+                            "noteCategory",
+                            Questionnaire.QuestionnaireItemType.Text,
+                            "DocumentReference.category",
+                            initial: new[] { new Coding("http://bscglobal.com/CodeSystem/free-text-type", "note") }
+                        )
+                    }
+                )
+            }
+        );
+
+        var questionanireResponse = new QuestionnaireResponse
+        {
+            Item =
+            {
+                new()
+                {
+                    LinkId = "note",
+                    Item =
+                    {
+                        new() { LinkId = "noteId" },
+                        new()
+                        {
+                            LinkId = "noteContent",
+                            Item =
+                            {
+                                new()
+                                {
+                                    LinkId = "noteContentAttachment",
+                                    Answer =
+                                    {
+                                        new()
+                                        {
+                                            Value = new Attachment { Data = Encoding.UTF8.GetBytes("Well Hellow") }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        };
+
+        var loaderResponse = new Dictionary<string, IReadOnlyCollection<Resource>>();
+        var launchContext = new Dictionary<string, Resource>
+        {
+            {
+                "user",
+                new Practitioner { Id = "123" }
+            }
+        };
+
+        var expectedExtractionBundle = new Bundle
+        {
+            Entry =
+            {
+                new()
+                {
+                    Resource = new Composition
+                    {
+                        Author = { new() { Reference = "Practitioner/123" } },
+                        Section =
+                        {
+                            new() { Title = "Section Title", Entry = { new("DocumentReference/123456") } }
+                        }
+                    }
+                },
+                new()
+                {
+                    Resource = new DocumentReference
+                    {
+                        Id = "123456",
+                        Content = { new() { Attachment = new() { Data = Encoding.UTF8.GetBytes("Well Hellow") } } },
+                        Author = { new() { Reference = "Practitioner/123" } },
+                        Category = { new CodeableConcept("http://bscglobal.com/CodeSystem/free-text-type", "note") }
+                    }
+                }
+            }
+        };
+
+        await TestExtractor(
+            questionnaire,
+            questionanireResponse,
+            loaderResponse,
+            new Dictionary<string, StructureDefinition>(),
+            launchContext,
+            expectedExtractionBundle
+        );
+    }
+
     private async Task TestExtractor(
         Questionnaire questionnaire,
         QuestionnaireResponse response,
@@ -269,6 +449,14 @@ public class ExtractorTests
                 (url, _) => Task.FromResult(profiles.TryGetValue(url.Value, out var profile) ? profile : null)
             );
 
+        var idProvider = new NumericIdProvider();
+        var evaluator = new FhirPathMapping(new TestLogger<FhirPathMapping>(_output));
+
+        var loggerFactoryMock = new Mock<ILoggerFactory>();
+        loggerFactoryMock.Setup(factory => factory.CreateLogger(It.IsAny<string>())).Returns(new TestLogger(_output));
+
+        var graphGenerator = new DependencyGraphGenerator(idProvider, evaluator, loggerFactoryMock.Object);
+
         var scopeTreeCreatorMock = new Mock<IScopeTreeCreator>();
         scopeTreeCreatorMock
             .Setup(factory =>
@@ -289,14 +477,15 @@ public class ExtractorTests
             >(
                 (questionnaire, questionnaireResponse, launchContext, resolvingContext, cancellationToken) =>
                     new QuestionnaireParser(
-                        new NumericIdProvider(),
+                        idProvider,
                         questionnaire,
                         questionnaireResponse,
                         launchContext,
                         resourceLoaderMock.Object,
                         resolvingContext,
-                        new FhirPathMapping(new TestLogger<FhirPathMapping>(_output)),
-                        new TestLogger<QuestionnaireParser>(_output)
+                        evaluator,
+                        new TestLogger<QuestionnaireParser>(_output),
+                        graphGenerator
                     ).ParseQuestionnaireAsync(cancellationToken)
             );
 
@@ -314,6 +503,9 @@ public class ExtractorTests
         var actualResources = actualBundle.Entry.Select(e => e.Resource);
 
         actualResources.Should().HaveSameCount(expectedResources);
+        // _output.WriteLine(
+        //     JsonSerializer.Serialize(actualResources, new JsonSerializerOptions { WriteIndented = true })
+        // );
 
         foreach (var expected in expectedResources)
         {

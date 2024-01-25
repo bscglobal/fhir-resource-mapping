@@ -7,8 +7,8 @@ public static class QuestionnaireItemCreator
 {
     public static Questionnaire.ItemComponent Create(
         string linkId,
-        string definition,
         Questionnaire.QuestionnaireItemType type,
+        string? definition = null,
         bool required = false,
         bool readOnly = false,
         bool hidden = false,
@@ -16,9 +16,12 @@ public static class QuestionnaireItemCreator
         FhirExpression? extractionContext = null,
         FhirExpression? populationContext = null,
         FhirExpression? initialExpression = null,
+        FhirExpression? calculatedExpression = null,
         IEnumerable<FhirExpression>? variables = null,
+        IEnumerable<DataType>? initial = null,
         IEnumerable<Questionnaire.ItemComponent>? items = null,
-        string? answerValueSet = null
+        string? answerValueSet = null,
+        IEnumerable<Extension>? extensions = null
     )
     {
         var item = new Questionnaire.ItemComponent
@@ -80,6 +83,22 @@ public static class QuestionnaireItemCreator
             );
         }
 
+        if (calculatedExpression is not null)
+        {
+            item.Extension.Add(
+                new()
+                {
+                    Url = Constants.CALCULATED_EXPRESSION,
+                    Value = new Expression
+                    {
+                        Language = calculatedExpression.Language,
+                        Expression_ = calculatedExpression.Expression,
+                        Name = calculatedExpression.Name
+                    }
+                }
+            );
+        }
+
         if (variables is not null)
         {
             item.Extension.AddRange(
@@ -96,9 +115,19 @@ public static class QuestionnaireItemCreator
             );
         }
 
+        if (initial is not null)
+        {
+            item.Initial = initial.Select(i => new Questionnaire.InitialComponent { Value = i }).ToList();
+        }
+
         if (answerValueSet is not null)
         {
             item.AnswerValueSet = answerValueSet;
+        }
+
+        if (extensions is not null)
+        {
+            item.Extension.AddRange(extensions);
         }
 
         return item;

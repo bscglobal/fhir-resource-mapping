@@ -7,7 +7,7 @@ public static partial class GeneralNote
 {
     public static QuestionnaireResponse CreateQuestionnaireResponse(
         string compositionId,
-        string noteId,
+        string? noteId,
         IReadOnlyCollection<string> imageIds
     )
     {
@@ -16,15 +16,20 @@ public static partial class GeneralNote
         return response;
     }
 
-    private static QuestionnaireResponse AddNote(this QuestionnaireResponse response, string noteId)
+    private static QuestionnaireResponse AddNote(this QuestionnaireResponse response, string? noteId = null)
     {
+        var noteIdAnswer = new QuestionnaireResponse.ItemComponent { LinkId = "note.id" };
+        if (noteId != null)
+        {
+            noteIdAnswer.Answer.Add(new() { Value = new FhirString(noteId) });
+        }
         response.Item.Add(
             new QuestionnaireResponse.ItemComponent
             {
                 LinkId = "note",
                 Item =
                 {
-                    new() { LinkId = "note.id", Answer = { new() { Value = new FhirString(noteId) } } },
+                    noteIdAnswer,
                     new()
                     {
                         LinkId = "note.content",

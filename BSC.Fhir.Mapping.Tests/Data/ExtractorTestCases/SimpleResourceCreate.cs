@@ -24,8 +24,8 @@ public record SimpleResourceCreate()
             {
                 QuestionnaireItemCreator.Create(
                     "patientBirthDate",
-                    "Patient.birthDate",
                     Questionnaire.QuestionnaireItemType.Date,
+                    "Patient.birthDate",
                     true
                 ),
             }

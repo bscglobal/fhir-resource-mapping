@@ -7,6 +7,7 @@ using BSC.Fhir.Mapping.Tests.Mocks;
 using FluentAssertions;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
+using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit.Abstractions;
 using FhirPathExpression = BSC.Fhir.Mapping.Tests.Data.Common.FhirPathExpression;
@@ -23,13 +24,13 @@ public class PopulatorTests
         _output = output;
     }
 
-    private static object[] DemographicsTestCase()
+    [Fact]
+    public async Task DemographicsTestCase()
     {
         var patientId = Guid.NewGuid().ToString();
         var relativeIds = (Guid.NewGuid().ToString(), Guid.NewGuid().ToString(), Guid.NewGuid().ToString());
         var resources = Demographics.ResourceLoaderResponse(patientId, relativeIds);
-        return new object[]
-        {
+        await PopulateTest(
             Demographics.CreateQuestionnaire(),
             resources,
             new Dictionary<string, Resource>
@@ -37,16 +38,17 @@ public class PopulatorTests
                 { "patient", resources.Values.Select(value => value.First()).First(value => value is Patient) }
             },
             Demographics.PopulationResponse(patientId, relativeIds)
-        };
+        );
     }
 
-    private static object[] ServiceRequestTestCase()
+    [Fact]
+    public async Task ServiceRequestTestCase()
     {
         var serviceRequestId = Guid.NewGuid().ToString();
         var patientId = Guid.NewGuid().ToString();
         var resources = TestServiceRequest.ResourceLoaderResponse(serviceRequestId, patientId);
-        return new object[]
-        {
+
+        await PopulateTest(
             TestServiceRequest.CreateQuestionnaire(),
             resources,
             new Dictionary<string, Resource>
@@ -57,10 +59,11 @@ public class PopulatorTests
                 }
             },
             TestServiceRequest.PopulationResponse(serviceRequestId, patientId)
-        };
+        );
     }
 
-    private static object[] GeneralNoteTestCase()
+    [Fact]
+    public async Task GeneralNoteTestCase()
     {
         var compositionId = Guid.NewGuid().ToString();
         var patientId = Guid.NewGuid().ToString();
@@ -68,8 +71,8 @@ public class PopulatorTests
         var noteId = Guid.NewGuid().ToString();
         var imageIds = new[] { Guid.NewGuid().ToString(), Guid.NewGuid().ToString(), Guid.NewGuid().ToString() };
         var resources = GeneralNote.ResourceLoaderResponse(compositionId, patientId, userId, imageIds, noteId);
-        return new object[]
-        {
+
+        await PopulateTest(
             GeneralNote.CreateQuestionnaire(),
             resources,
             new Dictionary<string, Resource>
@@ -85,17 +88,10 @@ public class PopulatorTests
                 }
             },
             GeneralNote.PopulationResponse(compositionId, patientId, noteId, imageIds)
-        };
+        );
     }
 
-    public static IEnumerable<object[]> AllTestCases()
-    {
-        return new object[][] { DemographicsTestCase(), ServiceRequestTestCase(), GeneralNoteTestCase() };
-    }
-
-    [Theory]
-    [MemberData(nameof(AllTestCases))]
-    public async Task PopulateAsync_ReturnsCorrectQuestionnaireResponse(
+    private async Task PopulateTest(
         Questionnaire questionnaire,
         Dictionary<string, IReadOnlyCollection<Resource>> resourceLoaderResponse,
         Dictionary<string, Resource> launchContext,
@@ -108,6 +104,14 @@ public class PopulatorTests
                 loader.GetResourcesAsync(It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>())
             )
             .ReturnsAsync(resourceLoaderResponse);
+
+        var idProvider = new NumericIdProvider();
+        var evaluator = new FhirPathMapping(new TestLogger<FhirPathMapping>(_output));
+
+        var loggerFactoryMock = new Mock<ILoggerFactory>();
+        loggerFactoryMock.Setup(factory => factory.CreateLogger(It.IsAny<string>())).Returns(new TestLogger(_output));
+
+        var graphGenerator = new DependencyGraphGenerator(idProvider, evaluator, loggerFactoryMock.Object);
 
         var scopeTreeCreatorMock = new Mock<IScopeTreeCreator>();
         scopeTreeCreatorMock
@@ -129,14 +133,15 @@ public class PopulatorTests
             >(
                 (questionnaire, questionnaireResponse, launchContext, resolvingContext, cancellationToken) =>
                     new QuestionnaireParser(
-                        new NumericIdProvider(),
+                        idProvider,
                         questionnaire,
                         questionnaireResponse,
                         launchContext,
                         resourceLoaderMock.Object,
                         resolvingContext,
-                        new FhirPathMapping(new TestLogger<FhirPathMapping>(_output)),
-                        new TestLogger<QuestionnaireParser>(_output)
+                        evaluator,
+                        new TestLogger<QuestionnaireParser>(_output),
+                        graphGenerator
                     ).ParseQuestionnaireAsync(cancellationToken)
             );
 
@@ -166,22 +171,22 @@ public class PopulatorTests
             {
                 QuestionnaireItemCreator.Create(
                     "1",
-                    "Observation.component",
                     Questionnaire.QuestionnaireItemType.Group,
+                    "Observation.component",
                     populationContext: new FhirPathExpression("%observation.component", "component"),
                     items: new[]
                     {
                         QuestionnaireItemCreator.Create(
                             "1.1",
-                            "Observation.component.value",
                             Questionnaire.QuestionnaireItemType.Group,
+                            "Observation.component.value",
                             populationContext: new FhirPathExpression("%component.value", "value"),
                             items: new[]
                             {
                                 QuestionnaireItemCreator.Create(
                                     "1.1.1",
-                                    "Observation.component.value.coding",
                                     Questionnaire.QuestionnaireItemType.Choice,
+                                    "Observation.component.value.coding",
                                     repeats: true,
                                     initialExpression: new FhirPathExpression("%value.coding"),
                                     answerValueSet: "http://example.org/ValueSet"
@@ -260,6 +265,14 @@ public class PopulatorTests
 
         var idProvider = new NumericIdProvider();
         var logger = new TestLogger<Populator>(_output);
+
+        var evaluator = new FhirPathMapping(new TestLogger<FhirPathMapping>(_output));
+
+        var loggerFactoryMock = new Mock<ILoggerFactory>();
+        loggerFactoryMock.Setup(factory => factory.CreateLogger(It.IsAny<string>())).Returns(new TestLogger(_output));
+
+        var graphGenerator = new DependencyGraphGenerator(idProvider, evaluator, loggerFactoryMock.Object);
+
         var scopeTreeCreatorMock = new Mock<IScopeTreeCreator>();
         scopeTreeCreatorMock
             .Setup(factory =>
@@ -286,8 +299,9 @@ public class PopulatorTests
                         launchContext,
                         resourceLoaderMock.Object,
                         resolvingContext,
-                        new FhirPathMapping(new TestLogger<FhirPathMapping>(_output)),
-                        new TestLogger<QuestionnaireParser>(_output)
+                        evaluator,
+                        new TestLogger<QuestionnaireParser>(_output),
+                        graphGenerator
                     ).ParseQuestionnaireAsync(cancellationToken)
             );
 

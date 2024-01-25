@@ -5,6 +5,7 @@ using BSC.Fhir.Mapping.Tests.Data.Common;
 using BSC.Fhir.Mapping.Tests.Mocks;
 using FluentAssertions;
 using Hl7.Fhir.Model;
+using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit.Abstractions;
 using FhirPathExpression = BSC.Fhir.Mapping.Tests.Data.Common.FhirPathExpression;
@@ -91,6 +92,12 @@ public class QuestionnaireParserTests
             },
         };
 
+        var evaluator = new FhirPathMapping(new TestLogger<FhirPathMapping>(_output));
+        var loggerFactoryMock = new Mock<ILoggerFactory>();
+        loggerFactoryMock.Setup(factory => factory.CreateLogger(It.IsAny<string>())).Returns(new TestLogger(_output));
+
+        var graphGenerator = new DependencyGraphGenerator(idProvider, evaluator, loggerFactoryMock.Object);
+
         var questionnaireResponse = new QuestionnaireResponse();
         var parser = new QuestionnaireParser(
             idProvider,
@@ -99,8 +106,9 @@ public class QuestionnaireParserTests
             launchContext,
             resourceLoader.Object,
             ResolvingContext.Population,
-            new FhirPathMapping(new TestLogger<FhirPathMapping>(_output)),
-            new TestLogger<QuestionnaireParser>(_output)
+            evaluator,
+            new TestLogger<QuestionnaireParser>(_output),
+            graphGenerator
         );
 
         await parser.ParseQuestionnaireAsync();
@@ -132,6 +140,13 @@ public class QuestionnaireParserTests
 
         var idProvider = new NumericIdProvider();
         var resourceLoaderMock = new Mock<IResourceLoader>();
+
+        var evaluator = new FhirPathMapping(new TestLogger<FhirPathMapping>(_output));
+        var loggerFactoryMock = new Mock<ILoggerFactory>();
+        loggerFactoryMock.Setup(factory => factory.CreateLogger(It.IsAny<string>())).Returns(new TestLogger(_output));
+
+        var graphGenerator = new DependencyGraphGenerator(idProvider, evaluator, loggerFactoryMock.Object);
+
         var parser = new QuestionnaireParser(
             idProvider,
             questionnaire,
@@ -139,8 +154,9 @@ public class QuestionnaireParserTests
             new Dictionary<string, Resource>(),
             resourceLoaderMock.Object,
             ResolvingContext.Extraction,
-            new FhirPathMapping(new TestLogger<FhirPathMapping>(_output)),
-            new TestLogger<QuestionnaireParser>(_output)
+            evaluator,
+            new TestLogger<QuestionnaireParser>(_output),
+            graphGenerator
         );
 
         var scope = await parser.ParseQuestionnaireAsync();
@@ -177,6 +193,12 @@ public class QuestionnaireParserTests
                 }
             );
 
+        var evaluator = new FhirPathMapping(new TestLogger<FhirPathMapping>(_output));
+        var loggerFactoryMock = new Mock<ILoggerFactory>();
+        loggerFactoryMock.Setup(factory => factory.CreateLogger(It.IsAny<string>())).Returns(new TestLogger(_output));
+
+        var graphGenerator = new DependencyGraphGenerator(idProvider, evaluator, loggerFactoryMock.Object);
+
         var parser = new QuestionnaireParser(
             idProvider,
             questionnaire,
@@ -184,8 +206,9 @@ public class QuestionnaireParserTests
             new Dictionary<string, Resource> { { "patient", launchPatient } },
             resourceLoaderMock.Object,
             ResolvingContext.Extraction,
-            new FhirPathMapping(new TestLogger<FhirPathMapping>(_output)),
-            new TestLogger<QuestionnaireParser>(_output)
+            evaluator,
+            new TestLogger<QuestionnaireParser>(_output),
+            graphGenerator
         );
 
         var scope = await parser.ParseQuestionnaireAsync();
@@ -235,6 +258,12 @@ public class QuestionnaireParserTests
                 }
             );
 
+        var evaluator = new FhirPathMapping(new TestLogger<FhirPathMapping>(_output));
+        var loggerFactoryMock = new Mock<ILoggerFactory>();
+        loggerFactoryMock.Setup(factory => factory.CreateLogger(It.IsAny<string>())).Returns(new TestLogger(_output));
+
+        var graphGenerator = new DependencyGraphGenerator(idProvider, evaluator, loggerFactoryMock.Object);
+
         var parser = new QuestionnaireParser(
             idProvider,
             questionnaire,
@@ -242,8 +271,9 @@ public class QuestionnaireParserTests
             new Dictionary<string, Resource> { { "patient", launchPatient } },
             resourceLoaderMock.Object,
             ResolvingContext.Population,
-            new FhirPathMapping(new TestLogger<FhirPathMapping>(_output)),
-            new TestLogger<QuestionnaireParser>(_output)
+            evaluator,
+            new TestLogger<QuestionnaireParser>(_output),
+            graphGenerator
         );
 
         var scope = await parser.ParseQuestionnaireAsync();
@@ -302,6 +332,13 @@ public class QuestionnaireParserTests
                     { "Patient?_id=456", new[] { new Patient { Id = "456" } } }
                 }
             );
+
+        var evaluator = new FhirPathMapping(new TestLogger<FhirPathMapping>(_output));
+        var loggerFactoryMock = new Mock<ILoggerFactory>();
+        loggerFactoryMock.Setup(factory => factory.CreateLogger(It.IsAny<string>())).Returns(new TestLogger(_output));
+
+        var graphGenerator = new DependencyGraphGenerator(idProvider, evaluator, loggerFactoryMock.Object);
+
         var parser = new QuestionnaireParser(
             idProvider,
             questionnaire,
@@ -309,8 +346,9 @@ public class QuestionnaireParserTests
             new Dictionary<string, Resource> { { "composition", launchComposition } },
             resourceLoaderMock.Object,
             ResolvingContext.Extraction,
-            new FhirPathMapping(new TestLogger<FhirPathMapping>(_output)),
-            new TestLogger<QuestionnaireParser>(_output)
+            evaluator,
+            new TestLogger<QuestionnaireParser>(_output),
+            graphGenerator
         );
 
         var scope = await parser.ParseQuestionnaireAsync();
