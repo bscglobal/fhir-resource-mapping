@@ -66,7 +66,6 @@ public class DependencyGraphGenerator : IDependencyGraphGenerator
         {
             if (!_visitedScopes.Add(scope.Id))
             {
-                _logger.LogDebug("Already visited scope {LinkId}", scope.Item?.LinkId ?? "root");
                 return;
             }
 
@@ -102,10 +101,6 @@ public class DependencyGraphGenerator : IDependencyGraphGenerator
 
             foreach (Match match in matches)
             {
-                if (query.Name == "images")
-                {
-                    _logger.LogDebug("Match: {0}", match.Value);
-                }
                 var fhirpathExpression = match.Groups.Values.FirstOrDefault()?.Value;
                 if (string.IsNullOrEmpty(fhirpathExpression))
                 {
@@ -122,15 +117,6 @@ public class DependencyGraphGenerator : IDependencyGraphGenerator
                     scope,
                     query
                 );
-                if (query.Name == "images")
-                {
-                    _logger.LogDebug(
-                        "Adding Embedded expression {Expression} ({Id}) to scope {LinkId}",
-                        embeddedQuery.Expression,
-                        embeddedQuery.Id,
-                        scope.Item?.LinkId ?? "root"
-                    );
-                }
                 scope.Context.Add(embeddedQuery);
 
                 query.AddDependency(embeddedQuery);
@@ -190,7 +176,6 @@ public class DependencyGraphGenerator : IDependencyGraphGenerator
                 }
                 else
                 {
-                    _logger.LogDebug("Getting dependencies for expression {Expr}", query.Expression);
                     var targetScope = ScopeTree.GetScope(qItem.LinkId, _rootScope);
 
                     if (targetScope is null)
@@ -251,22 +236,11 @@ public class DependencyGraphGenerator : IDependencyGraphGenerator
                                 break;
                             }
 
-                            _logger.LogDebug(
-                                "Found common scope: {LinkId} - {Id}",
-                                scope1.Item?.LinkId ?? "root",
-                                scope1.Id
-                            );
                             targetRoot = scope1;
                         }
 
                         CreateDependencyGraph(targetRoot);
                     }
-
-                    _logger.LogDebug(
-                        "Context for Scope {LinkId} is [{Context}]",
-                        targetScope.Item?.LinkId ?? "root",
-                        string.Join(", ", targetScope.Context.Select(ctx => ctx.Type))
-                    );
 
                     var initial =
                         targetScope.Context.FirstOrDefault(ctx =>
@@ -276,7 +250,6 @@ public class DependencyGraphGenerator : IDependencyGraphGenerator
 
                     if (initial is not null)
                     {
-                        _logger.LogDebug("Adding dependency '{0}' to '{1}'", initial.Expression, query.Expression);
                         query.AddDependency(initial);
                     }
                 }
