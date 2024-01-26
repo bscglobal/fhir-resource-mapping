@@ -160,18 +160,20 @@ public class DependencyGraphGenerator : IDependencyGraphGenerator
 
             if (query.ResponseDependant)
             {
-                var qItemExpr = Regex.Replace(expression, "%resource", "%questionnaire");
-                qItemExpr = Regex.Replace(qItemExpr, "%context", "%qitem");
-                var qitemExpr = (FhirPathExpression)query.Clone(new { Id = _idProvider.GetId(), Scope = scope, });
+                var switcherooExpr = Regex.Replace(expression, "%resource", "%questionnaire");
+                switcherooExpr = Regex.Replace(switcherooExpr, "%context", "%qitem");
 
-                qitemExpr.ReplaceExpression(qItemExpr);
-                var result = _fhirPathEvaluator.EvaluateExpr(qitemExpr);
+                var switcherooQuery = (FhirPathExpression)query.Clone(new { Id = _idProvider.GetId(), Scope = scope, });
+                // We need to replace the original expression with the switcheroo expression
+                switcherooQuery.ReplaceExpression(switcherooExpr);
+
+                var result = _fhirPathEvaluator.EvaluateExpr(switcherooQuery);
 
                 if (result is null || result.Result.FirstOrDefault() is not Questionnaire.ItemComponent qItem)
                 {
                     _logger.LogWarning(
                         "Response Dependant FHIRPath expression does not resolve to QuestionnaireItem: {Expr}",
-                        qItemExpr
+                        switcherooExpr
                     );
                 }
                 else
@@ -211,17 +213,17 @@ public class DependencyGraphGenerator : IDependencyGraphGenerator
 
                         for (var i = 0; i < shortestPath; i++)
                         {
-                            var scope1 = currentScopePath[i];
-                            var scope2 = targetScopePath[i];
+                            var currentPathNode = currentScopePath[i];
+                            var targetPathNode = targetScopePath[i];
 
-                            if (scope1 != scope2)
+                            if (currentPathNode != targetPathNode)
                             {
                                 _logger.LogDebug(
                                     "Found LCA scope: {LinkId} - {Id}",
                                     targetRoot.Item?.LinkId ?? "root",
                                     targetRoot.Id
                                 );
-                                targetRoot = scope2;
+                                targetRoot = targetPathNode;
                                 break;
                             }
 
@@ -229,14 +231,14 @@ public class DependencyGraphGenerator : IDependencyGraphGenerator
                             {
                                 _logger.LogDebug(
                                     "Found LCA scope: {LinkId} - {Id}",
-                                    scope1.Item?.LinkId ?? "root",
-                                    scope1.Id
+                                    currentPathNode.Item?.LinkId ?? "root",
+                                    currentPathNode.Id
                                 );
                                 targetRoot = targetScopePath[i + 1];
                                 break;
                             }
 
-                            targetRoot = scope1;
+                            targetRoot = currentPathNode;
                         }
 
                         CreateDependencyGraph(targetRoot);
