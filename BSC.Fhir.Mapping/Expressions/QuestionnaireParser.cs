@@ -289,22 +289,6 @@ public class QuestionnaireParser
 
     private async Task<bool> ResolveDependenciesAsync(CancellationToken cancellationToken = default)
     {
-        var allExpressions = _scopeTree
-            .CurrentScope.AllContextInSubtree()
-            .OfType<IQuestionnaireExpression<BaseList>>()
-            .Where(expr =>
-                !expr.Resolved()
-                && !_notAllowedContextTypes.Contains(expr.Type)
-                && !expr.HasDependency(ctx => _notAllowedContextTypes.Contains(ctx.Type))
-            )
-            .ToArray();
-
-        var fhirPathExpressions = allExpressions.OfType<FhirPathExpression>().Select(expr => expr.Expression).ToArray();
-        var fhirQueryExpressions = allExpressions
-            .OfType<FhirQueryExpression>()
-            .Select(expr => expr.Expression)
-            .ToArray();
-
         while (true)
         {
             var expressions = _scopeTree
